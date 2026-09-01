@@ -1,0 +1,36 @@
+{
+  "name": "kloak-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kloak — Local-first, zero-knowledge password manager ecosystem",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspace=packages/tests",
+    "daemon": "npm run start --workspace=packages/daemon",
+    "cli": "node packages/daemon/dist/cli/index.js",
+    "website:dev": "npm run dev --workspace=packages/website",
+    "website:build": "npm run build --workspace=packages/website"
+  },
+  "keywords": [
+    "password-manager",
+    "zero-knowledge",
+    "local-first",
+    "raycast",
+    "browser-extension",
+    "swiftui",
+    "liquid-glass",
+    "argon2",
+    "aes-gcm",
+    "totp"
+  ],
+  "author": "Kloak Security Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.2.7",
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
+}
