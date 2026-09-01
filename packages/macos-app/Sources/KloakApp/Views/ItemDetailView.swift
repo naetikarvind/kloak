@@ -144,14 +144,15 @@ public struct ItemDetailView: View {
                                     Text(password)
                                         .font(.system(size: 13, design: .monospaced))
                                         .textSelection(.enabled)
-                                        .lineLimit(nil)
+                                        .lineLimit(1)
                                         .frame(maxWidth: .infinity, alignment: .leading)
-                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(height: 18)
                                         .transition(.opacity)
                                 } else {
                                     Text(String(repeating: "•", count: min(16, password.count)))
-                                        .font(.system(size: 14, weight: .heavy))
+                                        .font(.system(size: 13, weight: .heavy))
                                         .frame(maxWidth: .infinity, alignment: .leading)
+                                        .frame(height: 18)
                                         .transition(.opacity)
                                 }
 

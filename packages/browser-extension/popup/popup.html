@@ -722,7 +722,12 @@
       border-color: rgba(109,74,255,0.25);
     }
     .card-row {
-      display: flex; padding: 12px 14px; align-items: center; position: relative;
+      display: flex;
+      padding: 10px 14px;
+      min-height: 52px;
+      box-sizing: border-box;
+      align-items: center;
+      position: relative;
     }
     .card-row:not(:last-child)::after {
       content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
@@ -739,16 +744,37 @@
     .card-icon.muted { color: var(--text-muted); }
 
     .card-content {
-      flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      overflow: hidden;
+      min-height: 32px;
     }
-    .card-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .card-label {
+      font-size: 10.5px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      line-height: 13px;
+    }
     .card-value {
-      font-size: 13px; color: var(--text-main); font-weight: 400;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-size: 13px;
+      color: var(--text-main);
+      font-weight: 400;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      height: 18px;
+      line-height: 18px;
+      display: flex;
+      align-items: center;
     }
     .card-value.multiline {
       white-space: pre-wrap; word-break: break-word;
       font-size: 12px; line-height: 1.45; color: var(--text-muted);
+      height: auto;
     }
 
     .edit-input {

@@ -1113,7 +1113,7 @@ function renderDetailPane(item: any) {
         </div>
         <div class="card-content">
           <div class="card-label">Password</div>
-          <div class="card-value" id="pwd-val" style="font-family: monospace; font-size: 16px; letter-spacing: 2px;">••••••••••</div>
+          <div class="card-value" id="pwd-val" style="letter-spacing: 2px;">••••••••••</div>
         </div>
         <div class="card-actions">
           <div class="action-icon" id="toggle-pwd" title="Reveal">
@@ -1238,13 +1238,9 @@ function renderDetailPane(item: any) {
     if (!pwdEl) return;
     if (revealed) {
       pwdEl.textContent = item.password || '';
-      pwdEl.style.fontFamily = 'inherit';
-      pwdEl.style.fontSize = '13px';
       pwdEl.style.letterSpacing = 'normal';
     } else {
       pwdEl.textContent = '••••••••••';
-      pwdEl.style.fontFamily = 'monospace';
-      pwdEl.style.fontSize = '16px';
       pwdEl.style.letterSpacing = '2px';
     }
   });
