@@ -1,6 +1,6 @@
 /**
  * Kloak Raycast Extension — IPC Client
- * Connects directly to the local Kloak Daemon via Unix domain socket.
+ * Connects directly to the local Kloak Daemon via Unix domain socket or TCP port 53152.
  */
 
 import * as net from 'node:net';
@@ -11,15 +11,57 @@ const SOCKET_PATH = path.join(os.homedir(), '.kloak', 'kloak.sock');
 const TCP_PORT = 53152;
 const TCP_HOST = '127.0.0.1';
 
+export interface CardDetails {
+  cardholderName?: string;
+  number?: string;
+  brand?: string;
+  expMonth?: string;
+  expYear?: string;
+  cvv?: string;
+  billingAddress?: string;
+}
+
+export interface IdentityDetails {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  dateOfBirth?: string;
+  passportNumber?: string;
+  ssn?: string;
+}
+
+export interface AliasDetails {
+  aliasEmail?: string;
+  forwardTo?: string;
+  provider?: string;
+}
+
+export interface AuthenticatorDetails {
+  issuer?: string;
+  algorithm?: string;
+  digits?: number;
+  period?: number;
+}
+
 export interface KloakItem {
   id: string;
-  type: 'login' | 'secure_note' | 'card' | 'identity';
+  type: 'login' | 'secure_note' | 'card' | 'identity' | 'email_alias' | 'authenticator';
   title: string;
   username?: string;
   password?: string;
   urls: string[];
   notes?: string;
   totpSecret?: string;
+  card?: CardDetails;
+  identity?: IdentityDetails;
+  alias?: AliasDetails;
+  authenticatorDetails?: AuthenticatorDetails;
   favorite?: boolean;
   tags?: string[];
 }

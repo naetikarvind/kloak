@@ -111,6 +111,33 @@ public struct ItemRowView: View {
         return u.isEmpty && e.isEmpty
     }
 
+    private var subtitleText: String {
+        switch item.type {
+        case .identity:
+            return item.identity?.fullName ?? item.identity?.email ?? item.username ?? "Identity Profile"
+        case .card:
+            if let card = item.card {
+                let holder = card.cardholderName ?? ""
+                let brand = (card.brand ?? "Card").capitalized
+                return holder.isEmpty ? brand : "\(holder) • \(brand)"
+            }
+            return item.username ?? "Payment Card"
+        case .emailAlias:
+            if let alias = item.alias {
+                let email = alias.aliasEmail ?? item.username ?? ""
+                let fwd = alias.forwardTo ?? ""
+                return fwd.isEmpty ? email : "\(email) → \(fwd)"
+            }
+            return item.username ?? "Email Alias"
+        case .authenticator:
+            return item.authenticatorDetails?.issuer ?? item.username ?? "2FA Code"
+        case .secureNote:
+            return item.notes?.components(separatedBy: .newlines).first ?? "Secure Note"
+        case .login:
+            return item.username ?? item.urls.first ?? item.type.displayName
+        }
+    }
+
     public var body: some View {
         HStack(spacing: 10) {
             // High-resolution logo or fallback icon
@@ -128,7 +155,7 @@ public struct ItemRowView: View {
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
-                Text(item.username ?? item.oauth?.accountEmail ?? item.urls.first ?? item.type.displayName)
+                Text(subtitleText)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -138,16 +165,8 @@ public struct ItemRowView: View {
 
             HStack(spacing: 4) {
                 // Type specific badges
-                if item.type == .oauth {
-                    Text("OAuth")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(LiquidGlassTheme.purpleAccent.opacity(0.15))
-                        .foregroundColor(LiquidGlassTheme.purpleAccent)
-                        .clipShape(Capsule())
-                } else if item.type == .card {
+                switch item.type {
+                case .card:
                     Text("card")
                         .font(.system(size: 8, weight: .bold))
                         .fixedSize()
@@ -156,7 +175,7 @@ public struct ItemRowView: View {
                         .background(Color.blue.opacity(0.15))
                         .foregroundColor(Color.blue)
                         .clipShape(Capsule())
-                } else if item.type == .identity {
+                case .identity:
                     Text("identity")
                         .font(.system(size: 8, weight: .bold))
                         .fixedSize()
@@ -165,7 +184,25 @@ public struct ItemRowView: View {
                         .background(Color.cyan.opacity(0.15))
                         .foregroundColor(Color.cyan)
                         .clipShape(Capsule())
-                } else if item.type == .secureNote {
+                case .emailAlias:
+                    Text("alias")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color(red: 0.0, green: 0.82, blue: 0.71).opacity(0.15))
+                        .foregroundColor(Color(red: 0.0, green: 0.82, blue: 0.71))
+                        .clipShape(Capsule())
+                case .authenticator:
+                    Text("authenticator")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .clipShape(Capsule())
+                case .secureNote:
                     Text("note")
                         .font(.system(size: 8, weight: .bold))
                         .fixedSize()
@@ -174,6 +211,8 @@ public struct ItemRowView: View {
                         .background(Color.yellow.opacity(0.15))
                         .foregroundColor(Color.yellow)
                         .clipShape(Capsule())
+                case .login:
+                    EmptyView()
                 }
 
                 // Status & Security badges

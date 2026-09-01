@@ -478,24 +478,68 @@ public final class VaultStore: ObservableObject {
         VaultItem(
             type: .card,
             title: "Apple Card Titanium",
-            username: "Mastercard •••• 8842",
-            notes: "Virtual card for subscriptions",
-            tags: ["Finance"]
+            username: "Alex Rivera",
+            password: "842",
+            notes: "Virtual card for online subscriptions",
+            card: CardDetails(
+                cardholderName: "Alex Rivera",
+                number: "5532 8842 1928 4401",
+                brand: "mastercard",
+                expMonth: "09",
+                expYear: "2028",
+                cvv: "842",
+                billingAddress: "742 Evergreen Terrace, Springfield, OR 97477"
+            ),
+            tags: ["Finance"],
+            favorite: true
         ),
         VaultItem(
-            type: .oauth,
-            title: "Google Workspace SSO",
-            username: "alex.dev@gmail.com",
-            urls: ["https://accounts.google.com"],
-            notes: "Linked Google Single Sign-On Account",
-            oauth: OAuthDetails(
-                provider: "Google",
-                providerDisplayName: "Google SSO",
-                accountEmail: "alex.dev@gmail.com",
-                clientId: "89127391823-client.apps.googleusercontent.com",
-                scopes: ["openid", "email", "profile"]
+            type: .identity,
+            title: "Personal Identity Profile",
+            username: "Alex Rivera",
+            notes: "Primary personal contact and identity information",
+            identity: IdentityDetails(
+                firstName: "Alex",
+                lastName: "Rivera",
+                email: "alex.rivera@example.com",
+                phone: "+1 (555) 234-5678",
+                address1: "742 Evergreen Terrace",
+                city: "Springfield",
+                state: "OR",
+                zip: "97477",
+                country: "United States",
+                dateOfBirth: "1994-08-15",
+                passportNumber: "P982341029",
+                ssn: "•••-••-4819"
             ),
-            tags: ["OAuth", "Google"],
+            tags: ["Personal"],
+            favorite: true
+        ),
+        VaultItem(
+            type: .emailAlias,
+            title: "DuckDuckGo Shopping Alias",
+            username: "shopping.kloak84@duck.com",
+            notes: "Used for e-commerce checkouts and newsletter signups",
+            alias: AliasDetails(
+                aliasEmail: "shopping.kloak84@duck.com",
+                forwardTo: "alex.dev@gmail.com",
+                provider: "DuckDuckGo"
+            ),
+            tags: ["Privacy", "Alias"]
+        ),
+        VaultItem(
+            type: .authenticator,
+            title: "AWS Root Account 2FA",
+            username: "AWS Production Infrastructure",
+            notes: "Root credentials multi-factor authentication",
+            totpSecret: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ",
+            authenticatorDetails: AuthenticatorDetails(
+                issuer: "Amazon Web Services",
+                algorithm: "TOTP",
+                digits: 6,
+                period: 30
+            ),
+            tags: ["Cloud", "Security"],
             favorite: true
         ),
         VaultItem(

@@ -16,7 +16,8 @@ const PROTON_ICONS = {
   alias: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.88-11.71c-.36-.45-.91-.7-1.5-.7-1.25 0-2.38 1.05-2.38 2.41 0 1.34 1.13 2.41 2.38 2.41.59 0 1.14-.25 1.5-.7v.58c0 .88-.72 1.6-1.6 1.6-.74 0-1.39-.5-1.55-1.21l-1.36.32c.28 1.25 1.41 2.09 2.91 2.09 1.65 0 2.8-1.15 2.8-2.8V9.5h-1.2v.79zm-1.5 2.82c-.66 0-1.2-.54-1.2-1.21 0-.66.54-1.2 1.2-1.2.66 0 1.2.54 1.2 1.2 0 .67-.54 1.21-1.2 1.21z',
   card: 'M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z',
   note: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z',
-  identity: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.4c0-2 4-3.1 6-3.1s6 1.1 6 3.1V18z'
+  identity: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.4c0-2 4-3.1 6-3.1s6 1.1 6 3.1V18z',
+  authenticator: 'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z'
 };
 
 const PROTON_COLORS = {
@@ -24,7 +25,8 @@ const PROTON_COLORS = {
   alias: '#00D2B4',
   card: '#FF884D',
   note: '#4D96FF',
-  identity: '#E066FF'
+  identity: '#E066FF',
+  authenticator: '#29C98F'
 };
 
 let activeTabUrl = '';
@@ -183,7 +185,8 @@ function showAddForm(type: string) {
     alias: { title: 'New alias', icon: PROTON_ICONS.alias, color: PROTON_COLORS.alias },
     card: { title: 'New credit card', icon: PROTON_ICONS.card, color: PROTON_COLORS.card },
     note: { title: 'New encrypted note', icon: PROTON_ICONS.note, color: PROTON_COLORS.note },
-    identity: { title: 'New identity', icon: PROTON_ICONS.identity, color: PROTON_COLORS.identity }
+    identity: { title: 'New identity', icon: PROTON_ICONS.identity, color: PROTON_COLORS.identity },
+    authenticator: { title: 'New Authenticator (2FA)', icon: PROTON_ICONS.authenticator, color: PROTON_COLORS.authenticator }
   };
 
   const cfg = typeConfig[type] || typeConfig.login;
@@ -513,6 +516,65 @@ function showAddForm(type: string) {
         </div>
       </div>
     `;
+  } else if (type === 'authenticator') {
+    formHtml += `
+      <div class="card">
+        <div class="card-row">
+          <div class="card-icon" style="color: var(--color-alias);">
+            <svg viewBox="0 0 24 24"><path d="${PROTON_ICONS.authenticator}"/></svg>
+          </div>
+          <div class="card-content">
+            <div class="card-label">Account / Service Title</div>
+            <input type="text" class="edit-input" id="field-title" placeholder="e.g. AWS Root Account, GitHub 2FA">
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-row">
+          <div class="card-content">
+            <div class="card-label">Issuer / Service Name</div>
+            <input type="text" class="edit-input" id="field-auth-issuer" placeholder="e.g. Amazon Web Services, GitHub">
+          </div>
+        </div>
+        <div class="card-row">
+          <div class="card-content">
+            <div class="card-label">Secret Key (Base32 or otpauth://)</div>
+            <input type="text" class="edit-input" id="field-auth-secret" placeholder="JBSWY3DPEHPK3PXP" style="font-family: monospace;">
+          </div>
+        </div>
+        <div class="card-row" style="gap: 8px;">
+          <div class="card-content">
+            <div class="card-label">Algorithm</div>
+            <select class="edit-input" id="field-auth-algo" style="background: var(--bg-input);">
+              <option value="TOTP">TOTP (Time)</option>
+              <option value="HOTP">HOTP (Counter)</option>
+            </select>
+          </div>
+          <div class="card-content">
+            <div class="card-label">Digits</div>
+            <select class="edit-input" id="field-auth-digits" style="background: var(--bg-input);">
+              <option value="6">6 digits</option>
+              <option value="8">8 digits</option>
+            </select>
+          </div>
+          <div class="card-content">
+            <div class="card-label">Period</div>
+            <select class="edit-input" id="field-auth-period" style="background: var(--bg-input);">
+              <option value="30">30s</option>
+              <option value="60">60s</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-row">
+          <div class="card-content">
+            <div class="card-label">Notes (Optional)</div>
+            <textarea class="edit-input" id="field-notes" rows="2" placeholder="Additional recovery details..."></textarea>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   container.innerHTML = formHtml;
@@ -684,6 +746,7 @@ function showAddForm(type: string) {
     };
 
     if (type === 'login') {
+      newItem.type = 'login';
       newItem.username = (document.getElementById('field-username') as HTMLInputElement)?.value || '';
       newItem.password = (document.getElementById('field-password') as HTMLInputElement)?.value || '';
       const totp = (document.getElementById('field-totp') as HTMLInputElement)?.value || '';
@@ -694,8 +757,15 @@ function showAddForm(type: string) {
         if (u.value.trim()) newItem.urls.push(u.value.trim());
       });
     } else if (type === 'alias') {
-      newItem.username = (document.getElementById('field-username') as HTMLInputElement)?.value || '';
+      const aliasMail = (document.getElementById('field-username') as HTMLInputElement)?.value || '';
       const fwd = (document.getElementById('field-forward') as HTMLInputElement)?.value || '';
+      newItem.type = 'email_alias';
+      newItem.username = aliasMail;
+      newItem.alias = {
+        aliasEmail: aliasMail,
+        forwardTo: fwd,
+        provider: 'DuckDuckGo'
+      };
       newItem.notes = fwd ? `Forwarding to: ${fwd}\n${notes}` : notes;
     } else if (type === 'card') {
       const cardNum = (document.getElementById('field-cardnumber') as HTMLInputElement)?.value || '';
@@ -704,8 +774,18 @@ function showAddForm(type: string) {
       const cvv = (document.getElementById('field-cvv') as HTMLInputElement)?.value || '';
       const pin = (document.getElementById('field-pin') as HTMLInputElement)?.value || '';
 
+      const [expM, expY] = expiry.split('/');
+      newItem.type = 'card';
       newItem.username = cardHolder ? `${cardHolder} (•••• ${cardNum.slice(-4)})` : `•••• ${cardNum.slice(-4)}`;
       newItem.password = cvv;
+      newItem.card = {
+        cardholderName: cardHolder,
+        number: cardNum.replace(/\s+/g, ''),
+        brand: 'visa',
+        expMonth: expM,
+        expYear: expY,
+        cvv
+      };
       newItem.notes = `Card: ${cardNum}\nExpiry: ${expiry}\nCVV: ${cvv}${pin ? '\nPIN: ' + pin : ''}\n${notes}`;
     } else if (type === 'identity') {
       const fn = (document.getElementById('field-firstname') as HTMLInputElement)?.value || '';
@@ -716,9 +796,37 @@ function showAddForm(type: string) {
       const city = (document.getElementById('field-city') as HTMLInputElement)?.value || '';
       const zip = (document.getElementById('field-zip') as HTMLInputElement)?.value || '';
 
-      newItem.username = `${fn} ${ln}`.trim();
+      newItem.type = 'identity';
+      newItem.username = `${fn} ${ln}`.trim() || em;
       newItem.email = em;
+      newItem.identity = {
+        firstName: fn,
+        lastName: ln,
+        email: em,
+        phone: ph,
+        address1: addr,
+        city,
+        zip
+      };
       newItem.notes = `Phone: ${ph}\nAddress: ${addr}, ${city} ${zip}\n${notes}`;
+    } else if (type === 'authenticator') {
+      const issuer = (document.getElementById('field-auth-issuer') as HTMLInputElement)?.value || '';
+      const secret = (document.getElementById('field-auth-secret') as HTMLInputElement)?.value || '';
+      const algo = (document.getElementById('field-auth-algo') as HTMLSelectElement)?.value || 'TOTP';
+      const digits = parseInt((document.getElementById('field-auth-digits') as HTMLSelectElement)?.value || '6', 10);
+      const period = parseInt((document.getElementById('field-auth-period') as HTMLSelectElement)?.value || '30', 10);
+
+      newItem.type = 'authenticator';
+      newItem.username = issuer || undefined;
+      newItem.totpSecret = secret.replace(/\s+/g, '') || undefined;
+      newItem.authenticatorDetails = {
+        issuer: issuer || undefined,
+        algorithm: algo,
+        digits,
+        period
+      };
+    } else if (type === 'note') {
+      newItem.type = 'secure_note';
     }
 
     chrome.runtime.sendMessage({ type: 'ADD_ITEM', item: newItem }, (res) => {
@@ -994,7 +1102,8 @@ function renderSidebarList(items: any[]) {
 
     const subEl = document.createElement('div');
     subEl.className = 'item-subtitle';
-    subEl.textContent = item.username || 'no username';
+    const subText = item.username || item.identity?.fullName || item.card?.cardholderName || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || (item.type === 'secure_note' ? 'Encrypted Note' : 'no username');
+    subEl.textContent = subText;
 
     info.appendChild(titleEl);
     info.appendChild(subEl);

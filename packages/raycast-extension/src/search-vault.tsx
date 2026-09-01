@@ -64,11 +64,18 @@ export default function SearchVaultCommand() {
         {filtered.map((item) => (
           <List.Item
             key={item.id}
-            icon={item.type === "card" ? Icon.CreditCard : item.type === "secure_note" ? Icon.Document : Icon.Key}
+            icon={
+              item.type === "card" ? Icon.CreditCard :
+              item.type === "identity" ? Icon.Person :
+              item.type === "email_alias" ? Icon.Envelope :
+              item.type === "authenticator" ? Icon.Lock :
+              item.type === "secure_note" ? Icon.Document :
+              Icon.Key
+            }
             title={item.title}
-            subtitle={item.username || item.urls[0] || ""}
+            subtitle={item.username || [item.identity?.firstName, item.identity?.lastName].filter(Boolean).join(" ") || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || item.urls[0] || ""}
             accessories={[
-              { text: item.totpSecret ? "TOTP" : undefined, icon: item.totpSecret ? Icon.Clock : undefined },
+              { text: item.type === "authenticator" ? "2FA" : item.totpSecret ? "TOTP" : undefined, icon: item.totpSecret ? Icon.Clock : undefined },
               { icon: item.favorite ? Icon.Star : undefined }
             ]}
             actions={

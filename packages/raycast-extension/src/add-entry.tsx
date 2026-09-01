@@ -32,6 +32,7 @@ export default function AddEntryCommand() {
   const [expMonth, setExpMonth] = useState<string>("");
   const [expYear, setExpYear] = useState<string>("");
   const [cvv, setCvv] = useState<string>("");
+  const [billingAddress, setBillingAddress] = useState<string>("");
 
   // Identity fields
   const [firstName, setFirstName] = useState<string>("");
@@ -42,24 +43,39 @@ export default function AddEntryCommand() {
   const [city, setCity] = useState<string>("");
   const [state, setState] = useState<string>("");
   const [zip, setZip] = useState<string>("");
-  const [country, setCountry] = useState<string>("");
+  const [country, setCountry] = useState<string>("United States");
+  const [dateOfBirth, setDateOfBirth] = useState<string>("");
   const [passportNumber, setPassportNumber] = useState<string>("");
   const [ssn, setSsn] = useState<string>("");
 
   // Alias fields
   const [aliasEmail, setAliasEmail] = useState<string>("");
   const [forwardTo, setForwardTo] = useState<string>("");
+  const [aliasProvider, setAliasProvider] = useState<string>("DuckDuckGo");
+
+  // Authenticator fields
+  const [authIssuer, setAuthIssuer] = useState<string>("");
+  const [authSecret, setAuthSecret] = useState<string>("");
+  const [authAlgorithm, setAuthAlgorithm] = useState<string>("TOTP");
+  const [authDigits, setAuthDigits] = useState<string>("6");
+  const [authPeriod, setAuthPeriod] = useState<string>("30");
 
   async function handleSubmit() {
-    if (!title.trim() && !username.trim() && !url.trim() && !cardholderName.trim() && !aliasEmail.trim()) {
-      showToast({ style: Toast.Style.Failure, title: "Title or identification required" });
+    if (!title.trim() && !username.trim() && !url.trim() && !cardholderName.trim() && !aliasEmail.trim() && !authSecret.trim() && !notes.trim()) {
+      showToast({ style: Toast.Style.Failure, title: "Title or credential field required" });
       return;
     }
 
     try {
       const itemPayload: any = {
         type,
-        title: title.trim() || (type === "card" ? "Payment Card" : type === "identity" ? "Identity Profile" : "Untitled"),
+        title: title.trim() || (
+          type === "card" ? "Payment Card" :
+          type === "identity" ? "Identity Profile" :
+          type === "email_alias" ? "Email Alias" :
+          type === "authenticator" ? "Authenticator 2FA" :
+          "Untitled"
+        ),
         notes: notes.trim() || undefined,
         tags: []
       };
@@ -72,15 +88,20 @@ export default function AddEntryCommand() {
       } else if (type === "secure_note") {
         // Only title and notes
       } else if (type === "card") {
+        itemPayload.username = cardholderName.trim() || undefined;
+        itemPayload.password = cvv.trim() || undefined;
         itemPayload.card = {
           cardholderName: cardholderName.trim() || undefined,
           number: cardNumber.trim().replace(/\s+/g, "") || undefined,
           brand: cardBrand,
           expMonth: expMonth.trim() || undefined,
           expYear: expYear.trim() || undefined,
-          cvv: cvv.trim() || undefined
+          cvv: cvv.trim() || undefined,
+          billingAddress: billingAddress.trim() || undefined
         };
       } else if (type === "identity") {
+        const fn = [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+        itemPayload.username = fn || identityEmail.trim() || undefined;
         itemPayload.identity = {
           firstName: firstName.trim() || undefined,
           lastName: lastName.trim() || undefined,
@@ -91,16 +112,26 @@ export default function AddEntryCommand() {
           state: state.trim() || undefined,
           zip: zip.trim() || undefined,
           country: country.trim() || undefined,
+          dateOfBirth: dateOfBirth.trim() || undefined,
           passportNumber: passportNumber.trim() || undefined,
           ssn: ssn.trim() || undefined
         };
-      } else if (type === "alias") {
+      } else if (type === "email_alias") {
         itemPayload.username = aliasEmail.trim() || undefined;
-        if (forwardTo.trim()) {
-          itemPayload.notes = notes.trim()
-            ? `Forward to: ${forwardTo.trim()}\n\n${notes.trim()}`
-            : `Forward to: ${forwardTo.trim()}`;
-        }
+        itemPayload.alias = {
+          aliasEmail: aliasEmail.trim() || undefined,
+          forwardTo: forwardTo.trim() || undefined,
+          provider: aliasProvider
+        };
+      } else if (type === "authenticator") {
+        itemPayload.username = authIssuer.trim() || undefined;
+        itemPayload.totpSecret = authSecret.trim().replace(/\s+/g, "") || undefined;
+        itemPayload.authenticatorDetails = {
+          issuer: authIssuer.trim() || undefined,
+          algorithm: authAlgorithm,
+          digits: parseInt(authDigits, 10) || 6,
+          period: parseInt(authPeriod, 10) || 30
+        };
       }
 
       await requestDaemon("vault.addItem", { item: itemPayload });
@@ -119,7 +150,7 @@ export default function AddEntryCommand() {
           {type === "login" && (
             <Action
               title="Generate Strong Password"
-              icon={Icon.Dice}
+              icon={Icon.Wand}
               shortcut={{ modifiers: ["cmd"], key: "g" }}
               onAction={() => {
                 const generated = generateSecurePassword(20);
@@ -131,12 +162,13 @@ export default function AddEntryCommand() {
         </ActionPanel>
       }
     >
-      <Form.Dropdown id="type" title="Type" value={type} onChange={setType}>
+      <Form.Dropdown id="type" title="Item Type" value={type} onChange={setType}>
         <Form.Dropdown.Item value="login" title="Login" icon={Icon.Key} />
         <Form.Dropdown.Item value="secure_note" title="Secure Note" icon={Icon.Document} />
         <Form.Dropdown.Item value="card" title="Payment Card" icon={Icon.CreditCard} />
         <Form.Dropdown.Item value="identity" title="Identity" icon={Icon.Person} />
-        <Form.Dropdown.Item value="alias" title="Email Alias" icon={Icon.Envelope} />
+        <Form.Dropdown.Item value="email_alias" title="Email Alias" icon={Icon.Envelope} />
+        <Form.Dropdown.Item value="authenticator" title="Authenticator (2FA)" icon={Icon.Lock} />
       </Form.Dropdown>
 
       <Form.TextField
@@ -148,10 +180,12 @@ export default function AddEntryCommand() {
             : type === "card"
             ? "e.g. Personal Visa, Apple Card"
             : type === "identity"
-            ? "e.g. Personal Profile, Work ID"
-            : type === "alias"
+            ? "e.g. Personal Profile, Work Identity"
+            : type === "email_alias"
             ? "e.g. Shopping Alias, Newsletters"
-            : "e.g. Recovery Codes, Wi-Fi"
+            : type === "authenticator"
+            ? "e.g. AWS Root Account, GitHub 2FA"
+            : "e.g. Server Recovery Codes, Wi-Fi Keys"
         }
         value={title}
         onChange={setTitle}
@@ -180,6 +214,7 @@ export default function AddEntryCommand() {
           <Form.TextField id="expMonth" title="Exp Month" placeholder="MM (e.g. 09)" value={expMonth} onChange={setExpMonth} />
           <Form.TextField id="expYear" title="Exp Year" placeholder="YYYY (e.g. 2028)" value={expYear} onChange={setExpYear} />
           <Form.PasswordField id="cvv" title="Security Code (CVV)" placeholder="123" value={cvv} onChange={setCvv} />
+          <Form.TextField id="billingAddress" title="Billing Address" placeholder="123 Main St, Springfield, OR" value={billingAddress} onChange={setBillingAddress} />
         </>
       )}
 
@@ -194,15 +229,42 @@ export default function AddEntryCommand() {
           <Form.TextField id="state" title="State / Province" placeholder="CA" value={state} onChange={setState} />
           <Form.TextField id="zip" title="ZIP / Postal Code" placeholder="94105" value={zip} onChange={setZip} />
           <Form.TextField id="country" title="Country" placeholder="United States" value={country} onChange={setCountry} />
+          <Form.TextField id="dateOfBirth" title="Date of Birth" placeholder="YYYY-MM-DD (e.g. 1994-08-15)" value={dateOfBirth} onChange={setDateOfBirth} />
           <Form.TextField id="passportNumber" title="Passport Number" placeholder="Optional" value={passportNumber} onChange={setPassportNumber} />
           <Form.PasswordField id="ssn" title="SSN / ID Number" placeholder="Optional" value={ssn} onChange={setSsn} />
         </>
       )}
 
-      {type === "alias" && (
+      {type === "email_alias" && (
         <>
           <Form.TextField id="aliasEmail" title="Alias Email" placeholder="alias_xyz123@duck.com" value={aliasEmail} onChange={setAliasEmail} />
-          <Form.TextField id="forwardTo" title="Forward To" placeholder="real.address@example.com" value={forwardTo} onChange={setForwardTo} />
+          <Form.TextField id="forwardTo" title="Forward To Real Email" placeholder="real.address@example.com" value={forwardTo} onChange={setForwardTo} />
+          <Form.Dropdown id="aliasProvider" title="Alias Provider" value={aliasProvider} onChange={setAliasProvider}>
+            <Form.Dropdown.Item value="DuckDuckGo" title="DuckDuckGo" icon={Icon.Envelope} />
+            <Form.Dropdown.Item value="SimpleLogin" title="SimpleLogin" icon={Icon.Envelope} />
+            <Form.Dropdown.Item value="Firefox Relay" title="Firefox Relay" icon={Icon.Envelope} />
+            <Form.Dropdown.Item value="iCloud" title="iCloud Hide My Email" icon={Icon.Envelope} />
+            <Form.Dropdown.Item value="Custom" title="Custom" icon={Icon.Envelope} />
+          </Form.Dropdown>
+        </>
+      )}
+
+      {type === "authenticator" && (
+        <>
+          <Form.TextField id="authIssuer" title="Issuer / Service" placeholder="e.g. AWS, GitHub, Google" value={authIssuer} onChange={setAuthIssuer} />
+          <Form.TextField id="authSecret" title="Secret Key (Base32)" placeholder="JBSWY3DPEHPK3PXP" value={authSecret} onChange={setAuthSecret} />
+          <Form.Dropdown id="authAlgorithm" title="Algorithm" value={authAlgorithm} onChange={setAuthAlgorithm}>
+            <Form.Dropdown.Item value="TOTP" title="TOTP (Time-based)" icon={Icon.Clock} />
+            <Form.Dropdown.Item value="HOTP" title="HOTP (Counter-based)" icon={Icon.Clock} />
+          </Form.Dropdown>
+          <Form.Dropdown id="authDigits" title="Digits" value={authDigits} onChange={setAuthDigits}>
+            <Form.Dropdown.Item value="6" title="6 digits" icon={Icon.Number00} />
+            <Form.Dropdown.Item value="8" title="8 digits" icon={Icon.Number00} />
+          </Form.Dropdown>
+          <Form.Dropdown id="authPeriod" title="Period (Seconds)" value={authPeriod} onChange={setAuthPeriod}>
+            <Form.Dropdown.Item value="30" title="30 seconds" icon={Icon.Clock} />
+            <Form.Dropdown.Item value="60" title="60 seconds" icon={Icon.Clock} />
+          </Form.Dropdown>
         </>
       )}
 
@@ -210,4 +272,3 @@ export default function AddEntryCommand() {
     </Form>
   );
 }
-

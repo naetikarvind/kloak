@@ -55,7 +55,7 @@ public struct MenuBarView: View {
         case .all:
             break
         case .logins:
-            base = base.filter { $0.type == .login || $0.type == .oauth }
+            base = base.filter { $0.type == .login }
         case .totp:
             base = base.filter { $0.totpSecret != nil && !($0.totpSecret?.isEmpty ?? true) }
         case .generator:
@@ -67,7 +67,10 @@ public struct MenuBarView: View {
             return base.filter {
                 $0.title.lowercased().contains(q) ||
                 ($0.username?.lowercased().contains(q) ?? false) ||
-                ($0.oauth?.accountEmail?.lowercased().contains(q) ?? false) ||
+                ($0.identity?.fullName?.lowercased().contains(q) ?? false) ||
+                ($0.card?.cardholderName?.lowercased().contains(q) ?? false) ||
+                ($0.alias?.aliasEmail?.lowercased().contains(q) ?? false) ||
+                ($0.authenticatorDetails?.issuer?.lowercased().contains(q) ?? false) ||
                 $0.urls.contains { $0.lowercased().contains(q) }
             }
         }
@@ -608,7 +611,7 @@ public struct SuggestedHeroRow: View {
                 Text(item.title)
                     .font(.system(size: 12, weight: .bold))
                     .lineLimit(1)
-                Text(item.username ?? item.oauth?.accountEmail ?? item.type.displayName)
+                Text(item.username ?? item.identity?.fullName ?? item.card?.cardholderName ?? item.alias?.aliasEmail ?? item.type.displayName)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -684,7 +687,7 @@ public struct MenuBarItemRow: View {
                     Text(item.title)
                         .font(.system(size: 11, weight: .semibold))
                         .lineLimit(1)
-                    Text(item.username ?? item.oauth?.accountEmail ?? item.type.displayName)
+                    Text(item.username ?? item.identity?.fullName ?? item.card?.cardholderName ?? item.alias?.aliasEmail ?? item.type.displayName)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
@@ -707,7 +710,7 @@ public struct MenuBarItemRow: View {
                         .help("Copy 2FA TOTP Token")
                     }
 
-                    if item.username != nil || item.oauth?.accountEmail != nil {
+                    if item.username != nil || item.identity?.fullName != nil || item.card?.cardholderName != nil || item.alias?.aliasEmail != nil {
                         Button(action: onCopyUsername) {
                             Image(systemName: copiedFeedback == "user_\(item.id)" ? "checkmark" : "person.fill")
                                 .font(.system(size: 10))
@@ -717,7 +720,7 @@ public struct MenuBarItemRow: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                         }
                         .buttonStyle(.plain)
-                        .help("Copy Username / Email")
+                        .help("Copy Username / Name / Email")
                     }
 
                     if item.password != nil {

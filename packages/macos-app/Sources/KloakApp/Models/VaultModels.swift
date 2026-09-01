@@ -2,36 +2,41 @@ import Foundation
 
 public enum ItemType: String, Codable, CaseIterable, Identifiable, Sendable {
     case login
-    case oauth
     case secureNote = "secure_note"
     case card
     case identity
+    case emailAlias = "email_alias"
+    case authenticator
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
         case .login: return "Login"
-        case .oauth: return "OAuth Account"
         case .secureNote: return "Secure Note"
         case .card: return "Payment Card"
         case .identity: return "Identity"
+        case .emailAlias: return "Email Alias"
+        case .authenticator: return "Authenticator"
         }
     }
 
     public var iconName: String {
         switch self {
         case .login: return "key.fill"
-        case .oauth: return "link.badge.plus"
         case .secureNote: return "note.text"
         case .card: return "creditcard.fill"
         case .identity: return "person.text.rectangle.fill"
+        case .emailAlias: return "envelope.badge.shield.half.filled.fill"
+        case .authenticator: return "lock.shield.fill"
         }
     }
 }
 
+// MARK: - OAuth Details (Legacy / Attached to Logins)
+
 public struct OAuthDetails: Codable, Hashable, Sendable {
-    public var provider: String // Google, Apple, GitHub, Microsoft, GitLab, Slack, Custom
+    public var provider: String
     public var providerDisplayName: String?
     public var accountEmail: String?
     public var clientId: String?
@@ -64,6 +69,132 @@ public struct OAuthDetails: Codable, Hashable, Sendable {
     }
 }
 
+// MARK: - Card Details
+
+public struct CardDetails: Codable, Hashable, Sendable {
+    public var cardholderName: String?
+    public var number: String?
+    public var brand: String?      // visa, mastercard, amex, discover, other
+    public var expMonth: String?
+    public var expYear: String?
+    public var cvv: String?
+    public var billingAddress: String?
+
+    public init(
+        cardholderName: String? = nil,
+        number: String? = nil,
+        brand: String? = "visa",
+        expMonth: String? = nil,
+        expYear: String? = nil,
+        cvv: String? = nil,
+        billingAddress: String? = nil
+    ) {
+        self.cardholderName = cardholderName
+        self.number = number
+        self.brand = brand
+        self.expMonth = expMonth
+        self.expYear = expYear
+        self.cvv = cvv
+        self.billingAddress = billingAddress
+    }
+}
+
+// MARK: - Identity Details
+
+public struct IdentityDetails: Codable, Hashable, Sendable {
+    public var firstName: String?
+    public var lastName: String?
+    public var email: String?
+    public var phone: String?
+    public var address1: String?
+    public var city: String?
+    public var state: String?
+    public var zip: String?
+    public var country: String?
+    public var dateOfBirth: String?
+    public var passportNumber: String?
+    public var ssn: String?
+
+    public init(
+        firstName: String? = nil,
+        lastName: String? = nil,
+        email: String? = nil,
+        phone: String? = nil,
+        address1: String? = nil,
+        city: String? = nil,
+        state: String? = nil,
+        zip: String? = nil,
+        country: String? = nil,
+        dateOfBirth: String? = nil,
+        passportNumber: String? = nil,
+        ssn: String? = nil
+    ) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.phone = phone
+        self.address1 = address1
+        self.city = city
+        self.state = state
+        self.zip = zip
+        self.country = country
+        self.dateOfBirth = dateOfBirth
+        self.passportNumber = passportNumber
+        self.ssn = ssn
+    }
+
+    public var fullName: String? {
+        let parts = [firstName, lastName].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    public var fullAddress: String? {
+        let parts = [address1, city, state, zip, country].compactMap { $0?.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+}
+
+// MARK: - Email Alias Details
+
+public struct AliasDetails: Codable, Hashable, Sendable {
+    public var aliasEmail: String?
+    public var forwardTo: String?
+    public var provider: String?   // DuckDuckGo, SimpleLogin, Firefox Relay, iCloud, Custom
+
+    public init(
+        aliasEmail: String? = nil,
+        forwardTo: String? = nil,
+        provider: String? = nil
+    ) {
+        self.aliasEmail = aliasEmail
+        self.forwardTo = forwardTo
+        self.provider = provider
+    }
+}
+
+// MARK: - Authenticator Details
+
+public struct AuthenticatorDetails: Codable, Hashable, Sendable {
+    public var issuer: String?
+    public var algorithm: String?  // TOTP, HOTP
+    public var digits: Int?        // 6 or 8
+    public var period: Int?        // 30 or 60
+
+    public init(
+        issuer: String? = nil,
+        algorithm: String? = "TOTP",
+        digits: Int? = 6,
+        period: Int? = 30
+    ) {
+        self.issuer = issuer
+        self.algorithm = algorithm
+        self.digits = digits
+        self.period = period
+    }
+}
+
+// MARK: - Custom Field
+
 public struct CustomField: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
@@ -78,6 +209,8 @@ public struct CustomField: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - Vault Item
+
 public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var type: ItemType
@@ -88,6 +221,10 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
     public var notes: String?
     public var totpSecret: String?
     public var oauth: OAuthDetails?
+    public var card: CardDetails?
+    public var identity: IdentityDetails?
+    public var alias: AliasDetails?
+    public var authenticatorDetails: AuthenticatorDetails?
     public var customFields: [CustomField]?
     public var tags: [String]
     public var favorite: Bool
@@ -105,6 +242,10 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         notes: String? = nil,
         totpSecret: String? = nil,
         oauth: OAuthDetails? = nil,
+        card: CardDetails? = nil,
+        identity: IdentityDetails? = nil,
+        alias: AliasDetails? = nil,
+        authenticatorDetails: AuthenticatorDetails? = nil,
         customFields: [CustomField]? = nil,
         tags: [String] = [],
         favorite: Bool = false,
@@ -121,6 +262,10 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.notes = notes
         self.totpSecret = totpSecret
         self.oauth = oauth
+        self.card = card
+        self.identity = identity
+        self.alias = alias
+        self.authenticatorDetails = authenticatorDetails
         self.customFields = customFields
         self.tags = tags
         self.favorite = favorite
@@ -129,6 +274,8 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 }
+
+// MARK: - Vault Folder
 
 public struct VaultFolder: Codable, Identifiable, Hashable, Sendable {
     public var id: String
@@ -139,6 +286,8 @@ public struct VaultFolder: Codable, Identifiable, Hashable, Sendable {
         self.name = name
     }
 }
+
+// MARK: - Vault Settings
 
 public struct VaultSettings: Codable, Hashable, Sendable {
     public var autoLockMinutes: Int
@@ -178,6 +327,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.keychainSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .keychainSyncEnabled) ?? false
     }
 }
+
+// MARK: - Vault Payload
 
 public struct VaultPayload: Codable, Sendable {
     public var version: Int

@@ -31,10 +31,11 @@ public struct FaviconView: View {
     private var fallbackColor: Color {
         switch itemType {
         case .login: return LiquidGlassTheme.primaryAccent
-        case .oauth: return LiquidGlassTheme.purpleAccent
         case .secureNote: return LiquidGlassTheme.amberAccent
         case .card: return LiquidGlassTheme.emeraldAccent
         case .identity: return Color.cyan
+        case .emailAlias: return Color(red: 0.0, green: 0.82, blue: 0.71)
+        case .authenticator: return LiquidGlassTheme.emeraldAccent
         }
     }
 
