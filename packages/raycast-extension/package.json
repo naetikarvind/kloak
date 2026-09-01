@@ -1,0 +1,80 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "kloak",
+  "title": "Kloak Password Manager",
+  "description": "Zero-knowledge, local-first password manager with instant search, auto-clear clipboard, and generator.",
+  "icon": "icon.png",
+  "author": "kloak",
+  "categories": [
+    "Security",
+    "Productivity"
+  ],
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "search-vault",
+      "title": "Search Vault",
+      "subtitle": "Kloak",
+      "description": "Fuzzy search passwords and copy credentials instantly",
+      "mode": "view"
+    },
+    {
+      "name": "generate-password",
+      "title": "Generate Password",
+      "subtitle": "Kloak",
+      "description": "Generate high-entropy password or EFF passphrase",
+      "mode": "view"
+    },
+    {
+      "name": "add-entry",
+      "title": "Add Entry",
+      "subtitle": "Kloak",
+      "description": "Add new login, secure note, or card to vault",
+      "mode": "view"
+    },
+    {
+      "name": "lock-vault",
+      "title": "Lock Vault",
+      "subtitle": "Kloak",
+      "description": "Immediately lock Kloak vault and wipe memory",
+      "mode": "no-view"
+    },
+    {
+      "name": "import-vault",
+      "title": "Import Passwords",
+      "subtitle": "Kloak",
+      "description": "Import from 1Password, Bitwarden, LastPass, Apple, Chrome",
+      "mode": "view"
+    },
+    {
+      "name": "export-vault",
+      "title": "Export Vault",
+      "subtitle": "Kloak",
+      "description": "Export encrypted backup or open formats",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "autoClearClipboardSeconds",
+      "title": "Clear Clipboard After",
+      "description": "Seconds before copied passwords are wiped from clipboard",
+      "type": "textfield",
+      "default": "30",
+      "required": false
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.88.0",
+    "@raycast/utils": "^1.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.7.0"
+  },
+  "scripts": {
+    "build": "ray build -e dist",
+    "dev": "ray develop"
+  }
+}

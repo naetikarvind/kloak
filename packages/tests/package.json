@@ -1,0 +1,16 @@
+{
+  "name": "@kloak/tests",
+  "version": "1.0.0",
+  "description": "Kloak Automated Test Suite",
+  "scripts": {
+    "test": "node --test dist/**/*.test.js"
+  },
+  "dependencies": {
+    "@kloak/core": "file:../core",
+    "@kloak/daemon": "file:../daemon"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

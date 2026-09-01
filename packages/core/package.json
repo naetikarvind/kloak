@@ -1,0 +1,16 @@
+{
+  "name": "@kloak/core",
+  "version": "1.0.0",
+  "description": "Kloak Core — Zero-knowledge crypto engine, vault storage, TOTP & parsers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.10.0"
+  }
+}

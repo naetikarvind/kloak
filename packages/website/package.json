@@ -1,0 +1,10 @@
+{
+  "name": "@kloak/website",
+  "version": "1.0.0",
+  "description": "Kloak Password Manager — Official Website & Security Docs",
+  "scripts": {
+    "dev": "npx serve public -l 3000",
+    "build": "echo 'Website static files ready in public/'"
+  },
+  "dependencies": {}
+}

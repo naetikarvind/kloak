@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kloak Password Manager</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg-base: #16151D;       /* Proton Pass base dark */
+      --bg-sidebar: #191823;    /* Proton Pass sidebar */
+      --bg-active: #28233C;     /* Proton Pass active selected item */
+      --bg-card: #211F2D;       /* Proton Pass card background */
+      --bg-card-hover: #292738;
+      --bg-input: #111017;      /* Deep inset input */
+      --bg-btn: #272535;        /* Secondary button */
+      --bg-btn-hover: #333045;
+      --bg-url: #241D3B;        /* URL pill background */
+      
+      --border: #2C293D;        /* Subtle border */
+      --border-card: #2F2C3F;
+      
+      --accent: #6D4AFF;        /* Proton Signature Electric Purple */
+      --accent-hover: #7E5EFF;
+      --accent-muted: rgba(109, 74, 255, 0.16);
+      
+      --color-login: #6D4AFF;   /* Purple for logins */
+      --color-alias: #00D2B4;   /* Mint/Teal for aliases (Official Proton) */
+      --color-card: #FF884D;    /* Amber/Coral for cards */
+      --color-note: #4D96FF;    /* Sky blue for encrypted notes */
+      --color-identity: #E066FF;/* Rose magenta for identities */
+      
+      --text-main: #FFFFFF;
+      --text-muted: #9E9AA8;
+      --text-subtle: #736F80;
+      --text-url: #B098FF;
+      --text-group: #E2E2E8;
+      
+      --success: #29C98F;
+      --warning: #FFB800;
+      --danger: #F54A4A;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      width: 620px;
+      height: 460px;
+      background: var(--bg-base);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      height: 48px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+      background: var(--bg-base);
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--bg-btn);
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+    .btn-icon:hover { background: var(--bg-btn-hover); color: var(--text-main); }
+    .btn-icon.purple { background: var(--accent); color: #fff; }
+    .btn-icon.purple:hover { background: var(--accent-hover); }
+    .btn-icon svg { width: 16px; height: 16px; fill: currentColor; }
+
+    .search-wrapper {
+      flex: 1;
+      height: 32px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 8px;
+    }
+    .search-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .search-wrapper svg { width: 15px; height: 15px; fill: var(--text-muted); flex-shrink: 0; }
+    .search-wrapper input {
+      flex: 1; background: transparent; border: none; outline: none;
+      color: var(--text-main); font-size: 13px; font-family: inherit;
+    }
+    .search-wrapper input::placeholder { color: var(--text-muted); }
+
+    .header-right { display: flex; align-items: center; gap: 8px; }
+
+    /* ── ANIMATIONS ── */
+    @keyframes dropdownPop {
+      0% { opacity: 0; transform: translateY(-8px) scale(0.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes paneSlideIn {
+      0% { opacity: 0; transform: translateY(8px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes genExpand {
+      0% { opacity: 0; transform: translateY(-6px) scale(0.98); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes checkPop {
+      0% { transform: scale(0.7); opacity: 0.5; }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes pulseRing {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+
+    /* ── ADD DROPDOWN ── */
+    .add-dropdown {
+      display: none;
+      position: absolute;
+      top: 38px;
+      right: 0;
+      width: 250px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      z-index: 100;
+      padding: 6px;
+      flex-direction: column;
+      gap: 2px;
+      transform-origin: top right;
+    }
+    .add-dropdown.open {
+      display: flex;
+      animation: dropdownPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .add-dropdown-header {
+      padding: 6px 10px 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .add-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .add-dropdown-item:hover {
+      background: rgba(255,255,255,0.06);
+      transform: translateX(3px);
+    }
+    .add-dropdown-item .icon-wrap {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .add-dropdown-item:hover .icon-wrap {
+      transform: scale(1.1);
+    }
+    .add-dropdown-item .icon-wrap svg { width: 18px; height: 18px; fill: currentColor; }
+    .add-dropdown-item .item-text {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    .add-dropdown-item .item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .add-dropdown-item .item-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    /* ── CREATION / EDIT VIEW ── */
+    .creation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      animation: paneSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .creation-title-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-back {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--bg-btn);
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .btn-back:hover {
+      background: var(--bg-btn-hover);
+      color: var(--text-main);
+      transform: scale(1.08);
+    }
+    .btn-back svg { width: 14px; height: 14px; fill: currentColor; }
+
+    .vault-selector-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-btn);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      margin-bottom: 12px;
+      width: fit-content;
+      transition: all 0.15s;
+    }
+    .vault-selector-badge:hover {
+      border-color: var(--accent);
+      color: var(--text-main);
+    }
+    .vault-selector-badge svg { width: 12px; height: 12px; fill: var(--accent); }
+
+    /* ── STRENGTH METER ── */
+    .strength-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 6px;
+      animation: paneSlideIn 0.2s ease;
+    }
+    .strength-bars {
+      display: flex;
+      gap: 4px;
+      height: 4px;
+    }
+    .strength-segment {
+      flex: 1;
+      height: 100%;
+      background: #312E40;
+      border-radius: 2px;
+      transition: background 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s ease;
+    }
+    .strength-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 500;
+      transition: color 0.3s;
+    }
+
+    /* ── INLINE GENERATOR PANEL ── */
+    .inline-gen-panel {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: genExpand 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gen-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .gen-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gen-slider {
+      flex: 1;
+      accent-color: var(--accent);
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .gen-options-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .gen-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--bg-btn);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      user-select: none;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gen-chip:hover {
+      background: var(--bg-btn-hover);
+      transform: translateY(-1px);
+    }
+    .gen-chip.active {
+      background: rgba(109,74,255,0.18);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .gen-chip input { display: none; }
+
+    /* ── MULTI-URL ROWS ── */
+    .multi-url-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      animation: paneSlideIn 0.18s ease;
+    }
+    .btn-add-inline {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 4px 0;
+      width: fit-content;
+      transition: all 0.15s;
+    }
+    .btn-add-inline:hover {
+      color: var(--accent-hover);
+      transform: translateX(2px);
+    }
+    .btn-add-inline svg { width: 14px; height: 14px; fill: currentColor; }
+
+    /* ── TOTP PREVIEW ── */
+    .totp-inline-preview {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(109,74,255,0.18);
+      border: 1px solid rgba(109,74,255,0.3);
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: var(--accent);
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 4px;
+      width: fit-content;
+      animation: paneSlideIn 0.2s ease;
+    }
+
+    /* ── MAIN SPLIT ── */
+    .main-view { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 225px;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-sidebar);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    /* ── SUGGESTED CONTAINER (Contextual Suggestions) ── */
+    .suggested-container {
+      margin: 8px 10px 4px 10px;
+      padding: 8px;
+      background: #1C1A27;
+      border: 1px solid #2C293D;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      animation: paneSlideIn 0.2s ease;
+      flex-shrink: 0;
+    }
+    .suggested-header {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #9E9AA8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 2px 4px;
+    }
+    .suggested-header svg {
+      width: 12px;
+      height: 12px;
+      fill: #6D4AFF;
+    }
+    .suggested-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .suggested-row {
+      display: flex;
+      align-items: center;
+      background: #252234;
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 7px;
+      padding: 6px 8px;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .suggested-row:hover {
+      background: #2D2A3E;
+      border-color: rgba(109,74,255,0.3);
+    }
+    .suggested-row .item-avatar {
+      width: 26px;
+      height: 26px;
+      font-size: 11px;
+      margin-right: 0;
+    }
+    .suggested-row .item-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .suggested-row .item-title {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .suggested-row .item-subtitle {
+      font-size: 10px;
+    }
+    .btn-suggested-action {
+      background: #2B82FE;
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-suggested-action:hover {
+      background: #1A72EE;
+      transform: scale(1.04);
+    }
+    .btn-suggested-action:active {
+      transform: scale(0.96);
+    }
+    .btn-suggested-action svg {
+      width: 12px;
+      height: 12px;
+      fill: currentColor;
+    }
+    .btn-suggested-action.copied {
+      background: var(--success);
+      animation: checkPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .sidebar-filters {
+      display: flex;
+      padding: 10px 12px;
+      gap: 6px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .filter-btn {
+      display: flex; align-items: center; gap: 6px;
+      height: 28px; padding: 0 10px; border-radius: 6px;
+      background: transparent; border: 1px solid transparent;
+      color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .filter-btn:hover { background: var(--bg-btn); transform: translateY(-1px); }
+    .filter-btn.active {
+      background: rgba(109,74,255,0.16); color: var(--text-main);
+      border-color: rgba(109,74,255,0.35);
+    }
+    .filter-btn svg { width: 13px; height: 13px; fill: currentColor; }
+
+    /* ── SORT DROPDOWN ── */
+    .sort-wrapper {
+      position: relative;
+    }
+    .sort-dropdown {
+      display: none;
+      position: absolute;
+      top: 32px;
+      left: 0;
+      width: 148px;
+      background: #211F2D;
+      border: 1px solid #2C293D;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.7);
+      z-index: 100;
+      padding: 4px;
+      flex-direction: column;
+      gap: 1px;
+      transform-origin: top left;
+    }
+    .sort-dropdown.open {
+      display: flex;
+      animation: dropdownPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .sort-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #9E9AA8;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .sort-item:hover {
+      background: rgba(255,255,255,0.06);
+      color: #ffffff;
+    }
+    .sort-item.active {
+      background: rgba(109,74,255,0.15);
+      color: #ffffff;
+      font-weight: 600;
+    }
+    .sort-item .sort-item-icon {
+      width: 13px;
+      height: 13px;
+      fill: #9E9AA8;
+      flex-shrink: 0;
+    }
+    .sort-item:hover .sort-item-icon {
+      fill: #ffffff;
+    }
+    .sort-item.active .sort-item-icon {
+      fill: #6D4AFF;
+    }
+    .sort-item-text {
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sort-check {
+      width: 12px;
+      height: 12px;
+      fill: #6D4AFF;
+      flex-shrink: 0;
+      display: none;
+    }
+    .sort-item.active .sort-check {
+      display: block;
+    }
+
+    .item-list {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .item-list::-webkit-scrollbar { width: 5px; height: 0px; }
+    .item-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .list-group-header {
+      padding: 10px 12px 4px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .list-item {
+      display: flex; align-items: center;
+      padding: 8px 12px; cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .list-item:hover {
+      background: var(--bg-card-hover);
+      padding-left: 14px;
+    }
+    .list-item.active {
+      background: var(--bg-active);
+      border-left-color: var(--accent);
+      padding-left: 12px;
+    }
+
+    .item-avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--bg-card); display: flex;
+      align-items: center; justify-content: center;
+      margin-right: 10px; flex-shrink: 0;
+      color: var(--text-muted); overflow: hidden;
+      font-size: 13px; font-weight: 600;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .list-item:hover .item-avatar { transform: scale(1.06); }
+    .list-item.active .item-avatar { color: var(--accent); border: 1px solid var(--accent); }
+    .item-avatar svg { width: 16px; height: 16px; fill: currentColor; }
+    .item-avatar img { width: 22px; height: 22px; border-radius: 3px; }
+
+    .item-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .item-title {
+      font-size: 13px; font-weight: 500; color: var(--text-main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .item-subtitle {
+      font-size: 11px; color: var(--text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+    }
+
+    /* ── DETAIL PANE ── */
+    .detail-pane {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-base);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 18px;
+    }
+    .detail-pane > * {
+      animation: paneSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .detail-pane::-webkit-scrollbar { width: 5px; height: 0px; }
+    .detail-pane::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .detail-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%; color: var(--text-muted); font-size: 14px;
+      animation: paneSlideIn 0.2s ease;
+    }
+
+    .detail-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .detail-title {
+      font-size: 18px; font-weight: 600; color: var(--text-main);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 230px;
+    }
+
+    .detail-actions { display: flex; gap: 8px; }
+    .btn-pill {
+      height: 28px; padding: 0 12px; border-radius: 14px;
+      background: var(--bg-btn); border: none; color: var(--text-main);
+      font-size: 12px; font-weight: 500; display: flex;
+      align-items: center; gap: 6px; cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn-pill:hover {
+      background: var(--bg-btn-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    }
+    .btn-pill:active { transform: translateY(0) scale(0.98); }
+    .btn-pill svg { width: 13px; height: 13px; fill: currentColor; }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border-card);
+      border-radius: 10px; margin-bottom: 10px; display: flex; flex-direction: column;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover {
+      border-color: rgba(109,74,255,0.25);
+    }
+    .card-row {
+      display: flex; padding: 12px 14px; align-items: center; position: relative;
+    }
+    .card-row:not(:last-child)::after {
+      content: ''; position: absolute; bottom: 0; left: 14px; right: 14px;
+      height: 1px; background: var(--border-card);
+    }
+
+    .card-icon {
+      width: 22px; height: 22px; display: flex; align-items: center;
+      justify-content: center; color: var(--accent); margin-right: 12px; flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+    .card-row:hover .card-icon { transform: scale(1.08); }
+    .card-icon svg { width: 18px; height: 18px; fill: currentColor; }
+    .card-icon.muted { color: var(--text-muted); }
+
+    .card-content {
+      flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden;
+    }
+    .card-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.3px; }
+    .card-value {
+      font-size: 13px; color: var(--text-main); font-weight: 400;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .card-value.multiline {
+      white-space: pre-wrap; word-break: break-word;
+      font-size: 12px; line-height: 1.45; color: var(--text-muted);
+    }
+
+    .edit-input {
+      width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-main); padding: 7px 10px;
+      font-size: 13px; outline: none; font-family: inherit;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .edit-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(109,74,255,0.2);
+    }
+
+    .card-actions { display: flex; gap: 10px; align-items: center; }
+    .action-icon {
+      width: 22px; height: 22px; display: flex; align-items: center;
+      justify-content: center; color: var(--text-muted); cursor: pointer;
+      transition: all 0.18s ease;
+      border-radius: 4px;
+    }
+    .action-icon:hover {
+      color: var(--text-main);
+      transform: scale(1.15);
+    }
+    .action-icon:active { transform: scale(0.9); }
+    .action-icon.copied {
+      animation: checkPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .action-icon svg { width: 17px; height: 17px; fill: currentColor; }
+    .security-badge { color: var(--danger); }
+
+    .url-pill {
+      background: var(--bg-url); color: var(--text-url);
+      padding: 5px 12px; border-radius: 6px; font-size: 12px;
+      text-decoration: none; display: inline-block; cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .url-pill:hover {
+      background: rgba(109,74,255,0.25);
+      transform: translateY(-1px);
+    }
+
+    /* ── TOTP ── */
+    .totp-code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 18px; font-weight: 600; letter-spacing: 4px; color: var(--accent);
+    }
+    .totp-timer {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid var(--accent); display: flex;
+      align-items: center; justify-content: center;
+      font-size: 9px; font-weight: 700; color: var(--accent);
+    }
+    .totp-timer.warn { border-color: var(--danger); color: var(--danger); }
+
+    /* ── METADATA ── */
+    .meta-row {
+      display: flex; justify-content: space-between; padding: 6px 12px;
+      font-size: 10px; color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  
+  <!-- HEADER -->
+  <div class="header">
+    <div class="search-wrapper">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="search-input" placeholder="Search in all items...">
+    </div>
+    
+    <div class="header-right">
+      <button class="btn-icon purple" id="btn-add">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        <!-- Proton Pass Official Style Add Menu -->
+        <div class="add-dropdown" id="add-dropdown">
+          <div class="add-dropdown-header">Create item</div>
+          <div class="add-dropdown-item" data-type="login">
+            <div class="icon-wrap" style="background: rgba(109, 74, 255, 0.16); color: #6D4AFF;">
+              <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            </div>
+            <div class="item-text">
+              <div class="item-title">Login</div>
+              <div class="item-desc">Usernames, passwords & 2FA</div>
+            </div>
+          </div>
+          <div class="add-dropdown-item" data-type="alias">
+            <div class="icon-wrap" style="background: rgba(0, 210, 180, 0.16); color: #00D2B4;">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.88-11.71c-.36-.45-.91-.7-1.5-.7-1.25 0-2.38 1.05-2.38 2.41 0 1.34 1.13 2.41 2.38 2.41.59 0 1.14-.25 1.5-.7v.58c0 .88-.72 1.6-1.6 1.6-.74 0-1.39-.5-1.55-1.21l-1.36.32c.28 1.25 1.41 2.09 2.91 2.09 1.65 0 2.8-1.15 2.8-2.8V9.5h-1.2v.79zm-1.5 2.82c-.66 0-1.2-.54-1.2-1.21 0-.66.54-1.2 1.2-1.2.66 0 1.2.54 1.2 1.2 0 .67-.54 1.21-1.2 1.21z"/></svg>
+            </div>
+            <div class="item-text">
+              <div class="item-title">Alias</div>
+              <div class="item-desc">Keep your real email private</div>
+            </div>
+          </div>
+          <div class="add-dropdown-item" data-type="card">
+            <div class="icon-wrap" style="background: rgba(255, 136, 77, 0.16); color: #FF884D;">
+              <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/></svg>
+            </div>
+            <div class="item-text">
+              <div class="item-title">Credit card</div>
+              <div class="item-desc">Secure payment cards & CVV</div>
+            </div>
+          </div>
+          <div class="add-dropdown-item" data-type="note">
+            <div class="icon-wrap" style="background: rgba(77, 150, 255, 0.16); color: #4D96FF;">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+            </div>
+            <div class="item-text">
+              <div class="item-title">Encrypted note</div>
+              <div class="item-desc">Sensitive notes, PINs & keys</div>
+            </div>
+          </div>
+          <div class="add-dropdown-item" data-type="identity">
+            <div class="icon-wrap" style="background: rgba(224, 102, 255, 0.16); color: #E066FF;">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.4c0-2 4-3.1 6-3.1s6 1.1 6 3.1V18z"/></svg>
+            </div>
+            <div class="item-text">
+              <div class="item-title">Identity</div>
+              <div class="item-desc">Personal details & addresses</div>
+            </div>
+          </div>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN SPLIT -->
+  <div class="main-view">
+    
+    <!-- LEFT SIDEBAR -->
+    <div class="sidebar">
+      <!-- SMART SUGGESTED CONTAINER -->
+      <div class="suggested-container" id="suggested-container" style="display: none;">
+        <div class="suggested-header">
+          <svg viewBox="0 0 24 24" class="sparkle-icon"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+          <span id="suggested-title">SUGGESTED FOR THIS SITE</span>
+        </div>
+        <div class="suggested-list" id="suggested-list">
+          <!-- Injected suggested login rows -->
+        </div>
+      </div>
+
+      <div class="sidebar-filters">
+        <button class="filter-btn active" id="filter-all">
+          <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z"/></svg>
+          All
+        </button>
+        <div class="sort-wrapper">
+          <button class="filter-btn" id="btn-sort" title="Sort items">
+            <svg viewBox="0 0 24 24" id="sort-btn-icon"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+            <span id="sort-label">Recent</span>
+            <svg viewBox="0 0 24 24" style="width: 10px; height: 10px; margin-left: 2px; fill: var(--text-muted);"><path d="M7 10l5 5 5-5z"/></svg>
+          </button>
+          <div class="sort-dropdown" id="sort-dropdown">
+            <div class="sort-item active" data-sort="recent">
+              <svg class="sort-item-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+              <span class="sort-item-text">Recently used</span>
+              <svg class="sort-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+            <div class="sort-item" data-sort="alpha">
+              <svg class="sort-item-icon" viewBox="0 0 24 24"><path d="M9.25 5l-4.5 12h2.09l.94-2.75h4.44l.94 2.75h2.09L10.75 5h-1.5zm-.53 7.42l1.53-4.5 1.53 4.5H8.72zM15 15h6v1.75h-6V15zm0-3.5h6v1.75h-6V11.5zm0-3.5h6v1.75h-6V8z"/></svg>
+              <span class="sort-item-text">Alphabetical (A to Z)</span>
+              <svg class="sort-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+            <div class="sort-item" data-sort="newest">
+              <svg class="sort-item-icon" viewBox="0 0 24 24"><path d="M19 15l-1.41-1.41L13 18.17V2h-2v16.17l-4.59-4.59L5 15l7 7 7-7z"/></svg>
+              <span class="sort-item-text">Newest to oldest</span>
+              <svg class="sort-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+            <div class="sort-item" data-sort="oldest">
+              <svg class="sort-item-icon" viewBox="0 0 24 24"><path d="M5 9l1.41 1.41L11 5.83V22h2V5.83l4.59 4.59L19 9l-7-7-7 7z"/></svg>
+              <span class="sort-item-text">Oldest to newest</span>
+              <svg class="sort-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="item-list" id="sidebar-list">
+        <!-- Populated via script -->
+      </div>
+    </div>
+    
+    <!-- RIGHT DETAIL PANE -->
+    <div class="detail-pane" id="detail-pane">
+      <div class="detail-empty">Select an item to view details</div>
+    </div>
+    
+  </div>
+
+  <script src="../dist/popup.js"></script>
+</body>
+</html>

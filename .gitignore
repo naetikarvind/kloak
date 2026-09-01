@@ -3,7 +3,7 @@ node_modules/
 
 # Swift & Xcode Build Artifacts
 .build/
-Packages/
+**/.build/
 *.xcodeproj/*
 !*.xcodeproj/project.pbxproj
 !*.xcodeproj/xcshareddata

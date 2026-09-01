@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kloak — Zero-Knowledge, Local-First Password Manager</title>
+  <meta name="description" content="A local-first, zero-knowledge password manager with a Raycast extension, native macOS Liquid Glass app, cross-browser extension, and seamless import/export.">
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.35);
+      --emerald: #10b981;
+      --purple: #8b5cf6;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 20% 15%, rgba(59, 130, 246, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 80% 25%, rgba(139, 92, 246, 0.10) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 40%);
+    }
+
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Navbar */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-badge {
+      width: 34px;
+      height: 34px;
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px var(--primary-glow);
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .btn-download {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      font-weight: 600;
+      font-size: 13px;
+      padding: 8px 18px;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px var(--primary-glow);
+      transition: transform 0.15s;
+    }
+
+    .btn-download:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    /* Hero */
+    .hero {
+      text-align: center;
+      padding: 90px 0 60px;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #60a5fa;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      background: linear-gradient(180deg, #ffffff 40%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p {
+      font-size: 19px;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 36px;
+      line-height: 1.5;
+    }
+
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .btn-hero-primary {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      color: white;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      box-shadow: 0 8px 24px var(--primary-glow);
+    }
+
+    .btn-hero-secondary {
+      background: var(--card-bg);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 15px;
+      padding: 14px 28px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+    }
+
+    /* Architecture Grid */
+    .section-header {
+      text-align: center;
+      margin: 90px 0 48px;
+    }
+
+    .section-header h2 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      margin-bottom: 12px;
+    }
+
+    .section-header p {
+      color: var(--text-muted);
+      font-size: 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 28px;
+      backdrop-filter: blur(16px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      border-color: rgba(59, 130, 246, 0.4);
+    }
+
+    .card-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+    }
+
+    .card h3 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .card p {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Live Generator Demo */
+    .generator-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 36px;
+      max-width: 720px;
+      margin: 0 auto;
+      backdrop-filter: blur(20px);
+    }
+
+    .generator-display {
+      font-family: ui-monospace, monospace;
+      font-size: 22px;
+      font-weight: 700;
+      padding: 16px 20px;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      color: var(--emerald);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      word-break: break-all;
+      margin-bottom: 20px;
+    }
+
+    .entropy-pill {
+      font-size: 11px;
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--emerald);
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-family: sans-serif;
+      font-weight: 600;
+    }
+
+    /* Comparison Table */
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      margin-top: 30px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    th {
+      background: rgba(0, 0, 0, 0.3);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .highlight-cell {
+      background: rgba(59, 130, 246, 0.08);
+      font-weight: 700;
+      color: #60a5fa;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--card-border);
+      padding: 60px 0 40px;
+      margin-top: 100px;
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="navbar">
+      <div class="brand">
+        <div class="brand-badge">🛡️</div>
+        <span>Kloak</span>
+      </div>
+      <div class="nav-links">
+        <a href="#features">Architecture</a>
+        <a href="#demo">Generator</a>
+        <a href="#comparison">Comparison</a>
+        <a href="#security">Security Whitepaper</a>
+        <a href="#import">Migration Guides</a>
+      </div>
+      <a href="#downloads" class="btn-download">Get Kloak</a>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="pill-badge">✨ Native macOS Liquid Glass • Raycast • Cross-Browser MV3</div>
+      <h1>Zero-Knowledge.<br>Local-First Password Manager.</h1>
+      <p>Kloak merges the instant keyboard-first UX of Raycast with military-grade AES-256-GCM envelope encryption, native Touch ID, and zero cloud dependency.</p>
+      <div class="hero-actions">
+        <a href="#downloads" class="btn-hero-primary">Download Native App (macOS)</a>
+        <a href="#security" class="btn-hero-secondary">Read Security Whitepaper</a>
+      </div>
+    </section>
+
+    <!-- 4 Components -->
+    <section id="features">
+      <div class="section-header">
+        <h2>Four Front-Ends, One Secure Native Hub</h2>
+        <p>Your encrypted vault stays on-device in ~/Library/Application Support/Kloak/vault.kloak. Front-ends communicate via length-prefixed IPC and Native Messaging.</p>
+      </div>
+
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-icon">⚡</div>
+          <h3>Raycast Extension</h3>
+          <p>Instant keyboard search, configurable password generation, TOTP token copying, and auto-clearing clipboard after 30s.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">💎</div>
+          <h3>Native macOS App</h3>
+          <p>Built with Swift 6 and Apple's Liquid Glass design language. Full Touch ID biometric unlock and Keychain integration.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🌐</div>
+          <h3>Browser Extension (MV3)</h3>
+          <p>Cross-browser (Chrome, Brave, Edge, Firefox, Safari) with form auto-detection, side panel, and phishing defense.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-icon">🔒</div>
+          <h3>Zero-Knowledge Engine</h3>
+          <p>Argon2id / PBKDF2 (600,000 iterations), AES-256-GCM two-key wrapping, and RFC 6238 TOTP authenticator.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Interactive Generator Demo -->
+    <section id="demo" style="margin-top: 90px;">
+      <div class="section-header">
+        <h2>Interactive Password & EFF Passphrase Generator</h2>
+        <p>Test the high-entropy generator engine directly in your browser.</p>
+      </div>
+
+      <div class="generator-box">
+        <div class="generator-display">
+          <span id="demo-output">kloak-quantum-obsidian-cipher-42</span>
+          <span class="entropy-pill" id="demo-entropy">128 bits • Centuries to crack</span>
+        </div>
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <button id="btn-demo-pwd" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.08); border: 1px solid var(--card-border); color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">Random Password</button>
+          <button id="btn-demo-pass" style="flex: 1; padding: 10px; background: linear-gradient(135deg, #3b82f6, #1d4ed8); border: 1px solid rgba(255,255,255,0.2); color: white; border-radius: 8px; font-weight: 600; cursor: pointer;">EFF Passphrase</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Comparison Matrix -->
+    <section id="comparison" style="margin-top: 90px;">
+      <div class="section-header">
+        <h2>How Kloak Compares</h2>
+        <p>Designed for complete digital sovereignty, zero subscription fees, and no third-party cloud breach risk.</p>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th class="highlight-cell">Kloak</th>
+              <th>1Password</th>
+              <th>Bitwarden</th>
+              <th>Apple Passwords</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Architecture</td>
+              <td class="highlight-cell">Local-First (No Server)</td>
+              <td>Cloud-Centric</td>
+              <td>Cloud / Self-Hosted</td>
+              <td>iCloud Keychain</td>
+            </tr>
+            <tr>
+              <td>Encryption</td>
+              <td class="highlight-cell">AES-256-GCM + Two-Key Envelope</td>
+              <td>AES-256-GCM</td>
+              <td>AES-256-CBC</td>
+              <td>AES-256-GCM</td>
+            </tr>
+            <tr>
+              <td>Raycast Native Extension</td>
+              <td class="highlight-cell">✅ Official 1st-Party</td>
+              <td>⚠️ Community</td>
+              <td>⚠️ Community</td>
+              <td>❌ No</td>
+            </tr>
+            <tr>
+              <td>Liquid Glass Native UI</td>
+              <td class="highlight-cell">✅ Swift 6 / SwiftUI</td>
+              <td>❌ Electron</td>
+              <td>❌ Electron</td>
+              <td>✅ Native</td>
+            </tr>
+            <tr>
+              <td>Built-in RFC 6238 TOTP</td>
+              <td class="highlight-cell">✅ Free & Included</td>
+              <td>Paid Tier</td>
+              <td>Paid Tier</td>
+              <td>✅ Free</td>
+            </tr>
+            <tr>
+              <td>10+ Migration Parsers</td>
+              <td class="highlight-cell">✅ Built-in Importers</td>
+              <td>Partial</td>
+              <td>Partial</td>
+              <td>CSV only</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Security Whitepaper Summary -->
+    <section id="security" style="margin-top: 90px;">
+      <div class="section-header">
+        <h2>Security Whitepaper & Threat Model</h2>
+        <p>Engineered to the standard of "trust this with bank passwords."</p>
+      </div>
+
+      <div class="card" style="padding: 36px; line-height: 1.7;">
+        <h3 style="font-size: 20px; margin-bottom: 12px; color: #60a5fa;">1. Two-Key Envelope Key Hierarchy</h3>
+        <p>When you create a Kloak vault, a cryptographically random 256-bit <strong>Vault Key (VK)</strong> is generated. A <strong>Key Wrapping Key (KWK)</strong> is derived from your master password using PBKDF2-SHA256 (600,000 iterations) with a 256-bit random salt. The KWK wraps the VK using AES-256-GCM. When changing passwords, only the VK envelope is re-encrypted—preventing payload corruption.</p>
+
+        <h3 style="font-size: 20px; margin: 24px 0 12px; color: #60a5fa;">2. In-Memory Hygiene & Zeroization</h3>
+        <p>Decrypted secrets and unwrapped keys are strictly scoped. When the vault auto-locks on idle timeout (default 5m) or upon manual lock, the active memory buffers are explicitly wiped with zeros (<code>zeroizeBuffer</code>), defeating forensic memory scrapers.</p>
+
+        <h3 style="font-size: 20px; margin: 24px 0 12px; color: #60a5fa;">3. Phishing-Resistant Autofill Domain Matching</h3>
+        <p>The browser extension and native engine extract effective top-level domains (eTLD+1) before injecting credentials, strictly preventing lookalike domain and subdomain impersonation attacks (e.g. <code>github.com.evil-attacker.com</code>).</p>
+      </div>
+    </section>
+
+    <!-- Import Sources -->
+    <section id="import" style="margin-top: 90px;">
+      <div class="section-header">
+        <h2>Seamless Migration from Any Password Manager</h2>
+        <p>Dedicated parsers normalize foreign vault exports into the unified Kloak schema in seconds.</p>
+      </div>
+
+      <div class="grid-4">
+        <div class="card"><h3>1Password</h3><p>Direct parser for .1pux and legacy .1pif exports.</p></div>
+        <div class="card"><h3>Bitwarden</h3><p>Native Bitwarden JSON and CSV support.</p></div>
+        <div class="card"><h3>Apple Passwords</h3><p>Import all Safari / iCloud Passwords CSV files with OTPAuth.</p></div>
+        <div class="card"><h3>Chrome / Brave / Edge</h3><p>Instant CSV importer with automatic title and domain normalization.</p></div>
+        <div class="card"><h3>LastPass</h3><p>Parses grouping, secure notes, and OTP secrets.</p></div>
+        <div class="card"><h3>KeePass / KeePassXC</h3><p>Full XML and CSV entry tree support.</p></div>
+        <div class="card"><h3>Proton Pass & Dashlane</h3><p>Import logins, aliases, and 2FA secrets.</p></div>
+        <div class="card"><h3>Generic CSV</h3><p>Auto-detects columns or provides custom mapping fallback.</p></div>
+      </div>
+    </section>
+
+    <!-- Downloads Section -->
+    <section id="downloads" style="margin-top: 90px; text-align: center;">
+      <div class="section-header">
+        <h2>Get Started with Kloak Today</h2>
+        <p>Download the free, zero-knowledge password manager for macOS.</p>
+      </div>
+      <div class="hero-actions">
+        <a href="#" class="btn-hero-primary">Download Kloak for macOS</a>
+        <a href="#" class="btn-hero-secondary">Install Raycast Extension</a>
+        <a href="#" class="btn-hero-secondary">Chrome / Firefox Extension</a>
+      </div>
+    </section>
+
+    <footer>
+      <p>© 2026 Kloak Password Manager. 100% Local-First. Zero-Knowledge. Open Source.</p>
+    </footer>
+  </div>
+
+  <script>
+    const demoOutput = document.getElementById('demo-output');
+    const demoEntropy = document.getElementById('demo-entropy');
+    const words = ["quantum", "obsidian", "cascade", "cipher", "aurora", "beacon", "vortex", "horizon", "nebula", "sentinel", "apex", "echo"];
+
+    document.getElementById('btn-demo-pass')?.addEventListener('click', () => {
+      let selected = [];
+      for(let i=0; i<4; i++) selected.push(words[Math.floor(Math.random()*words.length)]);
+      selected.push(Math.floor(Math.random()*90 + 10));
+      demoOutput.innerText = selected.join('-');
+      demoEntropy.innerText = "128 bits • Centuries to crack";
+    });
+
+    document.getElementById('btn-demo-pwd')?.addEventListener('click', () => {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+";
+      let res = "";
+      for(let i=0; i<20; i++) res += chars[Math.floor(Math.random()*chars.length)];
+      demoOutput.innerText = res;
+      demoEntropy.innerText = "132 bits • Billions of years to crack";
+    });
+  </script>
+</body>
+</html>

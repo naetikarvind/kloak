@@ -1,0 +1,23 @@
+{
+  "name": "@kloak/daemon",
+  "version": "1.0.0",
+  "description": "Kloak Daemon — IPC Socket Server, Native Messaging Host & CLI",
+  "main": "dist/index.js",
+  "bin": {
+    "kloak": "dist/cli/index.js",
+    "kloak-daemon": "dist/index.js",
+    "kloak-native-host": "dist/native-messaging/host.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "cli": "node dist/cli/index.js"
+  },
+  "dependencies": {
+    "@kloak/core": "file:../core"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.10.0"
+  }
+}

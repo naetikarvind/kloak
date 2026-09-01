@@ -1,0 +1,1 @@
+{"version":3,"file":"host.d.ts","sourceRoot":"","sources":["../../src/native-messaging/host.ts"],"names":[],"mappings":"AAAA;;;GAGG;AAOH,eAAO,MAAM,gBAAgB,qBAAqB,CAAC;AAGnD,qBAAa,mBAAmB;IACvB,GAAG,IAAI,IAAI;YAiCJ,oBAAoB;IAsClC,OAAO,CAAC,WAAW;WASL,gBAAgB,CAAC,YAAY,GAAE,MAAM,EAAyC,GAAG,MAAM,EAAE;CAiDxG"}

@@ -1,0 +1,13 @@
+{
+  "name": "@kloak/browser-extension",
+  "version": "1.0.0",
+  "description": "Kloak Cross-Browser Extension (MV3)",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/chrome": "^0.0.280",
+    "typescript": "^5.7.0"
+  }
+}
