@@ -6,6 +6,8 @@
 const NATIVE_HOST = 'app.kloak.native';
 let cachedItems = [];
 let isVaultUnlocked = false;
+let lastActiveTabId = null;
+let lastActiveUrl = null;
 // Fallback demo vault items
 const FALLBACK_ITEMS = [
     {
@@ -35,6 +37,93 @@ const FALLBACK_ITEMS = [
 ];
 let rpcIdCounter = 1;
 /**
+ * eTLD+1 extraction
+ */
+function getRegistrableDomain(urlStr) {
+    try {
+        const url = new URL(urlStr);
+        let host = url.hostname.toLowerCase();
+        if (host.startsWith('www.')) {
+            host = host.slice(4);
+        }
+        const parts = host.split('.');
+        if (parts.length < 2)
+            return host;
+        const secondToLast = parts[parts.length - 2];
+        const knownShort = ['co', 'com', 'net', 'org', 'edu', 'gov', 'ac', 'ne', 'or'];
+        if (knownShort.includes(secondToLast) && parts.length >= 3) {
+            return parts.slice(-3).join('.');
+        }
+        return parts.slice(-2).join('.');
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Strict domain matching and scoring
+ */
+function strictMatch(items, pageUrlStr) {
+    const pageDomain = getRegistrableDomain(pageUrlStr);
+    if (!pageDomain)
+        return [];
+    let pageHost = '';
+    try {
+        pageHost = new URL(pageUrlStr).hostname.toLowerCase();
+        if (pageHost.startsWith('www.'))
+            pageHost = pageHost.slice(4);
+    }
+    catch { }
+    const matches = items.filter(item => {
+        if (!item.urls || !Array.isArray(item.urls))
+            return false;
+        return item.urls.some((u) => {
+            const itemDomain = getRegistrableDomain(u);
+            if (!itemDomain)
+                return false;
+            return itemDomain === pageDomain;
+        });
+    });
+    const scoredMatches = matches.map(item => {
+        let score = 0;
+        let exactMatch = false;
+        for (const u of item.urls) {
+            try {
+                let itemHost = new URL(u).hostname.toLowerCase();
+                if (itemHost.startsWith('www.'))
+                    itemHost = itemHost.slice(4);
+                if (itemHost === pageHost) {
+                    exactMatch = true;
+                    break;
+                }
+            }
+            catch { }
+        }
+        if (exactMatch) {
+            score += 100;
+        }
+        else {
+            score += 80; // eTLD+1 match
+        }
+        if (item.favorite)
+            score += 20;
+        if (item.lastUsed)
+            score += 10;
+        return { item, score };
+    });
+    scoredMatches.sort((a, b) => b.score - a.score);
+    return scoredMatches.map(sm => sm.item);
+}
+async function notifyMacOSApp(url) {
+    try {
+        chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+            method: 'extension.activeUrlChanged',
+            params: { url }
+        });
+    }
+    catch { }
+}
+/**
  * Sends a JSON-RPC request to the Kloak Native Messaging Host or local daemon.
  */
 async function sendNativeRequest(method, params = {}) {
@@ -48,7 +137,6 @@ async function sendNativeRequest(method, params = {}) {
         try {
             chrome.runtime.sendNativeMessage(NATIVE_HOST, req, (response) => {
                 if (chrome.runtime.lastError || !response) {
-                    // Native host not responding or disconnected
                     resolve(null);
                 }
                 else if (response.result !== undefined) {
@@ -100,24 +188,15 @@ async function updateBadgeForTab(tabId, urlStr) {
             await chrome.action.setBadgeText({ tabId, text: '' });
             return;
         }
-        const domain = url.hostname.toLowerCase().replace('www.', '');
-        // 1. Try native host query
         let matches = [];
         const nativeMatches = await sendNativeRequest('vault.matchByUrl', { url: urlStr });
         if (Array.isArray(nativeMatches) && nativeMatches.length > 0) {
-            matches = nativeMatches;
+            matches = strictMatch(nativeMatches, urlStr);
         }
-        else {
+        if (matches.length === 0) {
             // 2. Query in-memory cached/fallback items
             const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-            matches = pool.filter(item => item.urls.some((u) => {
-                try {
-                    return new URL(u).hostname.toLowerCase().replace('www.', '') === domain;
-                }
-                catch {
-                    return u.toLowerCase().includes(domain);
-                }
-            }) || item.title.toLowerCase().includes(domain.split('.')[0]));
+            matches = strictMatch(pool, urlStr);
         }
         if (matches.length > 0) {
             await chrome.action.setBadgeText({ tabId, text: String(matches.length) });
@@ -135,6 +214,31 @@ async function updateBadgeForTab(tabId, urlStr) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         switch (message.type) {
+            case 'PUSH_ACTIVE_URL': {
+                if (message.tabId) {
+                    lastActiveTabId = message.tabId;
+                }
+                if (message.url) {
+                    lastActiveUrl = message.url;
+                    notifyMacOSApp(message.url);
+                }
+                sendResponse({ success: true });
+                break;
+            }
+            case 'AUTOFILL_FROM_MACOS': {
+                if (lastActiveTabId !== null) {
+                    try {
+                        await chrome.tabs.sendMessage(lastActiveTabId, {
+                            type: 'INJECT_CREDENTIALS',
+                            username: message.username,
+                            password: message.password
+                        });
+                    }
+                    catch { }
+                }
+                sendResponse({ success: true });
+                break;
+            }
             case 'GET_MATCHED_LOGINS': {
                 const urlStr = message.url || sender.tab?.url || '';
                 try {
@@ -143,24 +247,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         sendResponse({ success: true, isUnlocked: false, items: [] });
                         return;
                     }
-                    // 1. Try live native matching
+                    let matches = [];
                     const nativeMatches = await sendNativeRequest('vault.matchByUrl', { url: urlStr });
                     if (Array.isArray(nativeMatches) && nativeMatches.length > 0) {
-                        sendResponse({ success: true, isUnlocked: true, items: nativeMatches });
-                        return;
+                        matches = strictMatch(nativeMatches, urlStr);
                     }
-                    // 2. Fallback matching
-                    const url = new URL(urlStr);
-                    const domain = url.hostname.toLowerCase().replace('www.', '');
-                    const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-                    const matches = pool.filter(item => item.urls.some((u) => {
-                        try {
-                            return new URL(u).hostname.toLowerCase().replace('www.', '') === domain;
-                        }
-                        catch {
-                            return u.toLowerCase().includes(domain);
-                        }
-                    }) || item.title.toLowerCase().includes(domain.split('.')[0]));
+                    if (matches.length === 0) {
+                        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
+                        matches = strictMatch(pool, urlStr);
+                    }
                     sendResponse({ success: true, isUnlocked: true, items: matches });
                 }
                 catch {
@@ -211,9 +306,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
             case 'UPDATE_ITEM': {
                 const { item } = message;
-                // 1. Send native request
                 await sendNativeRequest('vault.updateItem', { item });
-                // 2. Fallback in-memory update
                 const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
                 const index = pool.findIndex(i => i.id === item.id);
                 if (index !== -1) {
@@ -225,9 +318,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             case 'ADD_ITEM': {
                 const { item } = message;
                 item.id = `new-${Date.now()}`;
-                // 1. Send native request
                 await sendNativeRequest('vault.addItem', { item });
-                // 2. Fallback in-memory update
                 const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
                 pool.push(item);
                 sendResponse({ success: true, item });
@@ -242,18 +333,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 try {
                     const url = new URL(urlStr);
                     const domain = url.hostname.toLowerCase().replace('www.', '');
-                    const domainPrefix = domain.split('.')[0];
                     await refreshVaultState();
                     const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-                    const matched = pool.filter(item => (item.title || '').toLowerCase().includes(domainPrefix) ||
-                        (item.urls || []).some((u) => {
-                            try {
-                                return new URL(u).hostname.toLowerCase().replace('www.', '') === domain;
-                            }
-                            catch {
-                                return u.toLowerCase().includes(domain);
-                            }
-                        }));
+                    const matched = strictMatch(pool, urlStr);
                     if (matched.length === 0) {
                         sendResponse({ action: 'save_new', domain, username, password });
                     }

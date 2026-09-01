@@ -13,6 +13,11 @@ public struct MenuBarView: View {
     @State private var activeContext: ActiveContext? = nil
     @State private var smartSuggestions: [VaultItem] = []
 
+    // Live browser context pushed from extension
+    @State private var liveBrowserUrl: String? = nil
+    @State private var liveBrowserTabId: Int = -1
+    @State private var liveBrowserSuggestions: [VaultItem] = []
+
     // Unlock states
     @State private var unlockPassword: String = ""
     @State private var isUnlocking: Bool = false
@@ -323,13 +328,38 @@ public struct MenuBarView: View {
                                 if let ctx = activeContext, !smartSuggestions.isEmpty && searchText.isEmpty && selectedFilter == .suggestions {
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 5) {
-                                            Image(systemName: "sparkles")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(LiquidGlassTheme.primaryAccent)
-                                            Text(ctx.isBrowser && ctx.activeDomain != nil ? "Suggested for \(ctx.activeDomain!)" : "Suggested for \(ctx.appName)")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .foregroundColor(.secondary)
-                                                .textCase(.uppercase)
+                                            // Live browser context indicator
+                                            if liveBrowserUrl != nil {
+                                                HStack(spacing: 4) {
+                                                    Circle()
+                                                        .fill(LiquidGlassTheme.emeraldAccent)
+                                                        .frame(width: 6, height: 6)
+                                                    Image(systemName: "network")
+                                                        .font(.system(size: 9, weight: .bold))
+                                                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                                }
+                                            } else {
+                                                Image(systemName: "sparkles")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                            }
+
+                                            if let liveUrl = liveBrowserUrl, let host = URL(string: liveUrl)?.host {
+                                                Text("Live · \(host.replacingOccurrences(of: "www.", with: ""))")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                                    .textCase(.uppercase)
+                                            } else if ctx.isBrowser && ctx.activeDomain != nil {
+                                                Text("Suggested for \(ctx.activeDomain!)")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(.secondary)
+                                                    .textCase(.uppercase)
+                                            } else {
+                                                Text("Suggested for \(ctx.appName)")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                    .foregroundColor(.secondary)
+                                                    .textCase(.uppercase)
+                                            }
                                             Spacer()
                                         }
                                         .padding(.horizontal, 4)
@@ -371,12 +401,21 @@ public struct MenuBarView: View {
                                 if filteredItems.isEmpty {
                                     VStack(spacing: 8) {
                                         Spacer()
-                                        Image(systemName: "magnifyingglass")
+                                        Image(systemName: liveBrowserUrl != nil ? "key.slash" : "magnifyingglass")
                                             .font(.system(size: 24))
                                             .foregroundColor(.secondary.opacity(0.4))
-                                        Text(searchText.isEmpty ? "No items found" : "No matches")
-                                            .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
+                                        if let liveUrl = liveBrowserUrl, let host = URL(string: liveUrl)?.host {
+                                            Text("No passwords for \(host.replacingOccurrences(of: "www.", with: ""))")
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundColor(.secondary)
+                                            Text("Try searching or add a new login.")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary.opacity(0.6))
+                                        } else {
+                                            Text(searchText.isEmpty ? "No items found" : "No matches")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.secondary)
+                                        }
                                         Spacer()
                                     }
                                     .frame(maxWidth: .infinity, minHeight: 120)
@@ -445,6 +484,26 @@ public struct MenuBarView: View {
         .background(.ultraThinMaterial)
         .onAppear {
             refreshContext()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kloakBrowserUrlChanged)) { note in
+            guard vaultStore.isUnlocked else { return }
+            if let url = note.userInfo?["url"] as? String, !url.isEmpty {
+                liveBrowserUrl = url
+                liveBrowserTabId = note.userInfo?["tabId"] as? Int ?? -1
+                // Recompute suggestions using strict URL matching
+                let fakeCtx = ActiveContext(
+                    appName: "Browser",
+                    bundleIdentifier: nil,
+                    activeDomain: URL(string: url)?.host,
+                    activeUrl: url
+                )
+                liveBrowserSuggestions = ActiveContextService.shared.findSmartSuggestions(in: vaultStore.items, context: fakeCtx)
+                smartSuggestions = liveBrowserSuggestions
+                activeContext = fakeCtx
+                if selectedFilter != .generator {
+                    selectedFilter = .suggestions
+                }
+            }
         }
     }
 

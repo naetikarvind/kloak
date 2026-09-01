@@ -85,69 +85,63 @@ public final class ActiveContextService: @unchecked Sendable {
         )
     }
 
-    /// Finds matching vault items for the active context with smart relevance ranking.
+    /// Finds matching vault items for the active context using strict eTLD+1-based matching.
+    /// NEVER falls back to title-keyword matching — an item must have a URL that shares the
+    /// same registrable domain (eTLD+1) as the active browser page.
     public func findSmartSuggestions(in items: [VaultItem], context: ActiveContext) -> [VaultItem] {
         let activeItems = items.filter { !$0.trashed }
-
         var suggestions: [(item: VaultItem, score: Int)] = []
 
         for item in activeItems {
             var score = 0
 
-            // 1. Exact Domain Match (Highest priority)
-            if let domain = context.activeDomain, !domain.isEmpty {
+            // ── 1. Browser Domain Matching (Strict eTLD+1) ──
+            if let activeUrl = context.activeUrl, !activeUrl.isEmpty {
+                let pageRD = registrableDomain(from: activeUrl)
+                let pageHost = URL(string: activeUrl)?.host?.lowercased()
+
                 for itemUrl in item.urls {
-                    if let host = URL(string: itemUrl)?.host?.replacingOccurrences(of: "www.", with: "").lowercased() {
-                        if host == domain {
-                            score += 100
-                        } else if domain.hasSuffix("." + host) || host.hasSuffix("." + domain) {
-                            score += 80
-                        } else if host.contains(domain) || domain.contains(host) {
-                            score += 50
-                        }
+                    let itemHost = URL(string: itemUrl)?.host?.lowercased() ?? ""
+                    let itemRD = registrableDomain(from: itemUrl)
+
+                    // Exact full-host match (e.g. api.github.com == api.github.com)
+                    if let ph = pageHost, ph == itemHost {
+                        score = max(score, 100)
+                        continue
                     }
+                    // eTLD+1 match (e.g. github.com stored, login.github.com visited)
+                    if let prd = pageRD, let ird = itemRD, prd == ird {
+                        score = max(score, 80)
+                        continue
+                    }
+                    // NEVER use title fuzzy matching as a suggestion qualifier
                 }
+            }
 
-                // Check title against domain (e.g. title "GitHub" matching "github.com")
-                let domainStem = domain.components(separatedBy: ".").first ?? domain
-                if item.title.lowercased().contains(domainStem) || domainStem.contains(item.title.lowercased()) {
-                    score += 40
+            // ── 2. Native Desktop App Match (non-browser: Slack, Figma, etc.) ──
+            if !context.isBrowser || context.activeDomain == nil {
+                let cleanAppName = context.appName.lowercased().replacingOccurrences(of: ".app", with: "")
+                // App name must appear in item title or tags (no URL needed for native apps)
+                if item.title.lowercased() == cleanAppName || cleanAppName.contains(item.title.lowercased()) {
+                    score = max(score, 60)
+                }
+                if item.tags.contains(where: { $0.lowercased() == cleanAppName }) {
+                    score = max(score, 40)
                 }
             }
 
-            // 2. Desktop Application Match (e.g. Slack app matching Slack item)
-            let cleanAppName = context.appName.lowercased().replacingOccurrences(of: ".app", with: "")
-            if item.title.lowercased().contains(cleanAppName) || cleanAppName.contains(item.title.lowercased()) {
-                score += 60
-            }
-
-            if item.tags.contains(where: { $0.lowercased() == cleanAppName }) {
-                score += 40
-            }
-
-            // 3. Favorites boost
-            if item.favorite {
-                score += 15
-            }
-
+            // ── 3. Quality Boosts ──
             if score > 0 {
+                if item.favorite { score += 20 }
+                if !item.updatedAt.isEmpty { score += 10 }
                 suggestions.append((item, score))
             }
         }
 
-        // Sort by relevance score descending
-        let sorted = suggestions.sorted { $0.score > $1.score }.map { $0.item }
-
-        // If no direct domain/app matches, surface favorites and top logins
-        if sorted.isEmpty {
-            let favorites = activeItems.filter { $0.favorite }
-            if !favorites.isEmpty {
-                return Array(favorites.prefix(4))
-            }
-            return Array(activeItems.prefix(4))
-        }
-
-        return sorted
+        // Sort by relevance descending
+        return suggestions.sorted { $0.score > $1.score }.map { $0.item }
+        // NOTE: No fallback to favorites/all-items when there are no URL matches.
+        // An empty result means "no credentials for this site" — show that clearly.
     }
 
     private func executeAppleScript(_ source: String) -> String? {

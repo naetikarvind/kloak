@@ -2,6 +2,26 @@ import Foundation
 import Network
 import Combine
 
+// MARK: - Notification Names
+extension Notification.Name {
+    static let kloakBrowserUrlChanged = Notification.Name("app.kloak.browserUrlChanged")
+}
+
+// MARK: - eTLD+1 Helper
+/// Returns the registrable domain (eTLD+1) for a given URL string.
+/// e.g. "https://login.github.com" → "github.com", "https://bbc.co.uk" → "bbc.co.uk"
+func registrableDomain(from urlString: String) -> String? {
+    guard let url = URL(string: urlString), let host = url.host?.lowercased() else { return nil }
+    let labels = host.components(separatedBy: ".")
+    guard labels.count >= 2 else { return nil }
+    // Known two-part eTLD qualifiers (second level is non-descriptive)
+    let twoPartQualifiers: Set<String> = ["co", "com", "net", "org", "edu", "gov", "ac", "ne", "or", "mil", "int"]
+    if labels.count >= 3 && twoPartQualifiers.contains(labels[labels.count - 2]) {
+        return labels.suffix(3).joined(separator: ".")
+    }
+    return labels.suffix(2).joined(separator: ".")
+}
+
 public struct JsonRpcRequest: Codable {
     public var jsonrpc: String?
     public var id: AnyCodableValue?
@@ -242,26 +262,27 @@ public final class IPCServer: ObservableObject {
             }
             store.recordUserActivity()
             let urlParam = params?["url"]?.stringValue ?? ""
-            let host: String
-            if let parsed = URL(string: urlParam)?.host {
-                host = parsed.lowercased()
-            } else {
-                host = urlParam.lowercased()
+            let pageRD = registrableDomain(from: urlParam)
+            let pageHost = URL(string: urlParam)?.host?.lowercased()
+
+            let scoredMatches: [(item: VaultItem, score: Int)] = store.items.compactMap { item in
+                guard !item.trashed else { return nil }
+                var bestScore = 0
+                for u in item.urls {
+                    let itemHost = URL(string: u)?.host?.lowercased() ?? ""
+                    let itemRD = registrableDomain(from: u)
+                    // Exact host match
+                    if let ph = pageHost, ph == itemHost { bestScore = max(bestScore, 100); continue }
+                    // eTLD+1 match
+                    if let prd = pageRD, let ird = itemRD, prd == ird { bestScore = max(bestScore, 80); continue }
+                }
+                guard bestScore > 0 else { return nil }
+                var score = bestScore
+                if item.favorite { score += 20 }
+                return (item, score)
             }
 
-            let matches = store.items.filter { item in
-                guard !item.trashed else { return false }
-                for u in item.urls {
-                    if let uHost = URL(string: u)?.host?.lowercased() {
-                        if uHost == host || host.hasSuffix("." + uHost) || uHost.hasSuffix("." + host) {
-                            return true
-                        }
-                    } else if u.lowercased().contains(host) {
-                        return true
-                    }
-                }
-                return false
-            }
+            let matches = scoredMatches.sorted { $0.score > $1.score }.map { $0.item }
 
             if let encodedData = try? JSONEncoder().encode(matches),
                let codableVal = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedData) {
@@ -269,6 +290,21 @@ public final class IPCServer: ObservableObject {
             } else {
                 sendResult(on: connection, id: reqId, result: .array([]))
             }
+
+        case "extension.activeUrlChanged":
+            // Browser extension pushes current page URL so the menubar can show live suggestions
+            let urlParam = params?["url"]?.stringValue ?? ""
+            let tabIdParam = params?["tabId"]?.intValue ?? -1
+            if !urlParam.isEmpty {
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .kloakBrowserUrlChanged,
+                        object: nil,
+                        userInfo: ["url": urlParam, "tabId": tabIdParam]
+                    )
+                }
+            }
+            sendResult(on: connection, id: reqId, result: .dictionary(["success": .bool(true)]))
 
         case "vault.search":
             guard store.isUnlocked else {
