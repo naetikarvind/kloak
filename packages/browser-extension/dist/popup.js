@@ -1103,28 +1103,56 @@ function renderDetailPane(item) {
     const emailVal = document.getElementById('email-val');
     if (emailVal)
         emailVal.textContent = email;
-    // Card 2: TOTP
-    if (hasTotp) {
+    // Card 2: 2FA Live Authenticator
+    if (item.totpSecret) {
         const totpCard = document.createElement('div');
-        totpCard.className = 'card';
+        totpCard.className = 'totp-container';
         totpCard.innerHTML = `
-      <div class="card-row">
-        <div class="card-icon" style="color: var(--color-note);">
-          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-        </div>
-        <div class="card-content">
-          <div class="card-label">2FA Code</div>
-          <div class="totp-code" id="totp-code">------</div>
-        </div>
-        <div class="card-actions">
-          <div class="totp-timer" id="totp-timer">30</div>
-          <div class="action-icon" id="copy-totp" title="Copy">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      <div class="totp-header">
+        <div class="totp-label-group">
+          <div class="totp-shield-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
           </div>
+          <span class="totp-title">Authenticator</span>
         </div>
+        <div class="totp-countdown-pill" id="totp-countdown-pill">
+          <svg class="totp-countdown-svg" viewBox="0 0 24 24">
+            <circle class="totp-svg-bg" cx="12" cy="12" r="9"></circle>
+            <circle class="totp-svg-progress" id="totp-svg-progress" cx="12" cy="12" r="9"></circle>
+          </svg>
+          <span id="totp-timer-text">30s</span>
+        </div>
+      </div>
+      <div class="totp-body-row" id="copy-totp-row" title="Click to copy code">
+        <div class="totp-code-display" id="totp-code">------</div>
+        <button class="totp-copy-btn" id="copy-totp-btn">
+          <svg class="copy-icon-svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <span id="totp-copy-text">Copy</span>
+        </button>
       </div>
     `;
         container.appendChild(totpCard);
+        // Setup Copy Handler
+        const handleCopy = async (e) => {
+            e.stopPropagation();
+            const codeEl = document.getElementById('totp-code');
+            const rawCode = (codeEl?.textContent || '').replace(/\s+/g, '');
+            if (!rawCode || rawCode === '------')
+                return;
+            await copyToClipboardText(rawCode);
+            const copyBtn = document.getElementById('copy-totp-btn');
+            const copyText = document.getElementById('totp-copy-text');
+            if (copyBtn && copyText) {
+                copyBtn.classList.add('copied');
+                copyText.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.classList.remove('copied');
+                    copyText.textContent = 'Copy';
+                }, 1800);
+            }
+        };
+        totpCard.querySelector('#copy-totp-row')?.addEventListener('click', handleCopy);
+        totpCard.querySelector('#copy-totp-btn')?.addEventListener('click', handleCopy);
         startTotpCounter(item.totpSecret);
     }
     // Card 3: Websites
@@ -1337,13 +1365,22 @@ function startTotpCounter(secret) {
     const update = () => {
         const code = generateTOTP(secret);
         const codeEl = document.getElementById('totp-code');
-        const timerEl = document.getElementById('totp-timer');
+        const timerTextEl = document.getElementById('totp-timer-text');
+        const pillEl = document.getElementById('totp-countdown-pill');
+        const progressEl = document.getElementById('totp-svg-progress');
         if (codeEl)
-            codeEl.textContent = `${code.slice(0, 3)} ${code.slice(3)}`;
-        if (timerEl) {
-            const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
-            timerEl.textContent = `⏱ ${remaining}s`;
-            timerEl.classList.toggle('warn', remaining <= 5);
+            codeEl.textContent = `${code.slice(0, 3)}  ${code.slice(3)}`;
+        const remaining = 30 - (Math.floor(Date.now() / 1000) % 30);
+        if (timerTextEl)
+            timerTextEl.textContent = `${remaining}s`;
+        if (progressEl) {
+            const circumference = 2 * Math.PI * 9; // ~56.548
+            const offset = circumference * (1 - remaining / 30);
+            progressEl.style.strokeDashoffset = `${offset}`;
+        }
+        if (pillEl) {
+            pillEl.classList.toggle('warn', remaining <= 10 && remaining > 5);
+            pillEl.classList.toggle('danger', remaining <= 5);
         }
     };
     update();

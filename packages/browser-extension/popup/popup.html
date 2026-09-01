@@ -817,18 +817,141 @@
       transform: translateY(-1px);
     }
 
-    /* ── TOTP ── */
-    .totp-code {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 18px; font-weight: 600; letter-spacing: 4px; color: var(--accent);
+    /* ── ENHANCED AUTHENTICATOR (TOTP) CARD ── */
+    .totp-container {
+      background: linear-gradient(135deg, rgba(41, 201, 143, 0.09) 0%, rgba(33, 31, 45, 0.95) 100%) !important;
+      border: 1px solid rgba(41, 201, 143, 0.25) !important;
+      border-radius: 10px !important;
+      padding: 12px 14px !important;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      transition: all 0.2s ease;
+      cursor: default;
     }
-    .totp-timer {
-      width: 20px; height: 20px; border-radius: 50%;
-      border: 2px solid var(--accent); display: flex;
-      align-items: center; justify-content: center;
-      font-size: 9px; font-weight: 700; color: var(--accent);
+    .totp-container:hover {
+      border-color: rgba(41, 201, 143, 0.45) !important;
+      background: linear-gradient(135deg, rgba(41, 201, 143, 0.14) 0%, rgba(38, 36, 52, 0.98) 100%) !important;
     }
-    .totp-timer.warn { border-color: var(--danger); color: var(--danger); }
+    .totp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .totp-label-group {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .totp-shield-icon {
+      color: #29C98F;
+      display: flex;
+      align-items: center;
+    }
+    .totp-shield-icon svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+    .totp-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: #29C98F;
+      text-transform: uppercase;
+    }
+    .totp-countdown-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'SF Mono', monospace;
+      color: #29C98F;
+      border: 1px solid rgba(41, 201, 143, 0.25);
+      transition: all 0.25s ease;
+    }
+    .totp-countdown-pill.warn {
+      color: #FFB800;
+      border-color: rgba(255, 184, 0, 0.35);
+    }
+    .totp-countdown-pill.danger {
+      color: #F54A4A;
+      border-color: rgba(245, 74, 74, 0.35);
+    }
+    .totp-countdown-svg {
+      width: 14px;
+      height: 14px;
+      transform: rotate(-90deg);
+    }
+    .totp-svg-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 3;
+    }
+    .totp-svg-progress {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 56.54;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.8s linear, stroke 0.3s ease;
+    }
+    .totp-body-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .totp-body-row:hover {
+      background: rgba(0, 0, 0, 0.5);
+      border-color: rgba(41, 201, 143, 0.35);
+      transform: translateY(-1px);
+    }
+    .totp-code-display {
+      font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: #FFFFFF;
+      text-shadow: 0 0 10px rgba(41, 201, 143, 0.3);
+    }
+    .totp-copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(41, 201, 143, 0.15);
+      color: #29C98F;
+      border: 1px solid rgba(41, 201, 143, 0.3);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .totp-copy-btn:hover {
+      background: #29C98F;
+      color: #FFFFFF;
+    }
+    .totp-copy-btn.copied {
+      background: #29C98F;
+      color: #FFFFFF;
+    }
+    .totp-copy-btn svg {
+      width: 13px;
+      height: 13px;
+      fill: currentColor;
+    }
 
     /* ── METADATA ── */
     .meta-row {
