@@ -110,7 +110,7 @@ public struct VaultMainView: View {
                     )
                 }
             }
-            .navigationSplitViewColumnWidth(min: 280, ideal: 350, max: 480)
+            .navigationSplitViewColumnWidth(min: 240, ideal: 310, max: 420)
         } detail: {
             if let id = selectedItemId, let itemIndex = items.firstIndex(where: { $0.id == id }) {
                 ItemDetailView(
@@ -125,6 +125,7 @@ public struct VaultMainView: View {
                         selectedItemId = nil
                     }
                 )
+                .frame(minWidth: 360)
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "lock.shield")

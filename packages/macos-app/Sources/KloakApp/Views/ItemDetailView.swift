@@ -35,7 +35,7 @@ public struct ItemDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         if isEditing {
                             TextField("Item Title", text: $editTitle)
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .textFieldStyle(.plain)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
@@ -77,14 +77,15 @@ public struct ItemDetailView: View {
                             }
                         }
                     }
-
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                     if isEditing {
                         HStack(spacing: 8) {
                             Button(action: cancelEditing) {
                                 Text("Cancel")
                                     .font(.system(size: 12, weight: .medium))
+                                    .lineLimit(1)
+                                    .fixedSize()
                                     .foregroundColor(.secondary)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 6)
@@ -99,6 +100,8 @@ public struct ItemDetailView: View {
                                         .font(.system(size: 11, weight: .bold))
                                     Text("Save")
                                         .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                        .fixedSize()
                                 }
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 14)
@@ -109,6 +112,8 @@ public struct ItemDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(1)
                     } else {
                         HStack(spacing: 8) {
                             Button(action: startEditing) {
@@ -117,6 +122,8 @@ public struct ItemDetailView: View {
                                         .font(.system(size: 11, weight: .semibold))
                                     Text("Edit")
                                         .font(.system(size: 12, weight: .semibold))
+                                        .lineLimit(1)
+                                        .fixedSize()
                                 }
                                 .foregroundColor(.primary)
                                 .padding(.horizontal, 12)
@@ -146,6 +153,8 @@ public struct ItemDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        .fixedSize(horizontal: true, vertical: false)
+                        .layoutPriority(1)
                     }
                 }
                 .padding(16)
