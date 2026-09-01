@@ -77,7 +77,8 @@ public struct ItemDetailView: View {
                             }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer(minLength: 8)
 
                     if isEditing {
                         HStack(spacing: 8) {
@@ -112,30 +113,23 @@ public struct ItemDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(1)
+                        .fixedSize()
                     } else {
                         HStack(spacing: 8) {
                             Button(action: startEditing) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 11, weight: .semibold))
-                                    Text("Edit")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .lineLimit(1)
-                                        .fixedSize()
-                                }
-                                .foregroundColor(.primary)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.08))
-                                .clipShape(Capsule())
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
-                                )
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .frame(width: 32, height: 32)
+                                    .background(Color.white.opacity(0.08))
+                                    .clipShape(Circle())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                                    )
                             }
                             .buttonStyle(.plain)
+                            .help("Edit Item")
 
                             Button(action: {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
@@ -144,17 +138,21 @@ public struct ItemDetailView: View {
                                 onSave(item)
                             }) {
                                 Image(systemName: item.favorite ? "star.fill" : "star")
-                                    .font(.system(size: 15))
+                                    .font(.system(size: 14))
                                     .foregroundColor(item.favorite ? LiquidGlassTheme.amberAccent : .secondary)
                                     .scaleEffect(item.favorite ? 1.15 : 1.0)
-                                    .padding(8)
+                                    .frame(width: 32, height: 32)
                                     .background(Color.white.opacity(0.06))
                                     .clipShape(Circle())
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                    )
                             }
                             .buttonStyle(.plain)
+                            .help(item.favorite ? "Remove from Favorites" : "Add to Favorites")
                         }
-                        .fixedSize(horizontal: true, vertical: false)
-                        .layoutPriority(1)
+                        .fixedSize()
                     }
                 }
                 .padding(16)
