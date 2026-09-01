@@ -80,26 +80,14 @@ public struct SidebarView: View {
                     Label("Trash", systemImage: "trash.fill")
                         .badge(items.filter { $0.trashed }.count)
                 }
+
+                Button(action: onLock) {
+                    Label("Lock Vault", systemImage: "lock.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
             }
         }
         .listStyle(.sidebar)
-        .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button(action: onLock) {
-                    Label("Lock", systemImage: "lock.fill")
-                }
-                .buttonStyle(GlassCapsuleButton(isPrimary: false))
-
-                Spacer()
-
-                Button(action: onAddItem) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .bold))
-                }
-                .buttonStyle(GlassCapsuleButton(isPrimary: true))
-            }
-            .padding(12)
-            .background(.ultraThinMaterial)
-        }
     }
 }

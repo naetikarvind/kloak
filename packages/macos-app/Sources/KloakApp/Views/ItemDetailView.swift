@@ -549,8 +549,6 @@ public struct ItemDetailView: View {
                                     .foregroundColor(.secondary)
 
                                 TOTPRingView(secret: totp)
-                                    .padding(12)
-                                    .glassEffect(cornerRadius: 10)
                             }
                         }
 

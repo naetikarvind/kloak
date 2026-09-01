@@ -106,7 +106,8 @@ public struct VaultMainView: View {
                         items: filteredItems,
                         selectedItemId: $selectedItemId,
                         searchText: $searchText,
-                        onToggleFavorite: toggleFavorite
+                        onToggleFavorite: toggleFavorite,
+                        onAddItem: { isShowingNewItemSheet = true }
                     )
                 }
             }

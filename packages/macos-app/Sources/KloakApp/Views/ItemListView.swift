@@ -5,37 +5,53 @@ public struct ItemListView: View {
     @Binding var selectedItemId: String?
     @Binding var searchText: String
     var onToggleFavorite: (String) -> Void
+    var onAddItem: (() -> Void)? = nil
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Search field
+            // Search field & Add button
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 12))
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                        .font(.system(size: 12))
 
-                TextField("Search credentials, logins, URLs...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
+                    TextField("Search credentials, logins, URLs...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
 
-                if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                            .font(.system(size: 12))
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                                .font(.system(size: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.black.opacity(0.3))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 0.75)
+                        )
+                )
+
+                if let onAdd = onAddItem {
+                    Button(action: onAdd) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 30, height: 30)
+                            .background(LiquidGlassTheme.primaryAccent)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
+                    .help("Add New Item (⌘N)")
                 }
             }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.black.opacity(0.3))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 0.75)
-                    )
-            )
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
 
