@@ -77,6 +77,24 @@ public struct ItemRowView: View {
     let item: VaultItem
     var onToggleFavorite: () -> Void
 
+    private var isWeakPassword: Bool {
+        guard let p = item.password, !p.isEmpty else { return false }
+        if p.count < 8 { return true }
+        var score = 0
+        if p.count >= 12 { score += 1 }
+        if p.rangeOfCharacter(from: .uppercaseLetters) != nil && p.rangeOfCharacter(from: .lowercaseLetters) != nil { score += 1 }
+        if p.rangeOfCharacter(from: .decimalDigits) != nil { score += 1 }
+        if p.rangeOfCharacter(from: .punctuationCharacters.union(.symbols)) != nil { score += 1 }
+        return score <= 1
+    }
+
+    private var hasNoUsername: Bool {
+        guard item.type == .login else { return false }
+        let u = item.username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let e = item.oauth?.accountEmail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return u.isEmpty && e.isEmpty
+    }
+
     public var body: some View {
         HStack(spacing: 10) {
             // High-resolution logo or fallback icon
@@ -102,32 +120,85 @@ public struct ItemRowView: View {
 
             Spacer()
 
-            if item.type == .oauth {
-                Text("SSO")
-                    .font(.system(size: 8, weight: .bold))
-                    .fixedSize()
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(LiquidGlassTheme.purpleAccent.opacity(0.15))
-                    .foregroundColor(LiquidGlassTheme.purpleAccent)
-                    .clipShape(Capsule())
-            }
+            HStack(spacing: 4) {
+                // Type specific badges
+                if item.type == .oauth {
+                    Text("OAuth")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.purpleAccent.opacity(0.15))
+                        .foregroundColor(LiquidGlassTheme.purpleAccent)
+                        .clipShape(Capsule())
+                } else if item.type == .card {
+                    Text("card")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15))
+                        .foregroundColor(Color.blue)
+                        .clipShape(Capsule())
+                } else if item.type == .identity {
+                    Text("identity")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.cyan.opacity(0.15))
+                        .foregroundColor(Color.cyan)
+                        .clipShape(Capsule())
+                } else if item.type == .secureNote {
+                    Text("note")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.yellow.opacity(0.15))
+                        .foregroundColor(Color.yellow)
+                        .clipShape(Capsule())
+                }
 
-            if item.totpSecret != nil {
-                Text("TOTP")
-                    .font(.system(size: 8, weight: .bold))
-                    .fixedSize()
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
-                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                    .clipShape(Capsule())
-            }
+                // Status & Security badges
+                if hasNoUsername {
+                    Text("no username")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.15))
+                        .foregroundColor(Color.orange)
+                        .clipShape(Capsule())
+                }
 
-            if item.favorite {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 10))
-                    .foregroundColor(LiquidGlassTheme.amberAccent)
+                if isWeakPassword {
+                    Text("weak password")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.roseAccent.opacity(0.15))
+                        .foregroundColor(LiquidGlassTheme.roseAccent)
+                        .clipShape(Capsule())
+                }
+
+                if item.totpSecret != nil && !item.totpSecret!.isEmpty {
+                    Text("authenticator")
+                        .font(.system(size: 8, weight: .bold))
+                        .fixedSize()
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .clipShape(Capsule())
+                }
+
+                if item.favorite {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(LiquidGlassTheme.amberAccent)
+                }
             }
         }
         .padding(.vertical, 3)

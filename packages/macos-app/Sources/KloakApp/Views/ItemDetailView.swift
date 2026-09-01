@@ -326,9 +326,9 @@ public struct ItemDetailView: View {
                             .buttonStyle(.plain)
                         }
 
-                        // 2FA TOTP Secret
+                        // Authenticator Secret
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("2FA SECRET KEY (TOTP)")
+                            Text("AUTHENTICATOR (2FA SECRET KEY)")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.secondary)
 
@@ -541,10 +541,10 @@ public struct ItemDetailView: View {
                             }
                         }
 
-                        // 2FA Secret / TOTP Live Authenticator
+                        // Live Authenticator
                         if let totp = item.totpSecret, !totp.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("AUTHENTICATOR (TOTP)")
+                                Text("AUTHENTICATOR")
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.secondary)
 

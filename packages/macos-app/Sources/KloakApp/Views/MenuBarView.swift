@@ -32,7 +32,7 @@ public struct MenuBarView: View {
         case suggestions = "✨ Suggested"
         case all = "All"
         case logins = "Logins"
-        case totp = "2FA"
+        case totp = "Authenticator"
         case generator = "Generator"
 
         public var id: String { rawValue }
