@@ -2,28 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Network access for IPC (browser extension / Raycast communication) -->
     <key>com.apple.security.network.server</key>
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
-
-    <!-- Read/write access to vault file on disk -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
-    <key>com.apple.security.files.downloads.read-write</key>
-    <true/>
-
-    <!-- Home directory access for ~/.kloak socket and vault -->
-    <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
-    <array>
-        <string>/.kloak/</string>
-    </array>
-
-    <!-- Keychain access -->
-    <key>keychain-access-groups</key>
-    <array>
-        <string>$(AppIdentifierPrefix)com.kloak.app</string>
-    </array>
 </dict>
 </plist>
