@@ -305,6 +305,7 @@ public struct NewItemSheet: View {
                             }
                         }
                         .pickerStyle(.menu)
+                        .labelsHidden()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
