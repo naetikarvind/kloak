@@ -88,11 +88,19 @@ public struct FaviconView: View {
     }
 
     private func loadLogo() async {
-        // Fast synchronous check in cache
         let domains = LogoService.shared.resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
+        guard !domains.isEmpty else {
+            withAnimation(.easeOut(duration: 0.15)) {
+                self.loadedImage = nil
+            }
+            return
+        }
+
         let cacheKey = domains.joined(separator: "|")
         if let cached = await LogoService.shared.cachedImage(forKey: cacheKey) {
-            self.loadedImage = cached
+            withAnimation(.easeOut(duration: 0.15)) {
+                self.loadedImage = cached
+            }
             return
         }
 
@@ -104,10 +112,8 @@ public struct FaviconView: View {
             itemType: itemType
         )
 
-        if let img = fetched {
-            withAnimation(.easeOut(duration: 0.18)) {
-                self.loadedImage = img
-            }
+        withAnimation(.easeOut(duration: 0.18)) {
+            self.loadedImage = fetched
         }
     }
 }

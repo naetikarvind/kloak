@@ -87,9 +87,9 @@ public struct ItemDetailView: View {
                         } else {
                             Text(item.title)
                                 .font(.system(size: 18, weight: .bold))
-                                .lineLimit(1)
+                                .lineLimit(2)
                                 .truncationMode(.tail)
-                                .minimumScaleFactor(0.8)
+                                .minimumScaleFactor(0.85)
                         }
 
                         HStack(spacing: 6) {

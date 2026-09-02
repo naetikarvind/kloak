@@ -213,6 +213,11 @@ public actor LogoService {
 
         let brandMap: [String: String] = [
             "github": "github.com",
+            "copilot": "github.com",
+            "cursor": "cursor.com",
+            "gemini": "gemini.google.com",
+            "google gemini": "gemini.google.com",
+            "deepmind": "deepmind.google",
             "proton": "proton.me",
             "protonmail": "proton.me",
             "proton mail": "proton.me",
@@ -235,6 +240,9 @@ public actor LogoService {
             "chatgpt": "openai.com",
             "claude": "anthropic.com",
             "anthropic": "anthropic.com",
+            "huggingface": "huggingface.co",
+            "replicate": "replicate.com",
+            "midjourney": "midjourney.com",
             "perplexity": "perplexity.ai",
             "twitter": "x.com",
             "x.com": "x.com",
