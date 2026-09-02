@@ -49,7 +49,10 @@ public struct SidebarView: View {
                             } icon: {
                                 Image(systemName: type.iconName).foregroundColor(.secondary)
                             }
-                            .badge(items.filter { $0.type == type && !$0.trashed }.count)
+                            .badge(type == .authenticator
+                                ? items.filter { !$0.trashed && ($0.type == .authenticator || ($0.type == .login && !($0.totpSecret ?? "").isEmpty)) }.count
+                                : items.filter { $0.type == type && !$0.trashed }.count
+                            )
                         }
                     }
                 }

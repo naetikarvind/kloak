@@ -50,7 +50,17 @@ public struct VaultMainView: View {
         case .favorites:
             base = items.filter { $0.favorite && !$0.trashed }
         case .category(let type):
-            base = items.filter { $0.type == type && !$0.trashed }
+            if type == .authenticator {
+                // Show standalone authenticators + any login that has 2FA attached
+                base = items.filter {
+                    !$0.trashed && (
+                        $0.type == .authenticator ||
+                        ($0.type == .login && !($0.totpSecret ?? "").isEmpty)
+                    )
+                }
+            } else {
+                base = items.filter { $0.type == type && !$0.trashed }
+            }
         case .folder(let folderId):
             base = items.filter { $0.tags.contains(folderId) && !$0.trashed }
         case .trash:
