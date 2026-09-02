@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.kloak.app</string>
+    <key>CFBundleName</key>
+    <string>Kloak</string>
+    <key>CFBundleDisplayName</key>
+    <string>Kloak</string>
+    <key>CFBundleExecutable</key>
+    <string>Kloak</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <false/>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Kloak uses biometric authentication to securely unlock your password vault.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Kloak Vault URL</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>kloak</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

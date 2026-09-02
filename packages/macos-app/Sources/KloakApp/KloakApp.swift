@@ -6,8 +6,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        let directIconPath = "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/packages/macos-app/Sources/KloakApp/Resources/AppIcon.png"
-        if let icon = NSImage(contentsOfFile: directIconPath) {
+        // Load icon from bundle (works in .app); fall back to dev-mode path
+        if let icon = NSImage(named: "AppIcon") ??
+            Bundle.main.image(forResource: "AppIcon") {
             NSApp.applicationIconImage = icon
         }
 
