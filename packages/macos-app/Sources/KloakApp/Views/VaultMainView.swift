@@ -293,24 +293,53 @@ public struct NewItemSheet: View {
             // Form Content
             ScrollView {
                 VStack(spacing: 14) {
-                    // Type selector — menu dropdown (segmented clips with 6 items)
+                    // Type selector — scrollable pill bar
                     VStack(alignment: .leading, spacing: 6) {
                         Text("ITEM TYPE")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.secondary)
 
-                        Picker("Item Type", selection: $type) {
-                            ForEach(ItemType.allCases) { t in
-                                Label(t.displayName, systemImage: t.iconName).tag(t)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(ItemType.allCases) { t in
+                                    Button(action: { type = t }) {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: t.iconName)
+                                                .font(.system(size: 11, weight: .semibold))
+                                            Text(t.displayName)
+                                                .font(.system(size: 12, weight: .semibold))
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .background(
+                                            type == t
+                                                ? Color.accentColor
+                                                : Color.white.opacity(0.08)
+                                        )
+                                        .foregroundColor(
+                                            type == t ? .white : .secondary
+                                        )
+                                        .clipShape(Capsule())
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(
+                                                    type == t
+                                                        ? Color.clear
+                                                        : Color.white.opacity(0.1),
+                                                    lineWidth: 1
+                                                )
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .animation(.easeInOut(duration: 0.15), value: type)
+                                }
                             }
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 2)
                         }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(Color.black.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(4)
+                        .background(Color.black.opacity(0.25))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
 
                     // Title
