@@ -164,6 +164,7 @@ function createDropdownUI(items, rect) {
         noItems.textContent = `No passwords saved for ${window.location.hostname}`;
         noItems.style.padding = '8px 12px';
         noItems.style.color = '#666';
+        noItems.style.fontSize = '12px';
         dropdown.appendChild(noItems);
     }
     else {
@@ -221,6 +222,39 @@ function createDropdownUI(items, rect) {
             dropdown.appendChild(row);
         });
     }
+    // Add 1-Click Masked Protected Alias Option
+    const generateRow = document.createElement('div');
+    generateRow.style.padding = '8px 12px';
+    generateRow.style.cursor = 'pointer';
+    generateRow.style.backgroundColor = '#f8fafc';
+    generateRow.style.borderTop = '1px solid #e2e8f0';
+    generateRow.style.display = 'flex';
+    generateRow.style.alignItems = 'center';
+    generateRow.style.gap = '8px';
+    generateRow.innerHTML = `
+    <span style="font-size: 14px;">🛡️</span>
+    <div style="display: flex; flex-direction: column;">
+      <span style="font-weight: 600; font-size: 12px; color: #0284c7;">Generate Masked Protected Alias</span>
+      <span style="font-size: 10px; color: #64748b;">Auto-forwards to your connected inbox</span>
+    </div>
+  `;
+    generateRow.addEventListener('mouseenter', () => generateRow.style.backgroundColor = '#f1f5f9');
+    generateRow.addEventListener('mouseleave', () => generateRow.style.backgroundColor = '#f8fafc');
+    generateRow.addEventListener('click', () => {
+        chrome.runtime.sendMessage({
+            type: 'GENERATE_PROTECTED_ALIAS',
+            url: window.location.href,
+            domain: window.location.hostname
+        }, (res) => {
+            if (res && res.success) {
+                injectCredentials(res.aliasEmail, undefined, currentFocusedInput || undefined);
+                showSuccessNotification(`🛡️ Protected alias (${res.aliasEmail}) autofilled! Forwarding to ${res.forwardTo}`);
+                dropdown.remove();
+                activeDropdown = null;
+            }
+        });
+    });
+    dropdown.appendChild(generateRow);
     document.body.appendChild(dropdown);
     activeDropdown = dropdown;
     const closeOnClickOutside = (e) => {
@@ -253,10 +287,120 @@ document.addEventListener('focusin', (e) => {
         }
     }
 });
-// 6. Listen for INJECT_CREDENTIALS
+// 6. Threat Alert Banner & Protection
+function showThreatBanner(analysis, connectedAccount) {
+    if (document.getElementById('kloak-threat-banner'))
+        return;
+    const banner = document.createElement('div');
+    banner.id = 'kloak-threat-banner';
+    banner.style.cssText = `
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483647;
+    background: linear-gradient(135deg, rgba(24, 16, 16, 0.96), rgba(38, 20, 20, 0.96));
+    border: 1px solid rgba(239, 68, 68, 0.6);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.25);
+    border-radius: 12px;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #f3f4f6;
+    max-width: 90vw;
+    width: auto;
+  `;
+    const reasonSummary = (analysis.reasons && analysis.reasons.length > 0)
+        ? analysis.reasons[0]
+        : 'Potential phishing or unverified login form';
+    const domainDisplay = analysis.targetDomain || window.location.hostname;
+    banner.innerHTML = `
+    <div style="font-size: 24px; line-height: 1;">⚠️</div>
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 13px; font-weight: 700; color: #fca5a5; display: flex; align-items: center; gap: 6px;">
+        Kloak Threat Shield: Suspicious Website (${domainDisplay})
+        <span style="font-size: 10px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1px 6px; border-radius: 99px; color: #f87171;">Risk: ${analysis.riskScore || 65}%</span>
+      </div>
+      <div style="font-size: 11px; color: #d1d5db;">
+        ${reasonSummary}. Protect your real email with a custom disposable alias.
+      </div>
+    </div>
+    <button id="kloak-btn-protect" style="
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    ">
+      🛡️ Protect with Masked Alias
+    </button>
+    <button id="kloak-btn-dismiss" style="
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #9ca3af;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">✕</button>
+  `;
+    document.body.appendChild(banner);
+    banner.querySelector('#kloak-btn-dismiss')?.addEventListener('click', () => {
+        banner.remove();
+    });
+    banner.querySelector('#kloak-btn-protect')?.addEventListener('click', () => {
+        chrome.runtime.sendMessage({
+            type: 'GENERATE_PROTECTED_ALIAS',
+            url: window.location.href,
+            domain: domainDisplay
+        }, (res) => {
+            if (res && res.success) {
+                injectCredentials(res.aliasEmail);
+                showSuccessNotification(`🛡️ Protected alias (${res.aliasEmail}) autofilled! Forwarding to ${res.forwardTo}`);
+                banner.remove();
+            }
+        });
+    });
+}
+// Check Threat on load
+function checkPageThreat() {
+    chrome.runtime.sendMessage({
+        type: 'CHECK_THREAT',
+        url: window.location.href
+    }, (res) => {
+        if (res && res.analysis && res.analysis.isSuspicious) {
+            showThreatBanner(res.analysis, res.connectedAccount);
+        }
+    });
+}
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    checkPageThreat();
+}
+else {
+    window.addEventListener('DOMContentLoaded', checkPageThreat);
+}
+// 7. Listen for incoming messages
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'INJECT_CREDENTIALS') {
         injectCredentials(message.username, message.password);
+    }
+    else if (message.type === 'THREAT_DETECTED') {
+        showThreatBanner(message.analysis, message.connectedAccount);
     }
 });
 // 7. Keep existing save-password detection and prompt
@@ -285,19 +429,22 @@ function showSavePasswordPrompt(username, password) {
         }
     });
 }
-function showSuccessNotification() {
+function showSuccessNotification(customMsg) {
     const notif = document.createElement('div');
-    notif.textContent = 'Password saved securely!';
+    notif.textContent = customMsg || 'Password saved securely!';
     notif.style.position = 'fixed';
     notif.style.bottom = '20px';
     notif.style.right = '20px';
-    notif.style.backgroundColor = '#4CAF50';
+    notif.style.backgroundColor = '#10B981';
     notif.style.color = 'white';
-    notif.style.padding = '12px 24px';
-    notif.style.borderRadius = '4px';
+    notif.style.padding = '12px 20px';
+    notif.style.borderRadius = '8px';
+    notif.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+    notif.style.fontSize = '12px';
+    notif.style.fontWeight = '600';
     notif.style.zIndex = '2147483647';
     document.body.appendChild(notif);
-    setTimeout(() => notif.remove(), 3000);
+    setTimeout(() => notif.remove(), 3500);
 }
 setupFormSubmissionDetector();
 // 8. MutationObserver for dynamic forms

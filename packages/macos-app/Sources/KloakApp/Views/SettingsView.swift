@@ -67,7 +67,102 @@ public struct SettingsView: View {
                 .padding(14)
                 .glassEffect(cornerRadius: 16)
 
-                // Section 2: Zero-Knowledge Standalone Mode & Apple Keychain
+                // Section 2: Connected Accounts & Malicious Website Shield
+                VStack(alignment: .leading, spacing: 16) {
+                    Label("Connected Accounts & Threat Shield", systemImage: "shield.lefthalf.filled.badge.checkmark")
+                        .font(.system(size: 14, weight: .bold))
+
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Connect your primary Google, Microsoft, or Proton account. When Kloak detects a malicious, unverified, or phishing website, it automatically generates a custom disposable email alias that safely forwards to your inbox.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+
+                        // Provider Selection Pills
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("CONNECTED EMAIL PROVIDER")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+
+                            HStack(spacing: 8) {
+                                ForEach(["google", "microsoft", "proton", "custom"], id: \.self) { prov in
+                                    Button(action: {
+                                        settings.connectedAccountProvider = prov
+                                        onSaveSettings(settings)
+                                    }) {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: prov == "google" ? "g.circle.fill" : prov == "microsoft" ? "m.circle.fill" : prov == "proton" ? "lock.shield.fill" : "envelope.fill")
+                                                .font(.system(size: 11))
+                                            Text(prov == "google" ? "Google" : prov == "microsoft" ? "Microsoft" : prov == "proton" ? "Proton" : "Custom")
+                                                .font(.system(size: 11, weight: .semibold))
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            (settings.connectedAccountProvider ?? "google") == prov
+                                                ? LiquidGlassTheme.primaryAccent
+                                                : Color.white.opacity(0.08)
+                                        )
+                                        .foregroundColor(
+                                            (settings.connectedAccountProvider ?? "google") == prov
+                                                ? .white
+                                                : .secondary
+                                        )
+                                        .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+
+                        // Connected Account Email
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("FORWARDING DESTINATION EMAIL")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+
+                            HStack {
+                                Image(systemName: "envelope.badge.shield.half.filled.fill")
+                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                TextField("e.g. user@gmail.com, user@outlook.com", text: Binding(
+                                    get: { settings.connectedAccountEmail ?? "" },
+                                    set: { settings.connectedAccountEmail = $0; onSaveSettings(settings) }
+                                ))
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                            }
+                            .padding(8)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+
+                        Divider().opacity(0.15)
+
+                        Toggle("Malicious Website & Phishing Shield", isOn: $settings.maliciousSiteShieldEnabled)
+                            .onChange(of: settings.maliciousSiteShieldEnabled) { _, _ in onSaveSettings(settings) }
+
+                        Toggle("Auto-Suggest Masked Email on Untrusted Pages", isOn: $settings.autoMaskUntrustedSites)
+                            .onChange(of: settings.autoMaskUntrustedSites) { _, _ in onSaveSettings(settings) }
+
+                        HStack(spacing: 8) {
+                            Circle()
+                                .fill(settings.maliciousSiteShieldEnabled ? LiquidGlassTheme.emeraldAccent : Color.gray)
+                                .frame(width: 8, height: 8)
+                            Text(settings.maliciousSiteShieldEnabled
+                                ? "Threat Shield Active • Aliases forward to \(settings.connectedAccountEmail ?? "connected email")"
+                                : "Threat Shield Paused")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(settings.maliciousSiteShieldEnabled ? LiquidGlassTheme.emeraldAccent : .secondary)
+                        }
+                        .padding(.top, 2)
+                    }
+                    .padding(16)
+                    .background(Color.black.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(14)
+                .glassEffect(cornerRadius: 16)
+
+                // Section 3: Zero-Knowledge Standalone Mode & Apple Keychain
                 VStack(alignment: .leading, spacing: 16) {
                     Label("Zero-Knowledge Standalone Mode", systemImage: "shield.checkered")
                         .font(.system(size: 14, weight: .bold))

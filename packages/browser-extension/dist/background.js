@@ -1,11 +1,11 @@
-"use strict";
-/**
- * Kloak Browser Extension — Service Worker (MV3)
- * Native Messaging Host connector, vault IPC sync, badge manager & phishing defense.
- */
+import { analyzeUrl, generateMaskedAlias } from './threat-detector';
 const NATIVE_HOST = 'app.kloak.native';
 let cachedItems = [];
 let isVaultUnlocked = false;
+let connectedAccount = {
+    provider: 'google',
+    email: 'naetik.arvind@gmail.com'
+};
 let lastActiveTabId = null;
 let lastActiveUrl = null;
 // Fallback demo vault items
@@ -188,6 +188,21 @@ async function updateBadgeForTab(tabId, urlStr) {
             await chrome.action.setBadgeText({ tabId, text: '' });
             return;
         }
+        // 1. Check Threat Shield
+        const threat = analyzeUrl(urlStr);
+        if (threat.isSuspicious) {
+            await chrome.action.setBadgeText({ tabId, text: '⚠️' });
+            await chrome.action.setBadgeBackgroundColor({ tabId, color: '#E53935' });
+            try {
+                await chrome.tabs.sendMessage(tabId, {
+                    type: 'THREAT_DETECTED',
+                    analysis: threat,
+                    connectedAccount
+                });
+            }
+            catch { }
+            return;
+        }
         let matches = [];
         const nativeMatches = await sendNativeRequest('vault.matchByUrl', { url: urlStr });
         if (Array.isArray(nativeMatches) && nativeMatches.length > 0) {
@@ -214,6 +229,71 @@ async function updateBadgeForTab(tabId, urlStr) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     (async () => {
         switch (message.type) {
+            case 'CHECK_THREAT': {
+                const url = message.url || (sender.tab?.url ?? '');
+                const analysis = analyzeUrl(url);
+                sendResponse({ success: true, analysis, connectedAccount });
+                break;
+            }
+            case 'GENERATE_PROTECTED_ALIAS': {
+                const urlStr = message.url || (sender.tab?.url ?? '');
+                let targetDomain = message.domain || '';
+                try {
+                    if (!targetDomain && urlStr) {
+                        targetDomain = new URL(urlStr).hostname.replace(/^www\./, '');
+                    }
+                }
+                catch { }
+                targetDomain = targetDomain || 'untrusted-site';
+                const aliasEmail = generateMaskedAlias(targetDomain);
+                const forwardTo = connectedAccount.customForwardingEmail || connectedAccount.email || 'naetik.arvind@gmail.com';
+                const provider = (connectedAccount.provider || 'google').toUpperCase();
+                const newItem = {
+                    id: `alias-${Date.now()}`,
+                    type: 'email_alias',
+                    title: `Shield Alias (${targetDomain})`,
+                    username: aliasEmail,
+                    urls: urlStr ? [urlStr] : [],
+                    notes: `Kloak Threat Shield: Auto-generated disposable alias for ${targetDomain}. Emails automatically forward to ${forwardTo}.`,
+                    alias: {
+                        aliasEmail,
+                        forwardTo,
+                        provider: `Kloak Shield (${provider})`
+                    },
+                    tags: ['Shield', 'Protected Alias']
+                };
+                // Persist to native vault or local cache
+                try {
+                    await sendNativeRequest('shield.generateProtectedAlias', { url: urlStr, domain: targetDomain });
+                }
+                catch {
+                    await sendNativeRequest('vault.addItem', { item: newItem });
+                }
+                const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
+                pool.push(newItem);
+                sendResponse({
+                    success: true,
+                    aliasEmail,
+                    forwardTo,
+                    provider: `Kloak Shield (${provider})`
+                });
+                break;
+            }
+            case 'GET_CONNECTED_ACCOUNT': {
+                try {
+                    const res = await sendNativeRequest('shield.getConnectedAccount', {});
+                    if (res && res.email) {
+                        connectedAccount = {
+                            provider: res.provider || 'google',
+                            email: res.email,
+                            customForwardingEmail: res.customForwardingEmail
+                        };
+                    }
+                }
+                catch { }
+                sendResponse({ success: true, connectedAccount });
+                break;
+            }
             case 'PUSH_ACTIVE_URL': {
                 if (message.tabId) {
                     lastActiveTabId = message.tabId;
@@ -221,6 +301,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (message.url) {
                     lastActiveUrl = message.url;
                     notifyMacOSApp(message.url);
+                    if (sender.tab?.id) {
+                        updateBadgeForTab(sender.tab.id, message.url);
+                    }
                 }
                 sendResponse({ success: true });
                 break;

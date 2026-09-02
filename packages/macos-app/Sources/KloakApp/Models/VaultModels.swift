@@ -295,13 +295,27 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var biometricsEnabled: Bool
     public var defaultPasswordLength: Int
     public var keychainSyncEnabled: Bool
+    
+    // Malicious Site Shield & Connected Accounts
+    public var maliciousSiteShieldEnabled: Bool
+    public var connectedAccountProvider: String? // "google", "microsoft", "proton", "custom"
+    public var connectedAccountEmail: String?
+    public var customForwardingEmail: String?
+    public var autoMaskUntrustedSites: Bool
+    public var threatSensitivity: String // "high", "balanced", "low"
 
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
         clearClipboardSeconds: 30,
         biometricsEnabled: false,
         defaultPasswordLength: 20,
-        keychainSyncEnabled: false
+        keychainSyncEnabled: false,
+        maliciousSiteShieldEnabled: true,
+        connectedAccountProvider: "google",
+        connectedAccountEmail: "naetik.arvind@gmail.com",
+        customForwardingEmail: nil,
+        autoMaskUntrustedSites: true,
+        threatSensitivity: "balanced"
     )
 
     public init(
@@ -309,13 +323,25 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         clearClipboardSeconds: Int = 30,
         biometricsEnabled: Bool = false,
         defaultPasswordLength: Int = 20,
-        keychainSyncEnabled: Bool = false
+        keychainSyncEnabled: Bool = false,
+        maliciousSiteShieldEnabled: Bool = true,
+        connectedAccountProvider: String? = "google",
+        connectedAccountEmail: String? = "naetik.arvind@gmail.com",
+        customForwardingEmail: String? = nil,
+        autoMaskUntrustedSites: Bool = true,
+        threatSensitivity: String = "balanced"
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
         self.biometricsEnabled = biometricsEnabled
         self.defaultPasswordLength = defaultPasswordLength
         self.keychainSyncEnabled = keychainSyncEnabled
+        self.maliciousSiteShieldEnabled = maliciousSiteShieldEnabled
+        self.connectedAccountProvider = connectedAccountProvider
+        self.connectedAccountEmail = connectedAccountEmail
+        self.customForwardingEmail = customForwardingEmail
+        self.autoMaskUntrustedSites = autoMaskUntrustedSites
+        self.threatSensitivity = threatSensitivity
     }
 
     public init(from decoder: Decoder) throws {
@@ -325,6 +351,12 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.biometricsEnabled = try container.decodeIfPresent(Bool.self, forKey: .biometricsEnabled) ?? false
         self.defaultPasswordLength = try container.decodeIfPresent(Int.self, forKey: .defaultPasswordLength) ?? 20
         self.keychainSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .keychainSyncEnabled) ?? false
+        self.maliciousSiteShieldEnabled = try container.decodeIfPresent(Bool.self, forKey: .maliciousSiteShieldEnabled) ?? true
+        self.connectedAccountProvider = try container.decodeIfPresent(String.self, forKey: .connectedAccountProvider) ?? "google"
+        self.connectedAccountEmail = try container.decodeIfPresent(String.self, forKey: .connectedAccountEmail) ?? "naetik.arvind@gmail.com"
+        self.customForwardingEmail = try container.decodeIfPresent(String.self, forKey: .customForwardingEmail)
+        self.autoMaskUntrustedSites = try container.decodeIfPresent(Bool.self, forKey: .autoMaskUntrustedSites) ?? true
+        self.threatSensitivity = try container.decodeIfPresent(String.self, forKey: .threatSensitivity) ?? "balanced"
     }
 }
 

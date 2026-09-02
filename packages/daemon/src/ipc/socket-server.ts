@@ -247,6 +247,72 @@ export class IpcSocketServer {
         this.vaultManager.updateMasterPassword(params.oldPassword, params.newPassword);
         return { success: true };
 
+      case 'shield.inspectUrl': {
+        const urlStr = params.url || '';
+        let isSuspicious = false;
+        let riskScore = 0;
+        const reasons: string[] = [];
+        try {
+          const u = new URL(urlStr);
+          const host = u.hostname.toLowerCase();
+          if (/^(\d{1,3}\.){3}\d{1,3}$/.test(host)) {
+            isSuspicious = true;
+            riskScore += 45;
+            reasons.push('Raw IP address host');
+          }
+          if (['tk', 'ml', 'ga', 'cf', 'gq', 'top', 'xyz', 'click'].some(tld => host.endsWith('.' + tld))) {
+            isSuspicious = true;
+            riskScore += 35;
+            reasons.push('High-risk top-level domain');
+          }
+        } catch {}
+        return {
+          isSuspicious,
+          riskScore,
+          reasons,
+          suggestedAction: isSuspicious ? 'mask_email' : 'safe'
+        };
+      }
+
+      case 'shield.generateProtectedAlias': {
+        const domain = params.domain || 'untrusted-site';
+        const clean = domain.replace(/^www\./, '').split('.')[0] || 'site';
+        const randomHex = Math.random().toString(36).substring(2, 8);
+        const aliasEmail = `protect.${clean}.${randomHex}@shield.kloak.app`;
+        const forwardTo = 'naetik.arvind@gmail.com';
+        const item = {
+          id: `alias-${Date.now()}`,
+          type: 'email_alias',
+          title: `Shield Alias (${domain})`,
+          username: aliasEmail,
+          urls: params.url ? [params.url] : [],
+          notes: `Kloak Threat Shield: Disposable alias for ${domain}. Emails forwarded to ${forwardTo}.`,
+          alias: {
+            aliasEmail,
+            forwardTo,
+            provider: 'Kloak Shield'
+          },
+          tags: ['Shield', 'Protected Alias']
+        };
+        try {
+          this.vaultManager.addItem(item as any);
+        } catch {}
+        return {
+          aliasEmail,
+          forwardTo,
+          provider: 'Kloak Shield',
+          success: true
+        };
+      }
+
+      case 'shield.getConnectedAccount':
+        return {
+          provider: 'google',
+          email: 'naetik.arvind@gmail.com',
+          shieldEnabled: true,
+          autoMaskUntrusted: true
+        };
+
       default:
         throw new Error(`Unknown method: ${method}`);
     }

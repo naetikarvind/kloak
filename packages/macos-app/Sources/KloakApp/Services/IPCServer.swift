@@ -367,6 +367,62 @@ public final class IPCServer: ObservableObject {
                 sendError(on: connection, id: reqId, code: -32000, message: "Invalid Base32 TOTP secret")
             }
 
+        case "shield.inspectUrl":
+            let url = params?["url"]?.stringValue ?? ""
+            let analysis = ThreatDetectorService.shared.analyzeUrl(url)
+            var reasonsCodable: [AnyCodableValue] = []
+            for r in analysis.reasons {
+                reasonsCodable.append(.string(r))
+            }
+            sendResult(on: connection, id: reqId, result: .dictionary([
+                "isSuspicious": .bool(analysis.isSuspicious),
+                "riskScore": .int(analysis.riskScore),
+                "targetDomain": .string(analysis.targetDomain ?? ""),
+                "reasons": .array(reasonsCodable),
+                "suggestedAction": .string(analysis.suggestedAction),
+                "suggestedAliasEmail": .string(analysis.suggestedAliasEmail ?? "")
+            ]))
+
+        case "shield.generateProtectedAlias":
+            let url = params?["url"]?.stringValue ?? ""
+            let targetDomain = params?["domain"]?.stringValue ?? (URL(string: url)?.host ?? "untrusted-site")
+            let generatedEmail = ThreatDetectorService.shared.generateMaskedAlias(for: targetDomain)
+            let forwardDestination = store.settings.customForwardingEmail ?? store.settings.connectedAccountEmail ?? "naetik.arvind@gmail.com"
+            let providerName = (store.settings.connectedAccountProvider ?? "google").capitalized
+
+            let newAliasItem = VaultItem(
+                type: .emailAlias,
+                title: "Shield Alias (\(targetDomain))",
+                username: generatedEmail,
+                urls: url.isEmpty ? [] : [url],
+                notes: "Kloak Threat Shield: Auto-generated disposable alias for \(targetDomain). Emails forward to \(forwardDestination).",
+                alias: AliasDetails(
+                    aliasEmail: generatedEmail,
+                    forwardTo: forwardDestination,
+                    provider: "Kloak Shield (\(providerName))"
+                ),
+                tags: ["Shield", "Protected Alias"]
+            )
+
+            store.saveItem(newAliasItem)
+
+            sendResult(on: connection, id: reqId, result: .dictionary([
+                "aliasEmail": .string(generatedEmail),
+                "forwardTo": .string(forwardDestination),
+                "provider": .string("Kloak Shield"),
+                "itemId": .string(newAliasItem.id),
+                "success": .bool(true)
+            ]))
+
+        case "shield.getConnectedAccount":
+            sendResult(on: connection, id: reqId, result: .dictionary([
+                "provider": .string(store.settings.connectedAccountProvider ?? "google"),
+                "email": .string(store.settings.connectedAccountEmail ?? "naetik.arvind@gmail.com"),
+                "customForwardingEmail": .string(store.settings.customForwardingEmail ?? ""),
+                "shieldEnabled": .bool(store.settings.maliciousSiteShieldEnabled),
+                "autoMaskUntrusted": .bool(store.settings.autoMaskUntrustedSites)
+            ]))
+
         case "vault.lock":
             store.lock()
             sendResult(on: connection, id: reqId, result: .dictionary(["success": .bool(true)]))
