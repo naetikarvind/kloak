@@ -6,7 +6,7 @@ MACOS_APP_DIR="$REPO_ROOT/packages/macos-app"
 DIST_DIR="$REPO_ROOT/dist"
 APP_NAME="Kloak"
 APP_BUNDLE="$DIST_DIR/$APP_NAME.app"
-BINARY_NAME="KloakApp"
+BINARY_NAME="Kloak"
 
 echo "============================="
 echo "  Kloak .app builder"

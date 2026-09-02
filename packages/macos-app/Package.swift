@@ -7,7 +7,7 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "KloakApp", targets: ["KloakApp"])
+        .executable(name: "Kloak", targets: ["KloakApp"])
     ],
     dependencies: [],
     targets: [
