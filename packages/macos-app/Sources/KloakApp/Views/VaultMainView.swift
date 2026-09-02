@@ -124,6 +124,7 @@ public struct VaultMainView: View {
             .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
         } content: {
             mainColumnView
+                .id(selection)
                 .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
         } detail: {
             if let selId = selectedItemId, let itemBinding = binding(for: selId) {
@@ -156,6 +157,10 @@ public struct VaultMainView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        .onChange(of: selection) { _, _ in
+            selectedItemId = nil
+            searchText = ""
         }
         .sheet(isPresented: $isShowingNewItemSheet) {
             NewItemSheet(
@@ -278,7 +283,7 @@ public struct NewItemSheet: View {
             // Form Content
             ScrollView {
                 VStack(spacing: 14) {
-                    // Type selector
+                    // Type selector — menu dropdown (segmented clips with 6 items)
                     VStack(alignment: .leading, spacing: 6) {
                         Text("ITEM TYPE")
                             .font(.system(size: 10, weight: .bold))
@@ -289,7 +294,12 @@ public struct NewItemSheet: View {
                                 Label(t.displayName, systemImage: t.iconName).tag(t)
                             }
                         }
-                        .pickerStyle(.segmented)
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(Color.black.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
 
                     // Title
