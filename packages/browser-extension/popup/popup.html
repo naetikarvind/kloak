@@ -462,9 +462,15 @@
     .suggested-row .item-avatar {
       width: 26px;
       height: 26px;
+      border-radius: 6px;
       font-size: 11px;
       margin-right: 0;
     }
+    .suggested-row .item-avatar.has-image {
+      background: #ffffff;
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    .suggested-row .item-avatar img { width: 18px; height: 18px; object-fit: contain; }
     .suggested-row .item-info {
       flex: 1;
       min-width: 0;
@@ -642,18 +648,23 @@
     }
 
     .item-avatar {
-      width: 32px; height: 32px; border-radius: 50%;
+      width: 32px; height: 32px; border-radius: 8px;
       background: var(--bg-card); display: flex;
       align-items: center; justify-content: center;
       margin-right: 10px; flex-shrink: 0;
       color: var(--text-muted); overflow: hidden;
       font-size: 13px; font-weight: 600;
       transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    .item-avatar.has-image {
+      background: #ffffff;
+      border: 1px solid rgba(255,255,255,0.18);
     }
     .list-item:hover .item-avatar { transform: scale(1.06); }
-    .list-item.active .item-avatar { color: var(--accent); border: 1px solid var(--accent); }
+    .list-item.active .item-avatar { border-color: var(--accent); }
     .item-avatar svg { width: 16px; height: 16px; fill: currentColor; }
-    .item-avatar img { width: 22px; height: 22px; border-radius: 3px; }
+    .item-avatar img { width: 22px; height: 22px; object-fit: contain; }
 
     .item-info { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     .item-title {

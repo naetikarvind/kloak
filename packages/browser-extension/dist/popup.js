@@ -942,19 +942,7 @@ function renderSmartSuggestions(items) {
         row.className = 'suggested-row';
         const avatar = document.createElement('div');
         avatar.className = 'item-avatar';
-        const faviconUrl = getFaviconUrl(item);
-        if (faviconUrl) {
-            const img = document.createElement('img');
-            img.src = faviconUrl;
-            img.onerror = () => {
-                img.remove();
-                avatar.textContent = getInitialLetter(item);
-            };
-            avatar.appendChild(img);
-        }
-        else {
-            avatar.textContent = getInitialLetter(item);
-        }
+        renderItemAvatar(avatar, item, 26);
         const info = document.createElement('div');
         info.className = 'item-info';
         const titleDiv = document.createElement('div');
@@ -1026,23 +1014,226 @@ async function loadLogins() {
         }
     });
 }
-// ── Favicon & Avatar Helper ──
-function getFaviconUrl(item) {
-    try {
-        if (item.urls && item.urls.length > 0) {
-            const url = new URL(item.urls[0]);
-            return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=32`;
-        }
-        const title = (item.title || '').toLowerCase();
-        if (title.includes('.')) {
-            return `https://www.google.com/s2/favicons?domain=${title}&sz=32`;
+// ── Brand Recognition & Favicon Engine ──
+const BRAND_DOMAINS = {
+    "gemini": "gemini.google.com",
+    "google gemini": "gemini.google.com",
+    "deepmind": "deepmind.google",
+    "chatgpt": "openai.com",
+    "openai": "openai.com",
+    "claude": "anthropic.com",
+    "anthropic": "anthropic.com",
+    "github": "github.com",
+    "copilot": "github.com",
+    "cursor": "cursor.com",
+    "proton": "proton.me",
+    "protonmail": "proton.me",
+    "proton mail": "proton.me",
+    "google": "google.com",
+    "gmail": "google.com",
+    "google workspace": "google.com",
+    "apple": "apple.com",
+    "icloud": "apple.com",
+    "apple card": "apple.com",
+    "amazon": "amazon.com",
+    "aws": "aws.amazon.com",
+    "netflix": "netflix.com",
+    "spotify": "spotify.com",
+    "discord": "discord.com",
+    "slack": "slack.com",
+    "notion": "notion.so",
+    "figma": "figma.com",
+    "dropbox": "dropbox.com",
+    "huggingface": "huggingface.co",
+    "replicate": "replicate.com",
+    "midjourney": "midjourney.com",
+    "perplexity": "perplexity.ai",
+    "twitter": "x.com",
+    "x.com": "x.com",
+    "reddit": "reddit.com",
+    "linkedin": "linkedin.com",
+    "facebook": "facebook.com",
+    "meta": "meta.com",
+    "instagram": "instagram.com",
+    "gitlab": "gitlab.com",
+    "bitbucket": "bitbucket.org",
+    "atlassian": "atlassian.com",
+    "stripe": "stripe.com",
+    "paypal": "paypal.com",
+    "linear": "linear.app",
+    "vercel": "vercel.com",
+    "supabase": "supabase.com",
+    "tailscale": "tailscale.com",
+    "docker": "docker.com",
+    "cloudflare": "cloudflare.com",
+    "digitalocean": "digitalocean.com",
+    "heroku": "heroku.com",
+    "zoom": "zoom.us",
+    "uber": "uber.com",
+    "airbnb": "airbnb.com",
+    "pinterest": "pinterest.com",
+    "twitch": "twitch.tv",
+    "steam": "steampowered.com",
+    "epic games": "epicgames.com",
+    "playstation": "playstation.com",
+    "xbox": "xbox.com",
+    "nintendo": "nintendo.com",
+    "ebay": "ebay.com",
+    "adobe": "adobe.com",
+    "shopify": "shopify.com",
+    "whatsapp": "whatsapp.com",
+    "telegram": "telegram.org",
+    "signal": "signal.org",
+    "1password": "1password.com",
+    "bitwarden": "bitwarden.com",
+    "chase": "chase.com",
+    "bank of america": "bankofamerica.com",
+    "wells fargo": "wellsfargo.com",
+    "citi": "citi.com",
+    "american express": "americanexpress.com",
+    "amex": "americanexpress.com",
+    "mastercard": "mastercard.com",
+    "visa": "visa.com",
+    "hotstar": "hotstar.com",
+    "tabrr": "tabrr.com",
+    "dribbble": "dribbble.com",
+    "macked": "mcdonalds.com",
+    "mcdonald": "mcdonalds.com",
+    "roblox": "roblox.com",
+    "bandlab": "bandlab.com",
+    "scratch": "scratch.mit.edu",
+    "entrar": "entrar.in",
+    "entr": "entrar.in",
+    "codeskool": "codeskool.cc",
+    "office": "microsoft.com",
+    "officeapps": "microsoft.com",
+    "live.com": "microsoft.com",
+    "microsoft": "microsoft.com"
+};
+function cleanDomainHost(h) {
+    let domain = h.toLowerCase().trim();
+    const prefixes = ["www.", "app.", "mail.", "accounts.", "login.", "signin.", "auth.", "m.", "dashboard.", "portal.", "api.", "sso.", "my.", "web."];
+    for (const p of prefixes) {
+        if (domain.startsWith(p)) {
+            domain = domain.slice(p.length);
+            break;
         }
     }
-    catch { /* ignore */ }
-    return null;
+    return domain;
+}
+function resolveItemDomains(item) {
+    const domains = [];
+    // 1. From OAuth provider
+    if (item.oauth?.provider) {
+        const prov = item.oauth.provider.toLowerCase().trim();
+        if (BRAND_DOMAINS[prov])
+            domains.push(BRAND_DOMAINS[prov]);
+    }
+    // 2. From URLs
+    if (item.urls && Array.isArray(item.urls)) {
+        for (const u of item.urls) {
+            if (!u || typeof u !== 'string')
+                continue;
+            const str = u.trim();
+            let host = '';
+            try {
+                if (str.includes('://')) {
+                    host = new URL(str).hostname;
+                }
+                else {
+                    host = new URL('https://' + str).hostname;
+                }
+            }
+            catch { }
+            if (host) {
+                const cleaned = cleanDomainHost(host);
+                if (!domains.includes(cleaned))
+                    domains.push(cleaned);
+                if (cleaned !== host && !domains.includes(host))
+                    domains.push(host);
+            }
+        }
+    }
+    // 3. From Title (Brand inference)
+    const title = (item.title || '').toLowerCase().trim();
+    for (const [brand, dom] of Object.entries(BRAND_DOMAINS)) {
+        if (title === brand || title.includes(brand)) {
+            if (!domains.includes(dom))
+                domains.push(dom);
+            break;
+        }
+    }
+    // 4. If title itself looks like a domain (e.g. entrar.in or odc.officeapps.live.com)
+    if (title.includes('.') && !title.includes(' ')) {
+        const cleaned = cleanDomainHost(title);
+        if (!domains.includes(cleaned))
+            domains.push(cleaned);
+    }
+    return domains;
+}
+function getFaviconCandidates(domain) {
+    return [
+        `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+        `https://logo.clearbit.com/${domain}?size=64`,
+        `https://unavatar.io/${domain}?fallback=false`
+    ];
 }
 function getInitialLetter(item) {
     return (item.title || '?').charAt(0).toUpperCase();
+}
+function renderItemAvatar(avatarEl, item, size = 32) {
+    avatarEl.innerHTML = '';
+    avatarEl.classList.remove('has-image');
+    const domains = resolveItemDomains(item);
+    if (domains.length === 0) {
+        if (item.type && item.type !== 'login' && PROTON_ICONS[item.type]) {
+            avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: currentColor;"><path d="${PROTON_ICONS[item.type]}"/></svg>`;
+            avatarEl.style.color = PROTON_COLORS[item.type] || 'var(--text-muted)';
+        }
+        else {
+            avatarEl.textContent = getInitialLetter(item);
+            avatarEl.style.color = 'var(--text-muted)';
+        }
+        return;
+    }
+    const candidateUrls = [];
+    for (const d of domains) {
+        candidateUrls.push(...getFaviconCandidates(d));
+    }
+    let candidateIdx = 0;
+    const tryNext = () => {
+        if (candidateIdx >= candidateUrls.length) {
+            avatarEl.classList.remove('has-image');
+            avatarEl.innerHTML = '';
+            if (item.type && item.type !== 'login' && PROTON_ICONS[item.type]) {
+                avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: currentColor;"><path d="${PROTON_ICONS[item.type]}"/></svg>`;
+                avatarEl.style.color = PROTON_COLORS[item.type] || 'var(--text-muted)';
+            }
+            else {
+                avatarEl.textContent = getInitialLetter(item);
+                avatarEl.style.color = 'var(--text-muted)';
+            }
+            return;
+        }
+        const img = document.createElement('img');
+        img.src = candidateUrls[candidateIdx];
+        img.onload = () => {
+            if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
+                candidateIdx++;
+                tryNext();
+                return;
+            }
+            avatarEl.innerHTML = '';
+            avatarEl.classList.add('has-image');
+            avatarEl.appendChild(img);
+        };
+        img.onerror = () => {
+            candidateIdx++;
+            tryNext();
+        };
+    };
+    tryNext();
 }
 // ── Sidebar List ──
 function renderSidebarList(items) {
@@ -1063,19 +1254,7 @@ function renderSidebarList(items) {
         row.className = `list-item ${activeItem?.id === item.id ? 'active' : ''}`;
         const avatar = document.createElement('div');
         avatar.className = 'item-avatar';
-        const faviconUrl = getFaviconUrl(item);
-        if (faviconUrl) {
-            const img = document.createElement('img');
-            img.src = faviconUrl;
-            img.onerror = () => {
-                img.remove();
-                avatar.textContent = getInitialLetter(item);
-            };
-            avatar.appendChild(img);
-        }
-        else {
-            avatar.textContent = getInitialLetter(item);
-        }
+        renderItemAvatar(avatar, item, 32);
         const info = document.createElement('div');
         info.className = 'item-info';
         const titleEl = document.createElement('div');
@@ -1126,9 +1305,23 @@ function renderDetailPane(item) {
     // Header
     const header = document.createElement('div');
     header.className = 'detail-header';
+    const titleGroup = document.createElement('div');
+    titleGroup.style.display = 'flex';
+    titleGroup.style.alignItems = 'center';
+    titleGroup.style.gap = '10px';
+    titleGroup.style.minWidth = '0';
+    titleGroup.style.flex = '1';
+    const headerAvatar = document.createElement('div');
+    headerAvatar.className = 'item-avatar';
+    headerAvatar.style.width = '32px';
+    headerAvatar.style.height = '32px';
+    headerAvatar.style.marginRight = '0';
+    renderItemAvatar(headerAvatar, item, 32);
     const titleEl = document.createElement('div');
     titleEl.className = 'detail-title';
     titleEl.textContent = title;
+    titleGroup.appendChild(headerAvatar);
+    titleGroup.appendChild(titleEl);
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'detail-actions';
     actionsDiv.innerHTML = `
@@ -1141,7 +1334,7 @@ function renderDetailPane(item) {
       Edit
     </button>
   `;
-    header.appendChild(titleEl);
+    header.appendChild(titleGroup);
     header.appendChild(actionsDiv);
     container.appendChild(header);
     // Card 1: Username + Password
