@@ -992,25 +992,33 @@ function renderSmartSuggestions(items) {
     });
 }
 // ── Load Logins ──
-async function loadLogins() {
-    chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (res) => {
-        if (res && res.isUnlocked) {
-            chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (searchRes) => {
-                if (searchRes && searchRes.items) {
-                    allItems = searchRes.items;
-                    renderSmartSuggestions(allItems);
-                    applyFilterAndSort();
-                    const sorted = sortItems(allItems);
-                    if (sorted.length > 0)
-                        selectItem(sorted[0]);
-                }
-            });
+async function loadLogins(retryCount = 0) {
+    chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (searchRes) => {
+        if (searchRes && searchRes.isUnlocked && Array.isArray(searchRes.items) && searchRes.items.length > 0) {
+            allItems = searchRes.items;
+            renderSmartSuggestions(allItems);
+            applyFilterAndSort();
+            const sorted = sortItems(allItems);
+            if (sorted.length > 0 && !activeItem)
+                selectItem(sorted[0]);
+        }
+        else if (searchRes && searchRes.isUnlocked) {
+            allItems = searchRes.items || [];
+            renderSmartSuggestions(allItems);
+            applyFilterAndSort();
         }
         else {
-            const container = document.getElementById('sidebar-list');
-            if (container) {
-                container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">Vault is locked.<br>Open the macOS app to unlock.</div>';
-            }
+            chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (statusRes) => {
+                if (statusRes && statusRes.isUnlocked && retryCount < 2) {
+                    setTimeout(() => loadLogins(retryCount + 1), 300);
+                }
+                else if (!statusRes || !statusRes.isUnlocked) {
+                    const container = document.getElementById('sidebar-list');
+                    if (container) {
+                        container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">Vault is locked.<br>Open the macOS app to unlock.</div>';
+                    }
+                }
+            });
         }
     });
 }

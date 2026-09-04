@@ -375,8 +375,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         // 1. Try native search
         const nativeSearch = await sendNativeRequest('vault.search', { query: q });
-        if (Array.isArray(nativeSearch)) {
+        if (Array.isArray(nativeSearch) && (nativeSearch.length > 0 || q !== '')) {
           sendResponse({ success: true, isUnlocked: true, items: nativeSearch });
+          return;
+        }
+
+        const nativeItems = await sendNativeRequest('vault.getItems');
+        if (Array.isArray(nativeItems) && nativeItems.length > 0) {
+          cachedItems = nativeItems;
+          const filtered = q
+            ? nativeItems.filter(item =>
+                (item.title || '').toLowerCase().includes(q) ||
+                (item.username || '').toLowerCase().includes(q) ||
+                (item.urls || []).some((u: string) => u.toLowerCase().includes(q))
+              )
+            : nativeItems;
+          sendResponse({ success: true, isUnlocked: true, items: filtered });
           return;
         }
 
