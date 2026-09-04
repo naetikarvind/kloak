@@ -4,10 +4,11 @@ public struct VaultMainView: View {
     @Binding var isUnlocked: Bool
     @Binding var items: [VaultItem]
     var folders: [VaultFolder]
-    var settings: VaultSettings
+    @Binding var settings: VaultSettings
     var onLock: () -> Void
     var onSaveItem: (VaultItem) -> Void
     var onDeleteItem: (String) -> Void
+    var onSaveSettings: (VaultSettings) -> Void
     var onImport: (String, String) -> (Int, [String])
     var onExport: (String, String?) -> String
     var onChangeMasterPassword: (String, String) -> Bool
@@ -22,10 +23,11 @@ public struct VaultMainView: View {
         isUnlocked: Binding<Bool>,
         items: Binding<[VaultItem]>,
         folders: [VaultFolder],
-        settings: VaultSettings,
+        settings: Binding<VaultSettings>,
         onLock: @escaping () -> Void,
         onSaveItem: @escaping (VaultItem) -> Void,
         onDeleteItem: @escaping (String) -> Void,
+        onSaveSettings: @escaping (VaultSettings) -> Void,
         onImport: @escaping (String, String) -> (Int, [String]),
         onExport: @escaping (String, String?) -> String,
         onChangeMasterPassword: @escaping (String, String) -> Bool
@@ -33,13 +35,23 @@ public struct VaultMainView: View {
         self._isUnlocked = isUnlocked
         self._items = items
         self.folders = folders
-        self.settings = settings
+        self._settings = settings
         self.onLock = onLock
         self.onSaveItem = onSaveItem
         self.onDeleteItem = onDeleteItem
+        self.onSaveSettings = onSaveSettings
         self.onImport = onImport
         self.onExport = onExport
         self.onChangeMasterPassword = onChangeMasterPassword
+    }
+
+    private var isUtilitySection: Bool {
+        switch selection {
+        case .generator, .importExport, .settings:
+            return true
+        default:
+            return false
+        }
     }
 
     private var filteredItems: [VaultItem] {
@@ -88,7 +100,7 @@ public struct VaultMainView: View {
     }
 
     @ViewBuilder
-    private var mainColumnView: some View {
+    private var utilityColumnView: some View {
         switch selection {
         case .generator:
             GeneratorView()
@@ -101,76 +113,99 @@ public struct VaultMainView: View {
             )
         case .settings:
             SettingsView(
-                settings: .constant(settings),
-                onSaveSettings: { _ in },
+                settings: $settings,
+                onSaveSettings: onSaveSettings,
                 onChangeMasterPassword: onChangeMasterPassword
             )
         default:
-            ItemListView(
-                items: filteredItems,
-                selectedItemId: $selectedItemId,
-                searchText: $searchText,
-                onToggleFavorite: { id in
-                    if let idx = items.firstIndex(where: { $0.id == id }) {
-                        items[idx].favorite.toggle()
-                        items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-                        onSaveItem(items[idx])
-                    }
-                },
-                onAddItem: { isShowingNewItemSheet = true }
-            )
+            EmptyView()
         }
     }
 
     public var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(
-                selection: $selection,
-                items: items,
-                folders: folders,
-                onLock: onLock,
-                onAddItem: { isShowingNewItemSheet = true }
-            )
-            .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
-        } content: {
-            mainColumnView
-                .id(selection)
-                .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
-        } detail: {
-            if let selId = selectedItemId, let itemBinding = binding(for: selId) {
-                ItemDetailView(
-                    item: itemBinding,
-                    onSave: { updated in
-                        if let idx = items.firstIndex(where: { $0.id == updated.id }) {
-                            items[idx] = updated
-                            onSaveItem(updated)
-                        }
-                    },
-                    onDelete: { id in
-                        if let idx = items.firstIndex(where: { $0.id == id }) {
-                            items[idx].trashed = true
-                            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-                            onDeleteItem(id)
-                            selectedItemId = nil
-                        }
-                    }
-                )
-            } else {
-                VStack(spacing: 12) {
-                    KloakLogoView(size: 56, glow: true)
-                    Text("No Item Selected")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.secondary)
-                    Text("Choose a credential from the list or press + to create one.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary.opacity(0.7))
+        Group {
+            if isUtilitySection {
+                NavigationSplitView {
+                    SidebarView(
+                        selection: $selection,
+                        items: items,
+                        folders: folders,
+                        onLock: onLock,
+                        onAddItem: { isShowingNewItemSheet = true }
+                    )
+                    .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
+                } detail: {
+                    utilityColumnView
+                        .id(selection)
+                        .frame(minWidth: 540, maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                NavigationSplitView(columnVisibility: $columnVisibility) {
+                    SidebarView(
+                        selection: $selection,
+                        items: items,
+                        folders: folders,
+                        onLock: onLock,
+                        onAddItem: { isShowingNewItemSheet = true }
+                    )
+                    .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 280)
+                } content: {
+                    ItemListView(
+                        items: filteredItems,
+                        selectedItemId: $selectedItemId,
+                        searchText: $searchText,
+                        onToggleFavorite: { id in
+                            if let idx = items.firstIndex(where: { $0.id == id }) {
+                                items[idx].favorite.toggle()
+                                items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                onSaveItem(items[idx])
+                            }
+                        },
+                        onAddItem: { isShowingNewItemSheet = true }
+                    )
+                    .id(selection)
+                    .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
+                } detail: {
+                    if let selId = selectedItemId, let itemBinding = binding(for: selId) {
+                        ItemDetailView(
+                            item: itemBinding,
+                            onSave: { updated in
+                                if let idx = items.firstIndex(where: { $0.id == updated.id }) {
+                                    items[idx] = updated
+                                    onSaveItem(updated)
+                                }
+                            },
+                            onDelete: { id in
+                                if let idx = items.firstIndex(where: { $0.id == id }) {
+                                    items[idx].trashed = true
+                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                    onDeleteItem(id)
+                                    selectedItemId = nil
+                                }
+                            }
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            KloakLogoView(size: 56, glow: true)
+                            Text("No Item Selected")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.secondary)
+                            Text("Choose a credential from the list or press + to create one.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary.opacity(0.7))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
             }
         }
-        .onChange(of: selection) { _, _ in
+        .onAppear {
+            triggerWindowResize(for: selection)
+        }
+        .onChange(of: selection) { _, newSel in
             selectedItemId = nil
             searchText = ""
+            triggerWindowResize(for: newSel)
         }
         .sheet(isPresented: $isShowingNewItemSheet) {
             NewItemSheet(
@@ -188,6 +223,19 @@ public struct VaultMainView: View {
                     isShowingNewItemSheet = false
                 }
             )
+        }
+    }
+
+    private func triggerWindowResize(for sec: NavigationSection) {
+        switch sec {
+        case .settings:
+            WindowSizeManager.shared.resize(to: .vaultSettings)
+        case .generator:
+            WindowSizeManager.shared.resize(to: .vaultGenerator)
+        case .importExport:
+            WindowSizeManager.shared.resize(to: .vaultImport)
+        default:
+            WindowSizeManager.shared.resize(to: .vaultItems)
         }
     }
 

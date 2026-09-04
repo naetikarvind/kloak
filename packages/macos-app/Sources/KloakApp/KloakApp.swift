@@ -38,12 +38,15 @@ public struct KloakApp: App {
             Group {
                 if !vaultStore.hasVault {
                     SetupView()
+                        .onAppear {
+                            WindowSizeManager.shared.resize(to: .setup)
+                        }
                 } else if vaultStore.isUnlocked {
                     VaultMainView(
                         isUnlocked: $vaultStore.isUnlocked,
                         items: $vaultStore.items,
                         folders: vaultStore.folders,
-                        settings: vaultStore.settings,
+                        settings: $vaultStore.settings,
                         onLock: {
                             vaultStore.lock()
                         },
@@ -52,6 +55,9 @@ public struct KloakApp: App {
                         },
                         onDeleteItem: { id in
                             vaultStore.deleteItem(id: id)
+                        },
+                        onSaveSettings: { newSettings in
+                            vaultStore.updateSettings(newSettings)
                         },
                         onImport: { content, format in
                             let parsedItems = parseImportContent(content, format: format)
@@ -71,6 +77,9 @@ public struct KloakApp: App {
                             return success
                         }
                     )
+                    .onAppear {
+                        WindowSizeManager.shared.resize(to: .vaultItems)
+                    }
                 } else {
                     UnlockView(
                         isUnlocked: $vaultStore.isUnlocked,
@@ -81,9 +90,19 @@ public struct KloakApp: App {
                             await vaultStore.unlockWithBiometrics()
                         }
                     )
+                    .onAppear {
+                        WindowSizeManager.shared.resize(to: .unlock)
+                    }
                 }
             }
-            .frame(minWidth: 540, idealWidth: 980, minHeight: 440, idealHeight: 660)
+            .onChange(of: vaultStore.isUnlocked) { _, isUnlocked in
+                if !isUnlocked {
+                    WindowSizeManager.shared.resize(to: .unlock)
+                } else {
+                    WindowSizeManager.shared.resize(to: .vaultItems)
+                }
+            }
+            .frame(minWidth: 420, minHeight: 480)
             .background(.ultraThinMaterial)
         }
         .windowStyle(.hiddenTitleBar)
@@ -93,6 +112,16 @@ public struct KloakApp: App {
                 Button("About Kloak") {
                     NSApp.orderFrontStandardAboutPanel(nil)
                 }
+            }
+            CommandGroup(after: .windowSize) {
+                Button("Auto-Fit Window Size") {
+                    if !vaultStore.isUnlocked {
+                        WindowSizeManager.shared.resize(to: .unlock)
+                    } else {
+                        WindowSizeManager.shared.resize(to: .vaultItems)
+                    }
+                }
+                .keyboardShortcut("0", modifiers: [.command, .option])
             }
             CommandGroup(replacing: .pasteboard) {
                 Button("Cut") {
