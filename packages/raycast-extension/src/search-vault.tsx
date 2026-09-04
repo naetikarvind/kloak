@@ -602,7 +602,7 @@ export default function SearchVaultCommand() {
                     <Action
                       title={isRevealed ? "Hide Password / Secret" : "Reveal Password / Secret"}
                       icon={isRevealed ? Icon.EyeDisabled : Icon.Eye}
-                      shortcut={{ modifiers: ["cmd"], key: "p" }}
+                      shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                       onAction={() => toggleRevealPassword(item.id)}
                     />
 
