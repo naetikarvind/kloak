@@ -12,6 +12,7 @@ import {
 } from "@raycast/api";
 import { requestDaemon, KloakItem } from "./kloak-ipc.js";
 import { generateLocalTotp, evaluatePasswordStrength, TotpResult } from "./totp-helper.js";
+import { getItemIcon, extractDomain } from "./logo-helper.js";
 import AddEntryCommand from "./add-entry.js";
 import GeneratePasswordCommand from "./generate-password.js";
 
@@ -178,27 +179,11 @@ export default function SearchVaultCommand() {
     });
   }, [items, category, searchText]);
 
-  function getItemIcon(item: KloakItem) {
-    switch (item.type) {
-      case "card":
-        return { source: Icon.CreditCard, tintColor: Color.Green };
-      case "identity":
-        return { source: Icon.Person, tintColor: Color.Orange };
-      case "email_alias":
-        return { source: Icon.Envelope, tintColor: Color.Purple };
-      case "authenticator":
-        return { source: Icon.Lock, tintColor: Color.Blue };
-      case "secure_note":
-        return { source: Icon.Document, tintColor: Color.Yellow };
-      default:
-        return { source: Icon.Key, tintColor: Color.Blue };
-    }
-  }
-
   function renderItemMarkdown(item: KloakItem): string {
     const lines: string[] = [];
+    const domain = extractDomain(item);
 
-    // Header Title
+    // Header Title with domain logo if available
     let emoji = "🔑";
     if (item.type === "card") emoji = "💳";
     else if (item.type === "identity") emoji = "👤";
@@ -206,7 +191,11 @@ export default function SearchVaultCommand() {
     else if (item.type === "authenticator") emoji = "🔐";
     else if (item.type === "secure_note") emoji = "📝";
 
-    lines.push(`# ${emoji} ${item.title}`);
+    if (domain) {
+      lines.push(`# ![Logo](https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64) ${item.title}`);
+    } else {
+      lines.push(`# ${emoji} ${item.title}`);
+    }
 
     if (item.urls && item.urls[0]) {
       lines.push(`🌐 **Website**: [${item.urls[0]}](${item.urls[0]})`);
