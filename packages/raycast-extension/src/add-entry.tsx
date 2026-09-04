@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { Form, ActionPanel, Action, Icon, showToast, Toast, useNavigation } from "@raycast/api";
 import { requestDaemon } from "./kloak-ipc.js";
+import * as crypto from "node:crypto";
 
 function generateSecurePassword(length = 20): string {
-  const pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+  const pool = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
   let res = "";
   for (let i = 0; i < length; i++) {
-    res += pool.charAt(Math.floor(Math.random() * pool.length));
+    res += pool.charAt(crypto.randomInt(0, pool.length));
   }
   return res;
 }
