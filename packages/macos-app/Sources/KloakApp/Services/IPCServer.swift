@@ -459,6 +459,47 @@ public final class IPCServer: ObservableObject {
                 "autoMaskUntrusted": .bool(store.settings.autoMaskUntrustedSites)
             ]))
 
+        case "vault.addItem", "vault.saveItem":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            if let itemDict = params?["item"],
+               let encoded = try? JSONEncoder().encode(itemDict),
+               let item = try? JSONDecoder().decode(VaultItem.self, from: encoded) {
+                store.saveItem(item)
+                reply(.dictionary(["success": .bool(true), "id": .string(item.id)]))
+            } else {
+                replyError(-32602, "Invalid item payload")
+            }
+
+        case "vault.toggleFavorite":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            let id = params?["id"]?.stringValue ?? ""
+            if let idx = store.items.firstIndex(where: { $0.id == id }) {
+                store.items[idx].favorite.toggle()
+                store.items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                store.saveItem(store.items[idx])
+                reply(.dictionary(["success": .bool(true), "favorite": .bool(store.items[idx].favorite)]))
+            } else {
+                replyError(-32004, "Item not found")
+            }
+
+        case "vault.deleteItem":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            let id = params?["id"]?.stringValue ?? ""
+            store.deleteItem(id: id)
+            reply(.dictionary(["success": .bool(true)]))
+
         case "vault.lock":
             store.lock()
             reply(.dictionary(["success": .bool(true)]))

@@ -49,6 +49,13 @@ export interface AuthenticatorDetails {
   period?: number;
 }
 
+export interface CustomField {
+  id: string;
+  name: string;
+  value: string;
+  type?: string;
+}
+
 export interface KloakItem {
   id: string;
   type: 'login' | 'secure_note' | 'card' | 'identity' | 'email_alias' | 'authenticator';
@@ -62,8 +69,12 @@ export interface KloakItem {
   identity?: IdentityDetails;
   alias?: AliasDetails;
   authenticatorDetails?: AuthenticatorDetails;
+  customFields?: CustomField[];
   favorite?: boolean;
+  trashed?: boolean;
   tags?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export async function requestDaemon(method: string, params: any = {}): Promise<any> {
