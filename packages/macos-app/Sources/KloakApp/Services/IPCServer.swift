@@ -222,6 +222,13 @@ public final class IPCServer: ObservableObject {
             return
         }
 
+        Task { @MainActor in
+            self.handleMainActorRequest(method: method, reqId: reqId, params: params, on: connection)
+        }
+    }
+
+    @MainActor
+    private func handleMainActorRequest(method: String, reqId: AnyCodableValue?, params: [String: AnyCodableValue]?, on connection: NWConnection) {
         let store = VaultStore.shared
 
         switch method {
