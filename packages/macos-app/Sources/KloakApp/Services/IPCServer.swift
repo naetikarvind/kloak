@@ -182,13 +182,27 @@ public final class IPCServer: ObservableObject {
                     currentBuffer.append(newData)
                 }
 
-                // Process newline-delimited messages
-                while let newlineIndex = currentBuffer.firstIndex(of: UInt8(ascii: "\n")) {
-                    let messageData = currentBuffer.subdata(in: 0..<newlineIndex)
-                    currentBuffer.removeSubrange(0...newlineIndex)
+                // Check for HTTP requests (OPTIONS / POST / GET)
+                if let str = String(data: currentBuffer, encoding: .utf8), (str.hasPrefix("OPTIONS ") || str.hasPrefix("POST ") || str.hasPrefix("GET ")) {
+                    if str.hasPrefix("OPTIONS ") {
+                        let httpResp = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: 0\r\n\r\n"
+                        if let respData = httpResp.data(using: .utf8) {
+                            connection.send(content: respData, completion: .contentProcessed({ _ in }))
+                        }
+                        currentBuffer = Data()
+                    } else if currentBuffer.range(of: "\r\n\r\n".data(using: .utf8)!) != nil {
+                        self.processRequest(currentBuffer, on: connection, isHttp: true)
+                        currentBuffer = Data()
+                    }
+                } else {
+                    // Process newline-delimited messages
+                    while let newlineIndex = currentBuffer.firstIndex(of: UInt8(ascii: "\n")) {
+                        let messageData = currentBuffer.subdata(in: 0..<newlineIndex)
+                        currentBuffer.removeSubrange(0...newlineIndex)
 
-                    if !messageData.isEmpty {
-                        self.processRequest(messageData, on: connection)
+                        if !messageData.isEmpty {
+                            self.processRequest(messageData, on: connection, isHttp: false)
+                        }
                     }
                 }
 
@@ -202,38 +216,53 @@ public final class IPCServer: ObservableObject {
         }
     }
 
-    private func processRequest(_ data: Data, on connection: NWConnection) {
+    private func processRequest(_ data: Data, on connection: NWConnection, isHttp: Bool = false) {
         guard !data.isEmpty else { return }
+
+        var payloadData = data
+        if isHttp {
+            if let separatorRange = data.range(of: "\r\n\r\n".data(using: .utf8)!) {
+                payloadData = data.subdata(in: separatorRange.upperBound..<data.count)
+            }
+        }
 
         let reqId: AnyCodableValue?
         let method: String
         let params: [String: AnyCodableValue]?
 
-        if let req = try? JSONDecoder().decode(JsonRpcRequest.self, from: data) {
+        if let req = try? JSONDecoder().decode(JsonRpcRequest.self, from: payloadData) {
             reqId = req.id
             method = req.method
             params = req.params
-        } else if let rawObj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        } else if let rawObj = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
             method = rawObj["method"] as? String ?? ""
             params = nil
             reqId = nil
         } else {
-            sendError(on: connection, id: nil, code: -32700, message: "Invalid JSON-RPC request")
+            sendError(on: connection, id: nil, code: -32700, message: "Invalid JSON-RPC request", isHttp: isHttp)
             return
         }
 
         Task { @MainActor in
-            self.handleMainActorRequest(method: method, reqId: reqId, params: params, on: connection)
+            self.handleMainActorRequest(method: method, reqId: reqId, params: params, on: connection, isHttp: isHttp)
         }
     }
 
     @MainActor
-    private func handleMainActorRequest(method: String, reqId: AnyCodableValue?, params: [String: AnyCodableValue]?, on connection: NWConnection) {
+    private func handleMainActorRequest(method: String, reqId: AnyCodableValue?, params: [String: AnyCodableValue]?, on connection: NWConnection, isHttp: Bool = false) {
         let store = VaultStore.shared
+
+        func reply(_ result: AnyCodableValue) {
+            self.sendResult(on: connection, id: reqId, result: result, isHttp: isHttp)
+        }
+
+        func replyError(_ code: Int, _ message: String) {
+            self.sendError(on: connection, id: reqId, code: code, message: message, isHttp: isHttp)
+        }
 
         switch method {
         case "daemon.ping":
-            sendResult(on: connection, id: reqId, result: .dictionary([
+            reply(.dictionary([
                 "pong": .bool(true),
                 "version": .string("1.0.0"),
                 "app": .string("Kloak macOS App"),
@@ -241,7 +270,7 @@ public final class IPCServer: ObservableObject {
             ]))
 
         case "vault.status":
-            sendResult(on: connection, id: reqId, result: .dictionary([
+            reply(.dictionary([
                 "isInitialized": .bool(store.hasVault),
                 "isUnlocked": .bool(store.isUnlocked),
                 "itemCount": .int(store.items.filter { !$0.trashed }.count),
@@ -250,21 +279,21 @@ public final class IPCServer: ObservableObject {
 
         case "vault.getItems":
             guard store.isUnlocked else {
-                sendError(on: connection, id: reqId, code: -32001, message: "Vault is locked")
+                replyError(-32001, "Vault is locked")
                 return
             }
             store.recordUserActivity()
             let exportable = store.items.filter { !$0.trashed }
             if let encodedData = try? JSONEncoder().encode(exportable),
                let codableVal = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedData) {
-                sendResult(on: connection, id: reqId, result: codableVal)
+                reply(codableVal)
             } else {
-                sendResult(on: connection, id: reqId, result: .array([]))
+                reply(.array([]))
             }
 
         case "vault.matchByUrl":
             guard store.isUnlocked else {
-                sendError(on: connection, id: reqId, code: -32001, message: "Vault is locked")
+                replyError(-32001, "Vault is locked")
                 return
             }
             store.recordUserActivity()
@@ -293,9 +322,9 @@ public final class IPCServer: ObservableObject {
 
             if let encodedData = try? JSONEncoder().encode(matches),
                let codableVal = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedData) {
-                sendResult(on: connection, id: reqId, result: codableVal)
+                reply(codableVal)
             } else {
-                sendResult(on: connection, id: reqId, result: .array([]))
+                reply(.array([]))
             }
 
         case "extension.activeUrlChanged":
@@ -311,11 +340,11 @@ public final class IPCServer: ObservableObject {
                     )
                 }
             }
-            sendResult(on: connection, id: reqId, result: .dictionary(["success": .bool(true)]))
+            reply(.dictionary(["success": .bool(true)]))
 
         case "vault.search":
             guard store.isUnlocked else {
-                sendError(on: connection, id: reqId, code: -32001, message: "Vault is locked")
+                replyError(-32001, "Vault is locked")
                 return
             }
             store.recordUserActivity()
@@ -332,14 +361,14 @@ public final class IPCServer: ObservableObject {
 
             if let encodedData = try? JSONEncoder().encode(filtered),
                let codableVal = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedData) {
-                sendResult(on: connection, id: reqId, result: codableVal)
+                reply(codableVal)
             } else {
-                sendResult(on: connection, id: reqId, result: .array([]))
+                reply(.array([]))
             }
 
         case "vault.getItem":
             guard store.isUnlocked else {
-                sendError(on: connection, id: reqId, code: -32001, message: "Vault is locked")
+                replyError(-32001, "Vault is locked")
                 return
             }
             store.recordUserActivity()
@@ -357,21 +386,21 @@ public final class IPCServer: ObservableObject {
                         "period": .int(totp.period)
                     ])
                 }
-                sendResult(on: connection, id: reqId, result: .dictionary(resDict))
+                reply(.dictionary(resDict))
             } else {
-                sendError(on: connection, id: reqId, code: -32004, message: "Item not found")
+                replyError(-32004, "Item not found")
             }
 
         case "vault.generateTotp":
             let secret = params?["secret"]?.stringValue ?? ""
             if let totp = TOTPEngine.shared.generate(secretBase32: secret) {
-                sendResult(on: connection, id: reqId, result: .dictionary([
+                reply(.dictionary([
                     "token": .string(totp.token),
                     "secondsRemaining": .int(totp.secondsRemaining),
                     "period": .int(totp.period)
                 ]))
             } else {
-                sendError(on: connection, id: reqId, code: -32000, message: "Invalid Base32 TOTP secret")
+                replyError(-32000, "Invalid Base32 TOTP secret")
             }
 
         case "shield.inspectUrl":
@@ -381,7 +410,7 @@ public final class IPCServer: ObservableObject {
             for r in analysis.reasons {
                 reasonsCodable.append(.string(r))
             }
-            sendResult(on: connection, id: reqId, result: .dictionary([
+            reply(.dictionary([
                 "isSuspicious": .bool(analysis.isSuspicious),
                 "riskScore": .int(analysis.riskScore),
                 "targetDomain": .string(analysis.targetDomain ?? ""),
@@ -413,7 +442,7 @@ public final class IPCServer: ObservableObject {
 
             store.saveItem(newAliasItem)
 
-            sendResult(on: connection, id: reqId, result: .dictionary([
+            reply(.dictionary([
                 "aliasEmail": .string(generatedEmail),
                 "forwardTo": .string(forwardDestination),
                 "provider": .string("Kloak Shield"),
@@ -422,7 +451,7 @@ public final class IPCServer: ObservableObject {
             ]))
 
         case "shield.getConnectedAccount":
-            sendResult(on: connection, id: reqId, result: .dictionary([
+            reply(.dictionary([
                 "provider": .string(store.settings.connectedAccountProvider ?? "google"),
                 "email": .string(store.settings.connectedAccountEmail ?? "naetik.arvind@gmail.com"),
                 "customForwardingEmail": .string(store.settings.customForwardingEmail ?? ""),
@@ -432,23 +461,32 @@ public final class IPCServer: ObservableObject {
 
         case "vault.lock":
             store.lock()
-            sendResult(on: connection, id: reqId, result: .dictionary(["success": .bool(true)]))
+            reply(.dictionary(["success": .bool(true)]))
 
         default:
-            sendError(on: connection, id: reqId, code: -32601, message: "Method not found: \(method)")
+            sendError(on: connection, id: reqId, code: -32601, message: "Method not found: \(method)", isHttp: isHttp)
         }
     }
 
-    private func sendResult(on connection: NWConnection, id: AnyCodableValue?, result: AnyCodableValue) {
+    private func sendResult(on connection: NWConnection, id: AnyCodableValue?, result: AnyCodableValue, isHttp: Bool = false) {
         let resp = JsonRpcResponse(jsonrpc: "2.0", id: id, result: result, error: nil)
         if let data = try? JSONEncoder().encode(resp) {
-            var fullData = data
-            fullData.append(UInt8(ascii: "\n"))
-            connection.send(content: fullData, completion: .contentProcessed({ _ in }))
+            if isHttp {
+                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
+                var fullData = header.data(using: .utf8) ?? Data()
+                fullData.append(data)
+                connection.send(content: fullData, completion: .contentProcessed({ _ in
+                    connection.cancel()
+                }))
+            } else {
+                var fullData = data
+                fullData.append(UInt8(ascii: "\n"))
+                connection.send(content: fullData, completion: .contentProcessed({ _ in }))
+            }
         }
     }
 
-    private func sendError(on connection: NWConnection, id: AnyCodableValue?, code: Int, message: String) {
+    private func sendError(on connection: NWConnection, id: AnyCodableValue?, code: Int, message: String, isHttp: Bool = false) {
         let resp = JsonRpcResponse(
             jsonrpc: "2.0",
             id: id,
@@ -456,9 +494,18 @@ public final class IPCServer: ObservableObject {
             error: JsonRpcError(code: code, message: message)
         )
         if let data = try? JSONEncoder().encode(resp) {
-            var fullData = data
-            fullData.append(UInt8(ascii: "\n"))
-            connection.send(content: fullData, completion: .contentProcessed({ _ in }))
+            if isHttp {
+                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
+                var fullData = header.data(using: .utf8) ?? Data()
+                fullData.append(data)
+                connection.send(content: fullData, completion: .contentProcessed({ _ in
+                    connection.cancel()
+                }))
+            } else {
+                var fullData = data
+                fullData.append(UInt8(ascii: "\n"))
+                connection.send(content: fullData, completion: .contentProcessed({ _ in }))
+            }
         }
     }
 }

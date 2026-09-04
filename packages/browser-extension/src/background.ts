@@ -130,7 +130,7 @@ async function notifyMacOSApp(url: string) {
 }
 
 /**
- * Sends a JSON-RPC request to the Kloak Native Messaging Host or local daemon.
+ * Sends a JSON-RPC request to the Kloak Native Messaging Host or local daemon HTTP endpoint.
  */
 async function sendNativeRequest(method: string, params: any = {}): Promise<any> {
   const req = {
@@ -140,7 +140,8 @@ async function sendNativeRequest(method: string, params: any = {}): Promise<any>
     params
   };
 
-  return new Promise((resolve) => {
+  // 1. Try Native Messaging Host
+  const nativeResult = await new Promise((resolve) => {
     try {
       chrome.runtime.sendNativeMessage(NATIVE_HOST, req, (response) => {
         if (chrome.runtime.lastError || !response) {
@@ -155,6 +156,27 @@ async function sendNativeRequest(method: string, params: any = {}): Promise<any>
       resolve(null);
     }
   });
+
+  if (nativeResult !== null && nativeResult !== undefined) {
+    return nativeResult;
+  }
+
+  // 2. Direct HTTP Fallback to local Kloak macOS App daemon (127.0.0.1:53152)
+  try {
+    const res = await fetch('http://127.0.0.1:53152/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.result !== undefined) {
+        return data.result;
+      }
+    }
+  } catch {}
+
+  return null;
 }
 
 /**
