@@ -17,6 +17,7 @@ export default function AddEntryCommand() {
   // General fields
   const [type, setType] = useState<string>("login");
   const [title, setTitle] = useState<string>("");
+  const [tagsInput, setTagsInput] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
 
   // Login fields
@@ -77,7 +78,7 @@ export default function AddEntryCommand() {
           "Untitled"
         ),
         notes: notes.trim() || undefined,
-        tags: []
+        tags: tagsInput.split(",").map((s) => s.trim()).filter(Boolean)
       };
 
       if (type === "login") {
@@ -268,6 +269,7 @@ export default function AddEntryCommand() {
         </>
       )}
 
+      <Form.TextField id="tags" title="Tags" placeholder="e.g. personal, work, finance (comma separated)" value={tagsInput} onChange={setTagsInput} />
       <Form.TextArea id="notes" title="Notes" placeholder="Additional notes or security info..." value={notes} onChange={setNotes} />
     </Form>
   );
