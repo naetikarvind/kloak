@@ -103,7 +103,7 @@ public struct ItemDetailView: View {
                                 .foregroundColor(.secondary)
                                 .clipShape(Capsule())
 
-                            if let tag = item.tags.first {
+                            if let tag = item.tags.first(where: { $0.lowercased() != "imported" }) {
                                 Text(tag)
                                     .font(.system(size: 11, weight: .medium))
                                     .lineLimit(1)

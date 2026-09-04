@@ -138,114 +138,68 @@ public struct ItemRowView: View {
         }
     }
 
+    private var displayTitle: String {
+        let t = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !t.isEmpty { return t }
+        if let u = item.username, !u.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return u }
+        if let url = item.urls.first, !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return url }
+        return item.type.displayName
+    }
+
     public var body: some View {
         HStack(spacing: 10) {
             // High-resolution logo or fallback icon
             FaviconView(
                 urls: item.urls,
-                title: item.title,
+                title: displayTitle,
                 oauthProvider: item.oauth?.provider,
                 itemType: item.type,
                 size: 28
             )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(item.title)
+                Text(displayTitle)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
 
                 Text(subtitleText)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
             HStack(spacing: 4) {
-                // Type specific badges
-                switch item.type {
-                case .card:
-                    Text("card")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.15))
-                        .foregroundColor(Color.blue)
-                        .clipShape(Capsule())
-                case .identity:
-                    Text("identity")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.cyan.opacity(0.15))
-                        .foregroundColor(Color.cyan)
-                        .clipShape(Capsule())
-                case .emailAlias:
-                    Text("alias")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color(red: 0.0, green: 0.82, blue: 0.71).opacity(0.15))
-                        .foregroundColor(Color(red: 0.0, green: 0.82, blue: 0.71))
-                        .clipShape(Capsule())
-                case .authenticator:
-                    Text("authenticator")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
-                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                        .clipShape(Capsule())
-                case .secureNote:
-                    Text("note")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.yellow.opacity(0.15))
-                        .foregroundColor(Color.yellow)
-                        .clipShape(Capsule())
-                case .login:
-                    EmptyView()
-                }
-
-                // Status & Security badges
-                if hasNoUsername {
-                    Text("no username")
-                        .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.15))
-                        .foregroundColor(Color.orange)
-                        .clipShape(Capsule())
-                }
-
                 if isWeakPassword {
-                    Text("weak password")
+                    Text("weak")
                         .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
+                        .lineLimit(1)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(LiquidGlassTheme.roseAccent.opacity(0.15))
                         .foregroundColor(LiquidGlassTheme.roseAccent)
                         .clipShape(Capsule())
-                }
-
-                if item.totpSecret != nil && !item.totpSecret!.isEmpty {
-                    Text("authenticator")
+                } else if item.totpSecret != nil && !item.totpSecret!.isEmpty {
+                    Text("2FA")
                         .font(.system(size: 8, weight: .bold))
-                        .fixedSize()
+                        .lineLimit(1)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .clipShape(Capsule())
+                } else if item.type != .login {
+                    Text(item.type.displayName.lowercased())
+                        .font(.system(size: 8, weight: .bold))
+                        .lineLimit(1)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.1))
+                        .foregroundColor(.secondary)
                         .clipShape(Capsule())
                 }
 
@@ -255,6 +209,7 @@ public struct ItemRowView: View {
                         .foregroundColor(LiquidGlassTheme.amberAccent)
                 }
             }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 3)
     }

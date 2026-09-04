@@ -24,6 +24,11 @@ Thumbs.db
 *.log
 .env
 .env.local
+*.kloak
+*.db
+*.sqlite
+*.sock
+kloak-backup-*
 
 # Temp Files
 *.swp
@@ -35,3 +40,4 @@ dist/*.app
 
 # Raycast extension build output
 packages/raycast-extension/dist/
+
