@@ -496,35 +496,7 @@ function showSuccessNotification(customMsg?: string) {
 
 setupFormSubmissionDetector();
 
-// 8. MutationObserver for dynamic forms
-function addKloakBadge(input: HTMLInputElement) {
-  if (input.dataset.kloakBadge) return;
-  input.dataset.kloakBadge = 'true';
-  input.style.backgroundImage = 'url("chrome-extension://__MSG_@@extension_id__/icon.png")'; // placeholder
-  input.style.backgroundRepeat = 'no-repeat';
-  input.style.backgroundPosition = 'right 8px center';
-  input.style.backgroundSize = '16px';
-}
-
+// 8. Form enhancement
 function scanAndEnhanceForms() {
-  const passwordInputs = document.querySelectorAll('input[type="password"]');
-  passwordInputs.forEach((input) => {
-    addKloakBadge(input as HTMLInputElement);
-  });
+  // Handled cleanly via focusin dropdown
 }
-
-const formObserver = new MutationObserver((mutations) => {
-  let shouldScan = false;
-  for (const mut of mutations) {
-    if (mut.addedNodes.length > 0) {
-      shouldScan = true;
-      break;
-    }
-  }
-  if (shouldScan) {
-    scanAndEnhanceForms();
-  }
-});
-
-formObserver.observe(document.body, { childList: true, subtree: true });
-scanAndEnhanceForms();
