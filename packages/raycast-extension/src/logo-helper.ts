@@ -12,6 +12,7 @@ const BRAND_MAP: Record<string, string> = {
   proton: "proton.me",
   protonmail: "proton.me",
   apple: "apple.com",
+  idmsa: "apple.com",
   icloud: "apple.com",
   amazon: "amazon.com",
   aws: "aws.amazon.com",
@@ -62,6 +63,7 @@ const BRAND_MAP: Record<string, string> = {
   microsoft: "microsoft.com",
   live: "live.com",
   outlook: "outlook.com",
+  office: "office.com",
   dribbble: "dribbble.com",
   macosicons: "macosicons.com",
   epicgames: "epicgames.com",
@@ -88,6 +90,51 @@ const BRAND_MAP: Record<string, string> = {
 };
 
 /**
+ * Clean a host string by stripping technical subdomains and extracting registrable brand domains
+ */
+export function cleanDomain(rawHost: string): string {
+  let host = rawHost.toLowerCase().trim();
+  // Strip protocol / query / port
+  host = host.replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/:\d+$/, "");
+
+  // Check known brands in host substring first (e.g. "accounts.spotify.com" -> "spotify.com")
+  for (const [brand, domain] of Object.entries(BRAND_MAP)) {
+    if (host.includes(brand)) {
+      return domain;
+    }
+  }
+
+  // Strip common service subdomains
+  const subdomainsToStrip = [
+    "accounts.", "account.", "signin.", "signin-", "signup.", "login.", "auth.", "auth0.",
+    "idmsa.", "id.", "identity.", "identitysso.", "sso.", "portal.", "app.", "apps.",
+    "my.", "myaccount.", "secure.", "web.", "m.", "mobile.", "api.", "mail.", "admin.",
+    "dashboard.", "connect.", "member.", "members.", "user.", "users.", "profile.",
+    "passwords.", "account-services.", "www."
+  ];
+
+  for (const sub of subdomainsToStrip) {
+    if (host.startsWith(sub)) {
+      host = host.slice(sub.length);
+      break;
+    }
+  }
+
+  // Extract eTLD+1 if multi-level subdomain remains
+  const parts = host.split(".");
+  if (parts.length >= 3) {
+    const sld = parts[parts.length - 2];
+    const twoPartTLDs = ["co", "com", "net", "org", "edu", "gov", "ac", "ne", "or", "mil"];
+    if (parts.length >= 4 && twoPartTLDs.includes(sld)) {
+      return parts.slice(-3).join(".");
+    }
+    return parts.slice(-2).join(".");
+  }
+
+  return host;
+}
+
+/**
  * Extract clean domain hostname from a URL or title
  */
 export function extractDomain(item: KloakItem): string | null {
@@ -98,19 +145,23 @@ export function extractDomain(item: KloakItem): string | null {
       if (!cleaned) continue;
       try {
         const urlObj = new URL(cleaned.startsWith("http") ? cleaned : `https://${cleaned}`);
-        if (urlObj.hostname) return urlObj.hostname;
+        if (urlObj.hostname) {
+          return cleanDomain(urlObj.hostname);
+        }
       } catch {}
     }
   }
 
-  // 2. From title if formatted like a domain (e.g. account.live.com, github.com, macosicons.com)
+  // 2. From title if formatted like a domain (e.g. account.live.com, github.com, accounts.spotify.com)
   const title = item.title.trim().toLowerCase();
   if (title.includes(".") && !title.includes(" ")) {
     try {
       const urlObj = new URL(title.startsWith("http") ? title : `https://${title}`);
-      if (urlObj.hostname) return urlObj.hostname;
+      if (urlObj.hostname) {
+        return cleanDomain(urlObj.hostname);
+      }
     } catch {
-      return title;
+      return cleanDomain(title);
     }
   }
 
@@ -123,7 +174,7 @@ export function extractDomain(item: KloakItem): string | null {
     }
   }
 
-  // 4. From Brand Name Dictionary Match
+  // 4. From Brand Name Dictionary Match on Title
   for (const [brand, domain] of Object.entries(BRAND_MAP)) {
     if (title === brand || title.includes(brand)) {
       return domain;

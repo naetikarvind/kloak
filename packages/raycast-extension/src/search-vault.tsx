@@ -12,7 +12,7 @@ import {
 } from "@raycast/api";
 import { requestDaemon, KloakItem } from "./kloak-ipc.js";
 import { generateLocalTotp, evaluatePasswordStrength, TotpResult } from "./totp-helper.js";
-import { getItemIcon, extractDomain } from "./logo-helper.js";
+import { getItemIcon, extractDomain, cleanDomain } from "./logo-helper.js";
 import AddEntryCommand from "./add-entry.js";
 import GeneratePasswordCommand from "./generate-password.js";
 
@@ -106,7 +106,7 @@ export default function SearchVaultCommand() {
     showToast({
       style: Toast.Style.Success,
       title: `Copied ${label}`,
-      message: `Clipboard will auto-clear in ${clearSeconds}s`
+      message: `Clipboard auto-clears in ${clearSeconds}s`
     });
 
     setTimeout(async () => {
@@ -156,7 +156,6 @@ export default function SearchVaultCommand() {
   // Filter items by category & search query
   const filtered = useMemo(() => {
     return items.filter((item) => {
-      // Category filter
       if (category === "favorites" && !item.favorite) return false;
       if (category === "authenticator") {
         if (item.type !== "authenticator" && !(item.type === "login" && !!item.totpSecret)) {
@@ -166,7 +165,6 @@ export default function SearchVaultCommand() {
         if (item.type !== category) return false;
       }
 
-      // Search filter
       if (!searchText) return true;
       const q = searchText.toLowerCase();
       return (
@@ -183,43 +181,27 @@ export default function SearchVaultCommand() {
     const lines: string[] = [];
     const domain = extractDomain(item);
 
-    // Header Title with domain logo if available
-    let emoji = "🔑";
-    if (item.type === "card") emoji = "💳";
-    else if (item.type === "identity") emoji = "👤";
-    else if (item.type === "email_alias") emoji = "✉️";
-    else if (item.type === "authenticator") emoji = "🔐";
-    else if (item.type === "secure_note") emoji = "📝";
+    lines.push(`# ${item.title}`);
 
-    if (domain) {
-      lines.push(`# ![Logo](https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64) ${item.title}`);
-    } else {
-      lines.push(`# ${emoji} ${item.title}`);
+    if (item.type === "card") {
+      const num = item.card?.number ? maskCardNumber(item.card.number) : "•••• •••• •••• ••••";
+      lines.push(`\`${num}\`\n\n*${(item.card?.brand || "Card").toUpperCase()} • Exp ${item.card?.expMonth || "MM"}/${item.card?.expYear || "YY"}*`);
+    } else if (item.type === "identity") {
+      const fn = [item.identity?.firstName, item.identity?.lastName].filter(Boolean).join(" ");
+      if (fn) lines.push(`*${fn}*`);
+    } else if (item.type === "email_alias" && item.alias?.aliasEmail) {
+      lines.push(`\`${item.alias.aliasEmail}\` ➔ *${item.alias.forwardTo || "Forwarding Address"}*`);
+    } else if (domain) {
+      lines.push(`*${domain}*`);
     }
 
-    if (item.urls && item.urls[0]) {
-      lines.push(`🌐 **Website**: [${item.urls[0]}](${item.urls[0]})`);
-    }
-
-    // Password strength meter for logins
-    if (item.type === "login" && item.password) {
-      const strength = evaluatePasswordStrength(item.password);
-      const barsFilled = Math.min(5, Math.max(1, strength.score + 1));
-      const meter = "█".repeat(barsFilled) + "░".repeat(5 - barsFilled);
-      lines.push(`\n**Password Strength**: \`${meter}\` **${strength.label}** (${strength.entropyBits} bits entropy)`);
-    }
-
-    // Live TOTP badge
     if (item.totpSecret && totpTokens[item.id]) {
       const totp = totpTokens[item.id];
-      lines.push(`\n---\n### 🔐 2FA Code: \`${totp.token}\`\n⏱ *Refreshes in ${totp.secondsRemaining} seconds*`);
+      lines.push(`\n---\n### 🔐 Live 2FA Code\n\`${totp.token}\`\n\n*⏱ Refreshes in ${totp.secondsRemaining} seconds*`);
     }
 
-    // Secure note preview
-    if (item.type === "secure_note" && item.notes) {
-      lines.push(`\n---\n### 📝 Note Content\n${item.notes}`);
-    } else if (item.notes && item.type !== "secure_note") {
-      lines.push(`\n---\n**Notes**: ${item.notes}`);
+    if (item.notes) {
+      lines.push(`\n---\n### 📝 Notes\n${item.notes}`);
     }
 
     return lines.join("\n\n");
@@ -257,19 +239,7 @@ export default function SearchVaultCommand() {
 
     return (
       <List.Item.Detail.Metadata>
-        <List.Item.Detail.Metadata.TagList title="Item Type">
-          <List.Item.Detail.Metadata.TagList.Item text={typeName} color={typeTagColor} />
-        </List.Item.Detail.Metadata.TagList>
-
-        <List.Item.Detail.Metadata.Label
-          title="Favorite"
-          text={item.favorite ? "⭐ Favorited" : "No"}
-          icon={item.favorite ? Icon.Star : undefined}
-        />
-
-        <List.Item.Detail.Metadata.Separator />
-
-        {/* Login Credentials */}
+        {/* Credentials Section */}
         {item.type === "login" && (
           <>
             <List.Item.Detail.Metadata.Label
@@ -286,10 +256,11 @@ export default function SearchVaultCommand() {
               <List.Item.Detail.Metadata.Label
                 title="Password Length"
                 text={`${item.password.length} characters`}
+                icon={Icon.Text}
               />
             )}
             {strength && (
-              <List.Item.Detail.Metadata.TagList title="Security">
+              <List.Item.Detail.Metadata.TagList title="Password Strength">
                 <List.Item.Detail.Metadata.TagList.Item
                   text={`${strength.label} (${strength.entropyBits} bits)`}
                   color={strengthColor}
@@ -300,13 +271,13 @@ export default function SearchVaultCommand() {
               <List.Item.Detail.Metadata.Link
                 title="Website"
                 target={item.urls[0]}
-                text={item.urls[0]}
+                text={cleanDomain(item.urls[0])}
               />
             )}
             {totp && (
               <>
                 <List.Item.Detail.Metadata.Label
-                  title="2FA Code"
+                  title="2FA TOTP Code"
                   text={totp.token}
                   icon={Icon.Clock}
                 />
@@ -341,7 +312,7 @@ export default function SearchVaultCommand() {
               text={`${item.card?.expMonth || "MM"} / ${item.card?.expYear || "YY"}`}
             />
             <List.Item.Detail.Metadata.Label
-              title="Security Code (CVV)"
+              title="CVV / CVC"
               text={isRevealed ? (item.card?.cvv || "—") : (item.card?.cvv ? "•••" : "—")}
             />
             {item.card?.billingAddress && (
@@ -451,6 +422,18 @@ export default function SearchVaultCommand() {
           </>
         )}
 
+        <List.Item.Detail.Metadata.Separator />
+
+        <List.Item.Detail.Metadata.TagList title="Item Type">
+          <List.Item.Detail.Metadata.TagList.Item text={typeName} color={typeTagColor} />
+        </List.Item.Detail.Metadata.TagList>
+
+        <List.Item.Detail.Metadata.Label
+          title="Favorite"
+          text={item.favorite ? "⭐ Favorited" : "No"}
+          icon={item.favorite ? { source: Icon.Star, tintColor: Color.Yellow } : undefined}
+        />
+
         {/* Timestamps */}
         <List.Item.Detail.Metadata.Separator />
         <List.Item.Detail.Metadata.Label title="Created" text={formatDate(item.createdAt)} />
@@ -539,7 +522,9 @@ export default function SearchVaultCommand() {
                   : undefined
               }
               accessories={[
-                ...(item.favorite ? [{ icon: Icon.Star, tooltip: "Favorite" }] : []),
+                ...(item.favorite
+                  ? [{ icon: { source: Icon.Star, tintColor: Color.Yellow }, tooltip: "Favorite" }]
+                  : []),
                 ...(liveTotp
                   ? [
                       {
