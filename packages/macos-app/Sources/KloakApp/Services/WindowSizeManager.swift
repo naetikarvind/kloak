@@ -78,15 +78,28 @@ public final class WindowSizeManager {
         if let screen = screen {
             let visible = screen.visibleFrame
 
-            // Smoothly anchor to the top-center so the titlebar remains stable
-            let newX = currentFrame.midX - (targetSize.width / 2)
-            let newY = (currentFrame.origin.y + currentFrame.height) - targetSize.height
+            // Anchor the top-left corner: keep left edge (origin.x) and top edge stationary
+            var newX = currentFrame.origin.x
+            let currentTop = currentFrame.origin.y + currentFrame.height
+            var newY = currentTop - targetSize.height
 
-            let clampedX = max(visible.minX + 12, min(newX, visible.maxX - targetSize.width - 12))
-            let clampedY = max(visible.minY + 12, min(newY, visible.maxY - targetSize.height - 12))
-            let newFrame = NSRect(x: clampedX, y: clampedY, width: targetSize.width, height: targetSize.height)
+            // Clamp so window never overflows the right or left edge of the visible screen
+            if newX + targetSize.width > visible.maxX - 12 {
+                newX = visible.maxX - targetSize.width - 12
+            }
+            newX = max(visible.minX + 12, newX)
 
-            if abs(currentFrame.width - targetSize.width) > 10 || abs(currentFrame.height - targetSize.height) > 10 {
+            // Clamp vertical position within visible screen bounds
+            if newY < visible.minY + 12 {
+                newY = visible.minY + 12
+            }
+            if newY + targetSize.height > visible.maxY - 12 {
+                newY = visible.maxY - targetSize.height - 12
+            }
+
+            let newFrame = NSRect(x: newX, y: newY, width: targetSize.width, height: targetSize.height)
+
+            if abs(currentFrame.width - targetSize.width) > 4 || abs(currentFrame.height - targetSize.height) > 4 {
                 if animated {
                     NSAnimationContext.runAnimationGroup { context in
                         context.duration = 0.36
