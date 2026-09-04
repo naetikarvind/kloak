@@ -991,8 +991,59 @@ function renderSmartSuggestions(items) {
         listEl.appendChild(row);
     });
 }
+async function fetchVaultItemsDirect() {
+    try {
+        const statusRes = await fetch('http://127.0.0.1:53152/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'vault.status' })
+        });
+        if (!statusRes.ok)
+            return null;
+        const statusData = await statusRes.json();
+        if (!statusData?.result?.isUnlocked) {
+            return { isUnlocked: false, items: [] };
+        }
+        const itemsRes = await fetch('http://127.0.0.1:53152/rpc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'vault.getItems' })
+        });
+        if (!itemsRes.ok)
+            return { isUnlocked: true, items: [] };
+        const itemsData = await itemsRes.json();
+        return {
+            isUnlocked: true,
+            items: Array.isArray(itemsData?.result) ? itemsData.result : []
+        };
+    }
+    catch {
+        return null;
+    }
+}
 // ── Load Logins ──
 async function loadLogins(retryCount = 0) {
+    // 1. Try local HTTP direct connection first (instant, robust across all browsers)
+    const direct = await fetchVaultItemsDirect();
+    if (direct) {
+        if (direct.isUnlocked && direct.items.length > 0) {
+            allItems = direct.items;
+            renderSmartSuggestions(allItems);
+            applyFilterAndSort();
+            const sorted = sortItems(allItems);
+            if (sorted.length > 0 && !activeItem)
+                selectItem(sorted[0]);
+            return;
+        }
+        else if (!direct.isUnlocked) {
+            const container = document.getElementById('sidebar-list');
+            if (container) {
+                container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">Vault is locked.<br>Open the macOS app to unlock.</div>';
+            }
+            return;
+        }
+    }
+    // 2. Fall back to background service worker message
     chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (searchRes) => {
         if (searchRes && searchRes.isUnlocked && Array.isArray(searchRes.items) && searchRes.items.length > 0) {
             allItems = searchRes.items;
