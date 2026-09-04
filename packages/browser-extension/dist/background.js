@@ -342,6 +342,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 sendResponse({ success: true });
                 break;
             }
+            case 'GET_CREDENTIALS':
             case 'GET_MATCHED_LOGINS': {
                 const urlStr = message.url || sender.tab?.url || '';
                 try {
@@ -363,6 +364,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 }
                 catch {
                     sendResponse({ success: true, isUnlocked: isVaultUnlocked, items: [] });
+                }
+                break;
+            }
+            case 'GENERATE_PASSWORD': {
+                const length = message.length || 20;
+                const useSymbols = message.symbols !== false;
+                const useDigits = message.digits !== false;
+                const useUpper = message.uppercase !== false;
+                const useLower = message.lowercase !== false;
+                let charset = '';
+                if (useLower)
+                    charset += 'abcdefghijkmnopqrstuvwxyz';
+                if (useUpper)
+                    charset += 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+                if (useDigits)
+                    charset += '23456789';
+                if (useSymbols)
+                    charset += '!@#$%^&*()-_=+[]{}|;:,.<>?';
+                if (!charset)
+                    charset = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*';
+                const randomBytes = new Uint8Array(length);
+                crypto.getRandomValues(randomBytes);
+                let password = '';
+                for (let i = 0; i < length; i++) {
+                    password += charset[randomBytes[i] % charset.length];
+                }
+                sendResponse({ success: true, password });
+                break;
+            }
+            case 'GET_TOTP': {
+                const secret = message.secret;
+                if (!secret) {
+                    sendResponse({ success: false, error: 'No secret provided' });
+                    break;
+                }
+                try {
+                    const res = await sendNativeRequest('vault.generateTotp', { secret });
+                    if (res && res.token) {
+                        sendResponse({ success: true, token: res.token, secondsRemaining: res.secondsRemaining });
+                    }
+                    else {
+                        sendResponse({ success: false, error: 'Could not generate TOTP' });
+                    }
+                }
+                catch {
+                    sendResponse({ success: false, error: 'TOTP generation failed' });
                 }
                 break;
             }
