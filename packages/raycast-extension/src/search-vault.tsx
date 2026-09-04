@@ -177,34 +177,14 @@ export default function SearchVaultCommand() {
     });
   }, [items, category, searchText]);
 
-  function renderItemMarkdown(item: KloakItem): string {
-    const lines: string[] = [];
-    const domain = extractDomain(item);
-
-    lines.push(`# ${item.title}`);
-
-    if (item.type === "card") {
-      const num = item.card?.number ? maskCardNumber(item.card.number) : "•••• •••• •••• ••••";
-      lines.push(`\`${num}\`\n\n*${(item.card?.brand || "Card").toUpperCase()} • Exp ${item.card?.expMonth || "MM"}/${item.card?.expYear || "YY"}*`);
-    } else if (item.type === "identity") {
-      const fn = [item.identity?.firstName, item.identity?.lastName].filter(Boolean).join(" ");
-      if (fn) lines.push(`*${fn}*`);
-    } else if (item.type === "email_alias" && item.alias?.aliasEmail) {
-      lines.push(`\`${item.alias.aliasEmail}\` ➔ *${item.alias.forwardTo || "Forwarding Address"}*`);
-    } else if (domain) {
-      lines.push(`*${domain}*`);
+  function renderItemMarkdown(item: KloakItem): string | undefined {
+    if (item.type === "secure_note" && item.notes) {
+      return `### 📝 Note Content\n\n${item.notes}`;
     }
-
-    if (item.totpSecret && totpTokens[item.id]) {
-      const totp = totpTokens[item.id];
-      lines.push(`\n---\n### 🔐 Live 2FA Code\n\`${totp.token}\`\n\n*⏱ Refreshes in ${totp.secondsRemaining} seconds*`);
+    if (item.notes && item.notes.trim().length > 0) {
+      return `### 📝 Notes\n\n${item.notes}`;
     }
-
-    if (item.notes) {
-      lines.push(`\n---\n### 📝 Notes\n${item.notes}`);
-    }
-
-    return lines.join("\n\n");
+    return undefined;
   }
 
   function renderItemMetadata(item: KloakItem) {
