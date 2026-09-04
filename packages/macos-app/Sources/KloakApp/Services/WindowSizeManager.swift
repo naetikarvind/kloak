@@ -14,17 +14,34 @@ public final class WindowSizeManager {
         case vaultImport     // 920 x 720 (2-column import & export)
     }
 
+    private var resizeWorkItem: DispatchWorkItem? = nil
+
     private init() {}
 
     public func resize(to mode: AppWindowMode, animated: Bool = true) {
-        // Find the main app window (skip status bar panels or popovers)
+        resizeWorkItem?.cancel()
+
+        let work = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            self.performResize(to: mode, animated: animated)
+        }
+        resizeWorkItem = work
+
+        if animated {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.012, execute: work)
+        } else {
+            work.perform()
+        }
+    }
+
+    private func performResize(to mode: AppWindowMode, animated: Bool) {
         guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: {
             $0.isVisible && !($0 is NSPanel) && $0.canBecomeMain
         }) ?? NSApp.windows.first else {
             return
         }
 
-        // Do not force resize if user is in fullscreen or zoomed (maximized)
+        // Respect fullscreen / maximized state
         if window.styleMask.contains(.fullScreen) || window.isZoomed {
             return
         }
@@ -61,16 +78,25 @@ public final class WindowSizeManager {
         if let screen = screen {
             let visible = screen.visibleFrame
 
-            // Center resize around current window midpoint
+            // Smoothly anchor to the top-center so the titlebar remains stable
             let newX = currentFrame.midX - (targetSize.width / 2)
-            let newY = currentFrame.midY - (targetSize.height / 2)
+            let newY = (currentFrame.origin.y + currentFrame.height) - targetSize.height
 
             let clampedX = max(visible.minX + 12, min(newX, visible.maxX - targetSize.width - 12))
             let clampedY = max(visible.minY + 12, min(newY, visible.maxY - targetSize.height - 12))
             let newFrame = NSRect(x: clampedX, y: clampedY, width: targetSize.width, height: targetSize.height)
 
-            if abs(currentFrame.width - targetSize.width) > 20 || abs(currentFrame.height - targetSize.height) > 20 {
-                window.setFrame(newFrame, display: true, animate: animated)
+            if abs(currentFrame.width - targetSize.width) > 10 || abs(currentFrame.height - targetSize.height) > 10 {
+                if animated {
+                    NSAnimationContext.runAnimationGroup { context in
+                        context.duration = 0.36
+                        context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
+                        context.allowsImplicitAnimation = true
+                        window.animator().setFrame(newFrame, display: true)
+                    }
+                } else {
+                    window.setFrame(newFrame, display: true)
+                }
             }
         }
     }
