@@ -726,11 +726,15 @@
     /* ── CARDS ── */
     .card {
       background: var(--bg-card); border: 1px solid var(--border-card);
-      border-radius: 10px; margin-bottom: 10px; display: flex; flex-direction: column;
+      border-radius: 10px; margin-bottom: 14px; display: flex; flex-direction: column;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
     .card:hover {
       border-color: rgba(109,74,255,0.25);
+    }
+    .detail-pane .card:last-child,
+    .detail-pane .totp-container:last-child {
+      margin-bottom: 0;
     }
     .card-row {
       display: flex;
@@ -834,6 +838,7 @@
       border: 1px solid rgba(41, 201, 143, 0.25) !important;
       border-radius: 10px !important;
       padding: 12px 14px !important;
+      margin-bottom: 14px !important;
       display: flex;
       flex-direction: column;
       gap: 9px;
