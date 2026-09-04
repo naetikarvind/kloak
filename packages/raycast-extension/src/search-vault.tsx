@@ -90,7 +90,12 @@ export default function SearchVaultCommand() {
     }
   }
 
-  async function copyWithAutoClear(text: string, label: string) {
+  async function copyWithAutoClear(text: string, label: string, isSecret = true) {
+    if (!text || text.trim().length === 0) {
+      showToast({ style: Toast.Style.Failure, title: `No ${label} to copy` });
+      return;
+    }
+
     let clearSeconds = 30;
     try {
       const prefs = getPreferenceValues<{ autoClearClipboardSeconds?: string }>();
@@ -102,19 +107,42 @@ export default function SearchVaultCommand() {
       // Use fallback 30s
     }
 
-    await Clipboard.copy(text);
+    await Clipboard.copy(text, { concealed: isSecret });
     showToast({
       style: Toast.Style.Success,
       title: `Copied ${label}`,
-      message: `Clipboard auto-clears in ${clearSeconds}s`
+      message: isSecret ? `Clipboard auto-clears in ${clearSeconds}s` : `Copied to clipboard`
     });
 
-    setTimeout(async () => {
-      const current = await Clipboard.readText();
-      if (current === text) {
-        await Clipboard.clear();
+    if (isSecret) {
+      setTimeout(async () => {
+        const current = await Clipboard.readText();
+        if (current === text) {
+          await Clipboard.clear();
+        }
+      }, clearSeconds * 1000);
+    }
+  }
+
+  async function copyTotpCode(item: KloakItem) {
+    if (!item.totpSecret) {
+      showToast({ style: Toast.Style.Failure, title: "No 2FA configured for this item" });
+      return;
+    }
+    const result = generateLocalTotp(item.totpSecret);
+    const token = result?.token || totpTokens[item.id]?.token;
+    if (token) {
+      await copyWithAutoClear(token, `2FA TOTP Code (${token})`, true);
+    } else {
+      try {
+        const res = await requestDaemon("vault.generateTotp", { secret: item.totpSecret });
+        if (res?.token) {
+          await copyWithAutoClear(res.token, `2FA TOTP Code (${res.token})`, true);
+        }
+      } catch (e: any) {
+        showToast({ style: Toast.Style.Failure, title: "Failed to generate 2FA TOTP", message: e.message });
       }
-    }, clearSeconds * 1000);
+    }
   }
 
   async function toggleFavorite(item: KloakItem) {
@@ -523,42 +551,140 @@ export default function SearchVaultCommand() {
               }
               actions={
                 <ActionPanel>
-                  <ActionPanel.Section title="Primary Actions">
+                  <ActionPanel.Section title="Copy Credentials">
+                    {/* Primary: Password or main credential */}
                     {item.password && (
                       <Action
                         title="Copy Password"
                         icon={Icon.Key}
-                        onAction={() => copyWithAutoClear(item.password!, "Password")}
+                        onAction={() => copyWithAutoClear(item.password!, "Password", true)}
                       />
                     )}
-                    {liveTotp && (
-                      <Action
-                        title={`Copy TOTP (${liveTotp.token})`}
-                        icon={Icon.Clock}
-                        shortcut={{ modifiers: ["cmd"], key: "t" }}
-                        onAction={() => copyWithAutoClear(liveTotp.token, "TOTP 2FA Code")}
-                      />
-                    )}
-                    {item.card?.number && (
-                      <Action
-                        title="Copy Card Number"
-                        icon={Icon.CreditCard}
-                        onAction={() => copyWithAutoClear(item.card!.number!, "Card Number")}
-                      />
-                    )}
+
+                    {/* Username */}
                     {item.username && (
                       <Action
                         title="Copy Username"
                         icon={Icon.Person}
                         shortcut={{ modifiers: ["cmd"], key: "u" }}
-                        onAction={() => copyWithAutoClear(item.username!, "Username")}
+                        onAction={() => copyWithAutoClear(item.username!, "Username", false)}
                       />
                     )}
-                    {item.type === "secure_note" && item.notes && (
+
+                    {/* 2FA TOTP Code */}
+                    {item.totpSecret && (
+                      <Action
+                        title={liveTotp ? `Copy 2FA Code (${liveTotp.token})` : "Copy 2FA TOTP Code"}
+                        icon={Icon.Clock}
+                        shortcut={{ modifiers: ["cmd"], key: "t" }}
+                        onAction={() => copyTotpCode(item)}
+                      />
+                    )}
+
+                    {/* Card details */}
+                    {item.card?.number && (
+                      <Action
+                        title="Copy Card Number"
+                        icon={Icon.CreditCard}
+                        onAction={() => copyWithAutoClear(item.card!.number!, "Card Number", true)}
+                      />
+                    )}
+                    {item.card?.cvv && (
+                      <Action
+                        title="Copy CVV Code"
+                        icon={Icon.Lock}
+                        onAction={() => copyWithAutoClear(item.card!.cvv!, "CVV", true)}
+                      />
+                    )}
+                    {item.card?.expMonth && item.card?.expYear && (
+                      <Action
+                        title="Copy Expiration Date"
+                        icon={Icon.Calendar}
+                        onAction={() =>
+                          copyWithAutoClear(
+                            `${item.card!.expMonth}/${item.card!.expYear}`,
+                            "Expiration Date",
+                            false
+                          )
+                        }
+                      />
+                    )}
+
+                    {/* Identity profile copies */}
+                    {item.type === "identity" && item.identity?.email && (
+                      <Action
+                        title="Copy Email"
+                        icon={Icon.Envelope}
+                        onAction={() => copyWithAutoClear(item.identity!.email!, "Email", false)}
+                      />
+                    )}
+                    {item.type === "identity" && item.identity?.phone && (
+                      <Action
+                        title="Copy Phone Number"
+                        icon={Icon.Phone}
+                        onAction={() => copyWithAutoClear(item.identity!.phone!, "Phone Number", false)}
+                      />
+                    )}
+
+                    {/* Email Alias */}
+                    {item.type === "email_alias" && item.alias?.aliasEmail && (
+                      <Action
+                        title="Copy Alias Email"
+                        icon={Icon.Envelope}
+                        onAction={() => copyWithAutoClear(item.alias!.aliasEmail!, "Alias Email", false)}
+                      />
+                    )}
+
+                    {/* Notes */}
+                    {item.notes && (
                       <Action
                         title="Copy Note Content"
                         icon={Icon.Document}
-                        onAction={() => copyWithAutoClear(item.notes!, "Secure Note")}
+                        onAction={() => copyWithAutoClear(item.notes!, "Note Content", false)}
+                      />
+                    )}
+
+                    {/* Website URL */}
+                    {item.urls[0] && (
+                      <Action
+                        title="Copy Website URL"
+                        icon={Icon.Globe}
+                        shortcut={{ modifiers: ["cmd", "opt"], key: "c" }}
+                        onAction={() => copyWithAutoClear(item.urls[0], "Website URL", false)}
+                      />
+                    )}
+                  </ActionPanel.Section>
+
+                  <ActionPanel.Section title="Paste into Active App">
+                    {item.password && (
+                      <Action.Paste
+                        title="Paste Password"
+                        content={item.password}
+                        icon={Icon.Key}
+                        shortcut={{ modifiers: ["cmd", "opt"], key: "p" }}
+                      />
+                    )}
+                    {item.username && (
+                      <Action.Paste
+                        title="Paste Username"
+                        content={item.username}
+                        icon={Icon.Person}
+                        shortcut={{ modifiers: ["cmd", "opt"], key: "u" }}
+                      />
+                    )}
+                    {liveTotp && (
+                      <Action.Paste
+                        title={`Paste 2FA Code (${liveTotp.token})`}
+                        content={liveTotp.token}
+                        icon={Icon.Clock}
+                        shortcut={{ modifiers: ["cmd", "opt"], key: "t" }}
+                      />
+                    )}
+                    {item.card?.number && (
+                      <Action.Paste
+                        title="Paste Card Number"
+                        content={item.card.number}
+                        icon={Icon.CreditCard}
                       />
                     )}
                   </ActionPanel.Section>
@@ -570,27 +696,6 @@ export default function SearchVaultCommand() {
                       shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
                       onAction={() => toggleRevealPassword(item.id)}
                     />
-
-                    {item.card?.cvv && (
-                      <Action
-                        title="Copy CVV Code"
-                        icon={Icon.Lock}
-                        onAction={() => copyWithAutoClear(item.card!.cvv!, "CVV")}
-                      />
-                    )}
-
-                    {item.card?.expMonth && item.card?.expYear && (
-                      <Action
-                        title="Copy Expiration Date"
-                        icon={Icon.Calendar}
-                        onAction={() =>
-                          copyWithAutoClear(
-                            `${item.card!.expMonth}/${item.card!.expYear}`,
-                            "Expiration Date"
-                          )
-                        }
-                      />
-                    )}
 
                     {item.urls[0] && (
                       <Action.OpenInBrowser
@@ -611,7 +716,7 @@ export default function SearchVaultCommand() {
                   <ActionPanel.Section title="View & Manage">
                     <Action
                       title={isShowingDetail ? "Hide Details" : "Show Details"}
-                      icon={isShowingDetail ? Icon.Sidebar : Icon.Sidebar}
+                      icon={Icon.Sidebar}
                       shortcut={{ modifiers: ["cmd"], key: "d" }}
                       onAction={() => setIsShowingDetail((prev) => !prev)}
                     />
