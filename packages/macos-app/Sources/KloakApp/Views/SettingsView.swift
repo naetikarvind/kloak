@@ -83,34 +83,39 @@ public struct SettingsView: View {
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.secondary)
 
-                            HStack(spacing: 8) {
-                                ForEach(["google", "microsoft", "proton", "custom"], id: \.self) { prov in
-                                    Button(action: {
-                                        settings.connectedAccountProvider = prov
-                                        onSaveSettings(settings)
-                                    }) {
-                                        HStack(spacing: 5) {
-                                            Image(systemName: prov == "google" ? "g.circle.fill" : prov == "microsoft" ? "m.circle.fill" : prov == "proton" ? "lock.shield.fill" : "envelope.fill")
-                                                .font(.system(size: 11))
-                                            Text(prov == "google" ? "Google" : prov == "microsoft" ? "Microsoft" : prov == "proton" ? "Proton" : "Custom")
-                                                .font(.system(size: 11, weight: .semibold))
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(["google", "microsoft", "proton", "custom"], id: \.self) { prov in
+                                        Button(action: {
+                                            settings.connectedAccountProvider = prov
+                                            onSaveSettings(settings)
+                                        }) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: prov == "google" ? "g.circle.fill" : prov == "microsoft" ? "m.circle.fill" : prov == "proton" ? "lock.shield.fill" : "envelope.fill")
+                                                    .font(.system(size: 12))
+                                                Text(prov == "google" ? "Google" : prov == "microsoft" ? "Microsoft" : prov == "proton" ? "Proton" : "Custom")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .lineLimit(1)
+                                            }
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                            .background(
+                                                (settings.connectedAccountProvider ?? "google") == prov
+                                                    ? LiquidGlassTheme.primaryAccent
+                                                    : Color.white.opacity(0.08)
+                                            )
+                                            .foregroundColor(
+                                                (settings.connectedAccountProvider ?? "google") == prov
+                                                    ? .white
+                                                    : .secondary
+                                            )
+                                            .clipShape(Capsule())
                                         }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            (settings.connectedAccountProvider ?? "google") == prov
-                                                ? LiquidGlassTheme.primaryAccent
-                                                : Color.white.opacity(0.08)
-                                        )
-                                        .foregroundColor(
-                                            (settings.connectedAccountProvider ?? "google") == prov
-                                                ? .white
-                                                : .secondary
-                                        )
-                                        .clipShape(Capsule())
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                                .padding(.vertical, 2)
                             }
                         }
 
