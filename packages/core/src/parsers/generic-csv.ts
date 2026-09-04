@@ -68,7 +68,7 @@ export function parseGenericCsv(csvText: string, customMapping?: ColumnMapping):
         urls: url ? [url] : [],
         notes: notes || undefined,
         totpSecret: totp || undefined,
-        tags: tag ? [tag] : ['Imported'],
+        tags: tag ? [tag] : [],
         favorite: false,
         trashed: false,
         createdAt: new Date().toISOString(),

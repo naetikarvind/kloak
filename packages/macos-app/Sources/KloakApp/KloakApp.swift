@@ -207,7 +207,7 @@ private func parseImportContent(_ content: String, format: String) -> [VaultItem
                     urls: urls,
                     notes: notes,
                     totpSecret: totp,
-                    tags: ["Imported"]
+                    tags: []
                 ))
             }
             return results
@@ -263,7 +263,7 @@ private func parseImportContent(_ content: String, format: String) -> [VaultItem
                 urls: url != nil && !url!.isEmpty ? [url!] : [],
                 notes: note,
                 totpSecret: totpSecret,
-                tags: ["Imported"]
+                tags: []
             ))
         }
     }

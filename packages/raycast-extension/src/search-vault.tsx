@@ -216,13 +216,16 @@ export function ItemDetailScreen({ item, onToggleFavorite, onReload }: ItemDetai
             />
           )}
 
-          {item.tags && item.tags.length > 0 && (
-            <Detail.Metadata.TagList title="Tags">
-              {item.tags.map((t) => (
-                <Detail.Metadata.TagList.Item key={t} text={t} color={getTagColor(t)} />
-              ))}
-            </Detail.Metadata.TagList>
-          )}
+          {(() => {
+            const validTags = (item.tags || []).filter((t) => t.toLowerCase().trim() !== "imported");
+            return validTags.length > 0 ? (
+              <Detail.Metadata.TagList title="Tags">
+                {validTags.map((t) => (
+                  <Detail.Metadata.TagList.Item key={t} text={t} color={getTagColor(t)} />
+                ))}
+              </Detail.Metadata.TagList>
+            ) : null;
+          })()}
 
           <Detail.Metadata.Separator />
 
@@ -847,13 +850,16 @@ export default function SearchVaultCommand() {
           </>
         )}
 
-        {item.tags && item.tags.length > 0 && (
-          <List.Item.Detail.Metadata.TagList title="Tags">
-            {item.tags.map((t) => (
-              <List.Item.Detail.Metadata.TagList.Item key={t} text={t} color={getTagColor(t)} />
-            ))}
-          </List.Item.Detail.Metadata.TagList>
-        )}
+        {(() => {
+          const validTags = (item.tags || []).filter((t) => t.toLowerCase().trim() !== "imported");
+          return validTags.length > 0 ? (
+            <List.Item.Detail.Metadata.TagList title="Tags">
+              {validTags.map((t) => (
+                <List.Item.Detail.Metadata.TagList.Item key={t} text={t} color={getTagColor(t)} />
+              ))}
+            </List.Item.Detail.Metadata.TagList>
+          ) : null;
+        })()}
 
         <List.Item.Detail.Metadata.Separator />
 
@@ -939,6 +945,7 @@ export default function SearchVaultCommand() {
         {filtered.map((item) => {
           const isRevealed = revealedPasswords[item.id] ?? false;
           const liveTotp = item.totpSecret ? totpTokens[item.id] : null;
+          const validTags = (item.tags || []).filter((t) => t.toLowerCase().trim() !== "imported");
 
           // Build accessories:
           // When right sidebar is shown (isShowingDetail === true), hide all tags from list items to maintain clean layout.
@@ -955,8 +962,8 @@ export default function SearchVaultCommand() {
             }
           } else {
             // Full list view (Right sidebar hidden) -> DISPLAY TAGS & BADGES
-            if (item.tags && item.tags.length > 0) {
-              for (const tag of item.tags.slice(0, 2)) {
+            if (validTags.length > 0) {
+              for (const tag of validTags.slice(0, 2)) {
                 accessories.push({
                   tag: { value: tag, color: getTagColor(tag) },
                   tooltip: `Tag: ${tag}`
@@ -1008,17 +1015,11 @@ export default function SearchVaultCommand() {
               }
               actions={
                 <ActionPanel>
-                  {/* Primary Action on Enter: View Item Details */}
-                  <Action.Push
-                    title="View Item Details"
-                    icon={Icon.Eye}
-                    target={
-                      <ItemDetailScreen
-                        item={item}
-                        onToggleFavorite={toggleFavorite}
-                        onReload={loadItems}
-                      />
-                    }
+                  {/* Primary Action on Enter: Toggle Show/Hide Details (Speedtest Style) */}
+                  <Action
+                    title={isShowingDetail ? "Hide Details" : "Show Details"}
+                    icon={Icon.Sidebar}
+                    onAction={() => setIsShowingDetail((prev) => !prev)}
                   />
 
                   <ActionPanel.Section title="Copy Credentials">
