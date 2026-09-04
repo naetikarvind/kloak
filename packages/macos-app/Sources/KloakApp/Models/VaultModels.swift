@@ -300,6 +300,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var maliciousSiteShieldEnabled: Bool
     public var connectedAccountProvider: String? // "google", "microsoft", "proton", "custom"
     public var connectedAccountEmail: String?
+    public var isAccountConnected: Bool?
+    public var connectedAccountToken: String?
     public var customForwardingEmail: String?
     public var autoMaskUntrustedSites: Bool
     public var threatSensitivity: String // "high", "balanced", "low"
@@ -313,6 +315,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         maliciousSiteShieldEnabled: true,
         connectedAccountProvider: "google",
         connectedAccountEmail: "naetik.arvind@gmail.com",
+        isAccountConnected: true,
+        connectedAccountToken: nil,
         customForwardingEmail: nil,
         autoMaskUntrustedSites: true,
         threatSensitivity: "balanced"
@@ -327,6 +331,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         maliciousSiteShieldEnabled: Bool = true,
         connectedAccountProvider: String? = "google",
         connectedAccountEmail: String? = "naetik.arvind@gmail.com",
+        isAccountConnected: Bool? = true,
+        connectedAccountToken: String? = nil,
         customForwardingEmail: String? = nil,
         autoMaskUntrustedSites: Bool = true,
         threatSensitivity: String = "balanced"
@@ -339,6 +345,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.maliciousSiteShieldEnabled = maliciousSiteShieldEnabled
         self.connectedAccountProvider = connectedAccountProvider
         self.connectedAccountEmail = connectedAccountEmail
+        self.isAccountConnected = isAccountConnected
+        self.connectedAccountToken = connectedAccountToken
         self.customForwardingEmail = customForwardingEmail
         self.autoMaskUntrustedSites = autoMaskUntrustedSites
         self.threatSensitivity = threatSensitivity
@@ -354,6 +362,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.maliciousSiteShieldEnabled = try container.decodeIfPresent(Bool.self, forKey: .maliciousSiteShieldEnabled) ?? true
         self.connectedAccountProvider = try container.decodeIfPresent(String.self, forKey: .connectedAccountProvider) ?? "google"
         self.connectedAccountEmail = try container.decodeIfPresent(String.self, forKey: .connectedAccountEmail) ?? "naetik.arvind@gmail.com"
+        self.isAccountConnected = try container.decodeIfPresent(Bool.self, forKey: .isAccountConnected) ?? (self.connectedAccountEmail != nil && !(self.connectedAccountEmail?.isEmpty ?? true))
+        self.connectedAccountToken = try container.decodeIfPresent(String.self, forKey: .connectedAccountToken)
         self.customForwardingEmail = try container.decodeIfPresent(String.self, forKey: .customForwardingEmail)
         self.autoMaskUntrustedSites = try container.decodeIfPresent(Bool.self, forKey: .autoMaskUntrustedSites) ?? true
         self.threatSensitivity = try container.decodeIfPresent(String.self, forKey: .threatSensitivity) ?? "balanced"

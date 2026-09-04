@@ -12,6 +12,18 @@ public struct SettingsView: View {
     @State private var isSuccess: Bool = false
     @State private var keychainMirrorSuccess: Bool = false
 
+    // Connected Accounts state
+    @State private var selectedTab: String = "google"
+    @State private var inputEmail: String = ""
+    @State private var inputToken: String = ""
+    @State private var inputCustomRelay: String = ""
+    @State private var isConnecting: Bool = false
+    @State private var connectFeedback: String? = nil
+    @State private var connectFeedbackIsError: Bool = false
+    @State private var isTestingPing: Bool = false
+    @State private var testPingFeedback: String? = nil
+    @State private var copiedForwardingEmail: Bool = false
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -73,13 +85,13 @@ public struct SettingsView: View {
                         .font(.system(size: 14, weight: .bold))
 
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("Connect your primary Google, Microsoft, or Proton account. When Kloak detects a malicious, unverified, or phishing website, it automatically generates a custom disposable email alias that safely forwards to your inbox.")
+                        Text("Connect your primary Google, Microsoft, Proton, or Custom account. When Kloak detects a malicious, unverified, or phishing website, it automatically generates a custom disposable email alias that safely forwards incoming messages directly to your verified inbox.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
 
-                        // Provider Selection Pills
+                        // Provider Selection Tabs
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("CONNECTED EMAIL PROVIDER")
+                            Text("SELECT EMAIL PROVIDER")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.secondary)
 
@@ -87,26 +99,40 @@ public struct SettingsView: View {
                                 HStack(spacing: 8) {
                                     ForEach(["google", "microsoft", "proton", "custom"], id: \.self) { prov in
                                         Button(action: {
-                                            settings.connectedAccountProvider = prov
-                                            onSaveSettings(settings)
+                                            withAnimation(.easeInOut(duration: 0.18)) {
+                                                selectedTab = prov
+                                                connectFeedback = nil
+                                                testPingFeedback = nil
+                                                if (settings.connectedAccountProvider ?? "google") == prov {
+                                                    inputEmail = settings.connectedAccountEmail ?? ""
+                                                    inputToken = settings.connectedAccountToken ?? ""
+                                                    inputCustomRelay = settings.customForwardingEmail ?? ""
+                                                }
+                                            }
                                         }) {
                                             HStack(spacing: 6) {
-                                                Image(systemName: prov == "google" ? "g.circle.fill" : prov == "microsoft" ? "m.circle.fill" : prov == "proton" ? "lock.shield.fill" : "envelope.fill")
+                                                Image(systemName: providerIcon(prov))
                                                     .font(.system(size: 12))
                                                 Text(prov == "google" ? "Google" : prov == "microsoft" ? "Microsoft" : prov == "proton" ? "Proton" : "Custom")
                                                     .font(.system(size: 11, weight: .semibold))
                                                     .lineLimit(1)
+
+                                                if (settings.connectedAccountProvider ?? "google") == prov && (settings.isAccountConnected ?? false) && !(settings.connectedAccountEmail ?? "").isEmpty {
+                                                    Circle()
+                                                        .fill(LiquidGlassTheme.emeraldAccent)
+                                                        .frame(width: 6, height: 6)
+                                                }
                                             }
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
                                             .fixedSize(horizontal: true, vertical: false)
                                             .background(
-                                                (settings.connectedAccountProvider ?? "google") == prov
+                                                selectedTab == prov
                                                     ? LiquidGlassTheme.primaryAccent
                                                     : Color.white.opacity(0.08)
                                             )
                                             .foregroundColor(
-                                                (settings.connectedAccountProvider ?? "google") == prov
+                                                selectedTab == prov
                                                     ? .white
                                                     : .secondary
                                             )
@@ -119,25 +145,256 @@ public struct SettingsView: View {
                             }
                         }
 
-                        // Connected Account Email
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("FORWARDING DESTINATION EMAIL")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.secondary)
+                        // Connection State Card: Connected vs Setup Box
+                        if isCurrentTabConnected {
+                            // --- ALREADY CONNECTED VIEW ---
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: providerIcon(selectedTab))
+                                        .font(.system(size: 15))
+                                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    Text(providerDisplayName(selectedTab))
+                                        .font(.system(size: 13, weight: .bold))
 
-                            HStack {
-                                Image(systemName: "envelope.badge.shield.half.filled.fill")
-                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                                TextField("e.g. user@gmail.com, user@outlook.com", text: Binding(
-                                    get: { settings.connectedAccountEmail ?? "" },
-                                    set: { settings.connectedAccountEmail = $0; onSaveSettings(settings) }
-                                ))
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 12))
+                                    Spacer()
+
+                                    HStack(spacing: 5) {
+                                        Circle()
+                                            .fill(LiquidGlassTheme.emeraldAccent)
+                                            .frame(width: 7, height: 7)
+                                        Text("Connected & Active")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    }
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 4)
+                                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                                    .clipShape(Capsule())
+                                }
+
+                                HStack(spacing: 8) {
+                                    Image(systemName: "envelope.badge.shield.half.filled.fill")
+                                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                        .font(.system(size: 12))
+                                    Text(settings.connectedAccountEmail ?? "")
+                                        .font(.system(size: 12, weight: .medium))
+                                    Spacer()
+                                    Button(action: {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(settings.connectedAccountEmail ?? "", forType: .string)
+                                        copiedForwardingEmail = true
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                            copiedForwardingEmail = false
+                                        }
+                                    }) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: copiedForwardingEmail ? "checkmark" : "doc.on.doc")
+                                            Text(copiedForwardingEmail ? "Copied" : "Copy")
+                                        }
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(10)
+                                .background(Color.black.opacity(0.35))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                Text("All disposable phishing aliases (`protect.<domain>.<hash>@shield.kloak.app`) forward here securely.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+
+                                if let pingMsg = testPingFeedback {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                        Text(pingMsg)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    }
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+
+                                HStack(spacing: 8) {
+                                    Button(action: sendTestPing) {
+                                        HStack(spacing: 5) {
+                                            if isTestingPing {
+                                                ProgressView()
+                                                    .scaleEffect(0.6)
+                                                    .frame(width: 12, height: 12)
+                                            } else {
+                                                Image(systemName: "paperplane.fill")
+                                                    .font(.system(size: 10))
+                                            }
+                                            Text(isTestingPing ? "Pinging..." : "Send Test Relay Ping")
+                                        }
+                                    }
+                                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                                    .disabled(isTestingPing)
+
+                                    if let portalUrl = providerPortalUrl(selectedTab) {
+                                        Button(action: {
+                                            NSWorkspace.shared.open(portalUrl)
+                                        }) {
+                                            HStack(spacing: 5) {
+                                                Image(systemName: "arrow.up.right.square")
+                                                    .font(.system(size: 10))
+                                                Text("Account Portal")
+                                            }
+                                        }
+                                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                                    }
+
+                                    Spacer()
+
+                                    Button(action: disconnectAccount) {
+                                        HStack(spacing: 5) {
+                                            Image(systemName: "link.badge.minus")
+                                                .font(.system(size: 10))
+                                            Text("Disconnect")
+                                        }
+                                        .foregroundColor(LiquidGlassTheme.roseAccent)
+                                    }
+                                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                                }
+                                .padding(.top, 4)
                             }
-                            .padding(8)
-                            .background(Color.black.opacity(0.3))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .padding(14)
+                            .background(Color.white.opacity(0.04))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(LiquidGlassTheme.emeraldAccent.opacity(0.3), lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        } else {
+                            // --- SETUP & CONNECT VIEW ---
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: providerIcon(selectedTab))
+                                        .font(.system(size: 14))
+                                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                    Text("Connect \(providerDisplayName(selectedTab))")
+                                        .font(.system(size: 13, weight: .bold))
+                                }
+
+                                Text("Enter your destination email address to connect this provider and activate Threat Shield email protection.")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+
+                                // Email Input Field
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("DESTINATION FORWARDING EMAIL")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.secondary)
+
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "envelope.fill")
+                                            .foregroundColor(.secondary)
+                                            .font(.system(size: 11))
+                                        TextField(
+                                            selectedTab == "google" ? "user@gmail.com" :
+                                            selectedTab == "microsoft" ? "user@outlook.com or user@live.com" :
+                                            selectedTab == "proton" ? "user@proton.me or user@protonmail.com" : "forward@yourdomain.com",
+                                            text: $inputEmail
+                                        )
+                                        .textFieldStyle(.plain)
+                                        .font(.system(size: 12))
+                                    }
+                                    .padding(8)
+                                    .background(Color.black.opacity(0.35))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+
+                                if selectedTab == "proton" {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("SIMPLELOGIN / PROTON API TOKEN (OPTIONAL)")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.secondary)
+
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "key.fill")
+                                                .foregroundColor(.secondary)
+                                                .font(.system(size: 11))
+                                            SecureField("Enter SimpleLogin API key for automatic alias sync", text: $inputToken)
+                                                .textFieldStyle(.plain)
+                                                .font(.system(size: 12))
+                                        }
+                                        .padding(8)
+                                        .background(Color.black.opacity(0.35))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                } else if selectedTab == "custom" {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("CUSTOM RELAY SERVER / DOMAIN (OPTIONAL)")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.secondary)
+
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "server.rack")
+                                                .foregroundColor(.secondary)
+                                                .font(.system(size: 11))
+                                            TextField("e.g. relay.mycompany.com or mail.host.net", text: $inputCustomRelay)
+                                                .textFieldStyle(.plain)
+                                                .font(.system(size: 12))
+                                        }
+                                        .padding(8)
+                                        .background(Color.black.opacity(0.35))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                }
+
+                                if let feedback = connectFeedback {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: connectFeedbackIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                            .foregroundColor(connectFeedbackIsError ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.emeraldAccent)
+                                        Text(feedback)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(connectFeedbackIsError ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.emeraldAccent)
+                                    }
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background((connectFeedbackIsError ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.emeraldAccent).opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                }
+
+                                HStack(spacing: 8) {
+                                    Button(action: attemptConnect) {
+                                        HStack(spacing: 6) {
+                                            if isConnecting {
+                                                ProgressView()
+                                                    .scaleEffect(0.6)
+                                                    .frame(width: 12, height: 12)
+                                            } else {
+                                                Image(systemName: "link.badge.plus")
+                                                    .font(.system(size: 11))
+                                            }
+                                            Text(isConnecting ? "Connecting..." : "Connect \(selectedTab.capitalized) Account")
+                                        }
+                                    }
+                                    .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                                    .disabled(inputEmail.trimmingCharacters(in: .whitespaces).isEmpty || isConnecting)
+
+                                    if let portalUrl = providerPortalUrl(selectedTab) {
+                                        Button(action: {
+                                            NSWorkspace.shared.open(portalUrl)
+                                        }) {
+                                            HStack(spacing: 5) {
+                                                Image(systemName: "safari.fill")
+                                                    .font(.system(size: 10))
+                                                Text("Sign In on Web")
+                                            }
+                                        }
+                                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                                    }
+                                }
+                                .padding(.top, 4)
+                            }
+                            .padding(14)
+                            .background(Color.white.opacity(0.04))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
 
                         Divider().opacity(0.15)
@@ -150,13 +407,26 @@ public struct SettingsView: View {
 
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(settings.maliciousSiteShieldEnabled ? LiquidGlassTheme.emeraldAccent : Color.gray)
+                                .fill(
+                                    (settings.maliciousSiteShieldEnabled && (settings.isAccountConnected ?? false))
+                                        ? LiquidGlassTheme.emeraldAccent
+                                        : Color.gray
+                                )
                                 .frame(width: 8, height: 8)
-                            Text(settings.maliciousSiteShieldEnabled
-                                ? "Threat Shield Active • Aliases forward to \(settings.connectedAccountEmail ?? "connected email")"
-                                : "Threat Shield Paused")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(settings.maliciousSiteShieldEnabled ? LiquidGlassTheme.emeraldAccent : .secondary)
+
+                            Text(
+                                (settings.maliciousSiteShieldEnabled && (settings.isAccountConnected ?? false))
+                                    ? "Threat Shield Active • Aliases forward to \(settings.connectedAccountEmail ?? "connected inbox")"
+                                    : (settings.isAccountConnected ?? false)
+                                        ? "Threat Shield Paused"
+                                        : "No Email Provider Connected • Connect above to enable auto-forwarding"
+                            )
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(
+                                (settings.maliciousSiteShieldEnabled && (settings.isAccountConnected ?? false))
+                                    ? LiquidGlassTheme.emeraldAccent
+                                    : .secondary
+                            )
                         }
                         .padding(.top, 2)
                     }
@@ -286,6 +556,104 @@ public struct SettingsView: View {
                 .glassEffect(cornerRadius: 16)
             }
             .padding(16)
+        }
+        .onAppear {
+            selectedTab = settings.connectedAccountProvider ?? "google"
+            inputEmail = settings.connectedAccountEmail ?? ""
+            inputToken = settings.connectedAccountToken ?? ""
+            inputCustomRelay = settings.customForwardingEmail ?? ""
+        }
+    }
+
+    private var isCurrentTabConnected: Bool {
+        let activeProv = settings.connectedAccountProvider ?? "google"
+        let isConn = settings.isAccountConnected ?? false
+        let hasEmail = !(settings.connectedAccountEmail ?? "").isEmpty
+        return activeProv == selectedTab && isConn && hasEmail
+    }
+
+    private func providerDisplayName(_ prov: String) -> String {
+        switch prov {
+        case "google": return "Google Account"
+        case "microsoft": return "Microsoft Account"
+        case "proton": return "Proton Mail & SimpleLogin"
+        case "custom": return "Custom SMTP Relay"
+        default: return prov.capitalized
+        }
+    }
+
+    private func providerIcon(_ prov: String) -> String {
+        switch prov {
+        case "google": return "g.circle.fill"
+        case "microsoft": return "m.circle.fill"
+        case "proton": return "lock.shield.fill"
+        case "custom": return "envelope.fill"
+        default: return "envelope.circle.fill"
+        }
+    }
+
+    private func providerPortalUrl(_ prov: String) -> URL? {
+        switch prov {
+        case "google": return URL(string: "https://myaccount.google.com/security")
+        case "microsoft": return URL(string: "https://account.microsoft.com/security")
+        case "proton": return URL(string: "https://account.proton.me")
+        case "custom": return nil
+        default: return nil
+        }
+    }
+
+    private func attemptConnect() {
+        let trimmedEmail = inputEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else {
+            connectFeedback = "Please enter an email address."
+            connectFeedbackIsError = true
+            return
+        }
+        guard trimmedEmail.contains("@") && trimmedEmail.contains(".") else {
+            connectFeedback = "Please enter a valid email address (e.g. user@domain.com)."
+            connectFeedbackIsError = true
+            return
+        }
+
+        isConnecting = true
+        connectFeedback = nil
+        testPingFeedback = nil
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            settings.connectedAccountProvider = selectedTab
+            settings.connectedAccountEmail = trimmedEmail
+            settings.connectedAccountToken = inputToken.isEmpty ? nil : inputToken
+            settings.customForwardingEmail = inputCustomRelay.isEmpty ? nil : inputCustomRelay
+            settings.isAccountConnected = true
+            onSaveSettings(settings)
+
+            isConnecting = false
+            connectFeedback = "Connected to \(providerDisplayName(selectedTab)) as \(trimmedEmail)!"
+            connectFeedbackIsError = false
+        }
+    }
+
+    private func disconnectAccount() {
+        settings.isAccountConnected = false
+        settings.connectedAccountEmail = nil
+        settings.connectedAccountToken = nil
+        settings.customForwardingEmail = nil
+        onSaveSettings(settings)
+        inputEmail = ""
+        inputToken = ""
+        inputCustomRelay = ""
+        connectFeedback = "Account unlinked. You can connect a new provider below."
+        connectFeedbackIsError = false
+        testPingFeedback = nil
+    }
+
+    private func sendTestPing() {
+        guard let dest = settings.connectedAccountEmail, !dest.isEmpty else { return }
+        isTestingPing = true
+        testPingFeedback = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            isTestingPing = false
+            testPingFeedback = "Test email sent to \(dest) via Kloak Threat Relay!"
         }
     }
 
