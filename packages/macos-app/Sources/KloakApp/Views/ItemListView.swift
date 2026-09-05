@@ -173,8 +173,10 @@ public struct ItemRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
 
-            HStack(spacing: 4) {
-                if isWeakPassword {
+            HStack(spacing: 6) {
+                if let totp = item.totpSecret, !totp.isEmpty {
+                    MiniTOTPRowView(secret: totp)
+                } else if isWeakPassword {
                     Text("weak")
                         .font(.system(size: 8, weight: .bold))
                         .lineLimit(1)
@@ -182,15 +184,6 @@ public struct ItemRowView: View {
                         .padding(.vertical, 2)
                         .background(LiquidGlassTheme.roseAccent.opacity(0.15))
                         .foregroundColor(LiquidGlassTheme.roseAccent)
-                        .clipShape(Capsule())
-                } else if item.totpSecret != nil && !item.totpSecret!.isEmpty {
-                    Text("2FA")
-                        .font(.system(size: 8, weight: .bold))
-                        .lineLimit(1)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
-                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         .clipShape(Capsule())
                 } else if item.type != .login {
                     Text(item.type.displayName.lowercased())

@@ -109,3 +109,98 @@ public struct TOTPRingView: View {
         }
     }
 }
+
+public struct MiniTOTPRowView: View {
+    public let secret: String
+    @State private var totpResult: TOTPResult?
+    @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var copied: Bool = false
+
+    public init(secret: String) {
+        self.secret = secret
+    }
+
+    private var progress: Double {
+        guard let res = totpResult else { return 0 }
+        return Double(res.secondsRemaining) / Double(res.period)
+    }
+
+    private var ringColor: Color {
+        guard let res = totpResult else { return LiquidGlassTheme.emeraldAccent }
+        if res.secondsRemaining <= 5 { return LiquidGlassTheme.roseAccent }
+        if res.secondsRemaining <= 10 { return LiquidGlassTheme.amberAccent }
+        return LiquidGlassTheme.emeraldAccent
+    }
+
+    private var formattedToken: String {
+        guard let token = totpResult?.token else { return "--- ---" }
+        if token.count == 6 {
+            return "\(token.prefix(3)) \(token.suffix(3))"
+        }
+        return token
+    }
+
+    public var body: some View {
+        Button(action: copyToken) {
+            HStack(spacing: 5) {
+                // Mini countdown ring
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.15), lineWidth: 2)
+                        .frame(width: 12, height: 12)
+
+                    Circle()
+                        .trim(from: 0, to: progress)
+                        .stroke(ringColor, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .frame(width: 12, height: 12)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 1.0), value: progress)
+                }
+
+                if copied {
+                    Text("Copied!")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                } else {
+                    Text(formattedToken)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+
+                    Text("\(totpResult?.secondsRemaining ?? 0)s")
+                        .font(.system(size: 8, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(LiquidGlassTheme.emeraldAccent.opacity(0.25), lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Click to copy 2FA code")
+        .onAppear { updateCode() }
+        .onReceive(timer) { _ in updateCode() }
+    }
+
+    private func updateCode() {
+        totpResult = TOTPEngine.shared.generate(secretBase32: secret)
+    }
+
+    private func copyToken() {
+        guard let token = totpResult?.token else { return }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(token, forType: .string)
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+            copied = true
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                copied = false
+            }
+        }
+    }
+}
