@@ -2,7 +2,7 @@ import Foundation
 import AppKit
 
 let masterSvg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
     <!-- Background Gradient -->
     <linearGradient id="bg-grad" x1="50%" y1="0%" x2="50%" y2="85%">
@@ -41,40 +41,57 @@ let masterSvg = """
       <stop offset="100%" stop-color="#ff8f00"/>
     </linearGradient>
 
-    <!-- Shadow filter -->
-    <filter id="drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.45"/>
+    <!-- HIG macOS App Icon Drop Shadow for the squircle tile -->
+    <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.4"/>
     </filter>
+
+    <!-- Inner Element Shadow filter -->
+    <filter id="element-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+
+    <clipPath id="squircle-clip">
+      <rect x="100" y="100" width="824" height="824" rx="185"/>
+    </clipPath>
   </defs>
 
-  <!-- App Icon Background Squircle -->
-  <rect x="0" y="0" width="512" height="512" rx="115" fill="url(#bg-grad)"/>
-
-  <!-- Subtle Inner Border Highlight -->
-  <rect x="2" y="2" width="508" height="508" rx="113" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="3"/>
-
-  <!-- Main Shield Group with Shadow -->
-  <g filter="url(#drop-shadow)" transform="translate(0, 8)">
-    <!-- Left Shield -->
-    <path d="M 256 64 Q 160 96 80 112 C 80 304 144 416 256 464 Z" fill="url(#shield-left-grad)"/>
-    <!-- Right Shield -->
-    <path d="M 256 64 Q 352 96 432 112 C 432 304 368 416 256 464 Z" fill="url(#shield-right-grad)"/>
-    
-    <!-- K Metallic Wings -->
-    <path d="M 256 216 L 336 120 L 416 120 L 288 256 Z" fill="url(#k-upper-grad)"/>
-    <path d="M 256 280 L 288 240 L 416 376 L 336 376 Z" fill="url(#k-lower-grad)"/>
+  <!-- HIG Base Squircle with standard macOS drop shadow -->
+  <g filter="url(#tile-shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-grad)"/>
   </g>
 
-  <!-- Golden Lock in Center -->
-  <g filter="url(#drop-shadow)" transform="translate(0, 0)">
-    <!-- Shackle -->
-    <path d="M 216 256 V 208 A 40 40 0 0 1 296 208 V 256" fill="none" stroke="url(#gold-lock-grad)" stroke-width="24" stroke-linecap="round"/>
-    <!-- Lock Body -->
-    <rect x="176" y="256" width="160" height="128" rx="32" fill="url(#gold-lock-grad)"/>
-    <!-- Keyhole Base -->
-    <circle cx="256" cy="304" r="16" fill="#1c262b"/>
-    <!-- Keyhole Stem -->
-    <path d="M 248 312 L 240 352 H 272 L 264 312 Z" fill="#1c262b"/>
+  <!-- Clipped Artwork Layer -->
+  <g clip-path="url(#squircle-clip)">
+    <!-- Inner subtle border highlight -->
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"/>
+
+    <!-- Scaled Artwork -->
+    <g transform="translate(100, 100) scale(1.609375)">
+      <!-- Main Shield Group with Shadow -->
+      <g filter="url(#element-shadow)" transform="translate(0, 8)">
+        <!-- Left Shield -->
+        <path d="M 256 64 Q 160 96 80 112 C 80 304 144 416 256 464 Z" fill="url(#shield-left-grad)"/>
+        <!-- Right Shield -->
+        <path d="M 256 64 Q 352 96 432 112 C 432 304 368 416 256 464 Z" fill="url(#shield-right-grad)"/>
+        
+        <!-- K Metallic Wings -->
+        <path d="M 256 216 L 336 120 L 416 120 L 288 256 Z" fill="url(#k-upper-grad)"/>
+        <path d="M 256 280 L 288 240 L 416 376 L 336 376 Z" fill="url(#k-lower-grad)"/>
+      </g>
+
+      <!-- Golden Lock in Center -->
+      <g filter="url(#element-shadow)">
+        <!-- Shackle -->
+        <path d="M 216 256 V 208 A 40 40 0 0 1 296 208 V 256" fill="none" stroke="url(#gold-lock-grad)" stroke-width="24" stroke-linecap="round"/>
+        <!-- Lock Body -->
+        <rect x="176" y="256" width="160" height="128" rx="32" fill="url(#gold-lock-grad)"/>
+        <!-- Keyhole Base -->
+        <circle cx="256" cy="304" r="16" fill="#1c262b"/>
+        <!-- Keyhole Stem -->
+        <path d="M 248 312 L 240 352 H 272 L 264 312 Z" fill="#1c262b"/>
+      </g>
+    </g>
   </g>
 </svg>
 """
