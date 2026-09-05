@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "build:icons": "./build-icons.sh",
     "test": "npm run test --workspace=packages/tests",
     "daemon": "npm run start --workspace=packages/daemon",
     "cli": "node packages/daemon/dist/cli/index.js",

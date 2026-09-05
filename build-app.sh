@@ -38,6 +38,11 @@ echo "✓ Info.plist copied"
 
 # ── 5. Copy app icon ──────────────────────────────────────────────────────────
 ICNS="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns"
+if [ ! -f "$ICNS" ] && [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
+    echo "→ Compiling AppIcon.icns from AppIcon.iconset..."
+    iconutil -c icns "$REPO_ROOT/AppIcon.iconset" -o "$ICNS"
+fi
+
 if [ -f "$ICNS" ]; then
     cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     echo "✓ AppIcon.icns copied"
