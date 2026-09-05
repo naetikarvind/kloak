@@ -33,7 +33,6 @@ files = [
     ("ActiveContextService.swift", "Sources/KloakApp/Services/ActiveContextService.swift", "sourcecode.swift"),
     ("CryptoEngine.swift", "Sources/KloakApp/Services/CryptoEngine.swift", "sourcecode.swift"),
     ("ThreatDetectorService.swift", "Sources/KloakApp/Services/ThreatDetectorService.swift", "sourcecode.swift"),
-    ("Assets.xcassets", "Assets.xcassets", "folder.assetcatalog"),
     ("AppIcon.icon", "AppIcon.icon", "folder"),
     ("Info.plist", "Info.plist", "text.plist.xml"),
     ("Kloak.entitlements", "Kloak.entitlements", "text.plist.entitlements")
@@ -73,7 +72,7 @@ out.append("\n/* Begin PBXBuildFile section */")
 for name, path, ftype in files:
     if ftype == "sourcecode.swift":
         out.append(f"\t\t{build_files[name]} /* {name} in Sources */ = {{isa = PBXBuildFile; fileRef = {file_refs[name][0]} /* {name} */; }};")
-    elif ftype in ("folder", "folder.assetcatalog"):
+    elif ftype == "folder":
         out.append(f"\t\t{build_files[name]} /* {name} in Resources */ = {{isa = PBXBuildFile; fileRef = {file_refs[name][0]} /* {name} */; }};")
 out.append("/* End PBXBuildFile section */\n")
 
@@ -111,7 +110,7 @@ out.append("/* End PBXProject section */\n")
 
 # PBXResourcesBuildPhase
 out.append("/* Begin PBXResourcesBuildPhase section */")
-out.append(f"\t\t{resources_build_phase} /* Resources */ = {{\n\t\t\tisa = PBXResourcesBuildPhase;\n\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t\t{build_files['Assets.xcassets']} /* Assets.xcassets in Resources */,\n\t\t\t\t{build_files['AppIcon.icon']} /* AppIcon.icon in Resources */,\n\t\t\t);\n\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t}};")
+out.append(f"\t\t{resources_build_phase} /* Resources */ = {{\n\t\t\tisa = PBXResourcesBuildPhase;\n\t\t\tbuildActionMask = 2147483647;\n\t\t\tfiles = (\n\t\t\t\t{build_files['AppIcon.icon']} /* AppIcon.icon in Resources */,\n\t\t\t);\n\t\t\trunOnlyForDeploymentPostprocessing = 0;\n\t\t}};")
 out.append("/* End PBXResourcesBuildPhase section */\n")
 
 # PBXSourcesBuildPhase
@@ -152,8 +151,6 @@ out.append(f"""\t\t{proj_release_cfg} /* Release */ = {{
 out.append(f"""\t\t{target_debug_cfg} /* Debug */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-\t\t\t\tPRIMARY_ICON_NAME = AppIcon;
 \t\t\t\tCODE_SIGN_ENTITLEMENTS = Kloak.entitlements;
 \t\t\t\tCODE_SIGN_IDENTITY = "-";
 \t\t\t\tCODE_SIGN_STYLE = Manual;
@@ -177,8 +174,6 @@ out.append(f"""\t\t{target_debug_cfg} /* Debug */ = {{
 out.append(f"""\t\t{target_release_cfg} /* Release */ = {{
 \t\t\tisa = XCBuildConfiguration;
 \t\t\tbuildSettings = {{
-\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-\t\t\t\tPRIMARY_ICON_NAME = AppIcon;
 \t\t\t\tCODE_SIGN_ENTITLEMENTS = Kloak.entitlements;
 \t\t\t\tCODE_SIGN_IDENTITY = "-";
 \t\t\t\tCODE_SIGN_STYLE = Manual;
@@ -230,4 +225,4 @@ os.makedirs(proj_dir, exist_ok=True)
 with open(os.path.join(proj_dir, "project.pbxproj"), "w") as f:
     f.write("\n".join(out))
 
-print(f"Generated {proj_dir}/project.pbxproj with Assets.xcassets and AppIcon.icon successfully!")
+print(f"Generated {proj_dir}/project.pbxproj relying solely on AppIcon.icon successfully!")
