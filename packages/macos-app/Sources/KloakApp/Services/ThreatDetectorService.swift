@@ -9,18 +9,51 @@ public struct ThreatAnalysisResult: Codable, Sendable {
     public var suggestedAliasEmail: String?
 }
 
+public struct KnownBrandItem: Sendable {
+    public let name: String
+    public let legitDomains: [String]
+
+    public init(name: String, legitDomains: [String]) {
+        self.name = name
+        self.legitDomains = legitDomains
+    }
+}
+
 public final class ThreatDetectorService: Sendable {
     public static let shared = ThreatDetectorService()
 
     private let highProfileDomains: [String] = [
         "google.com", "accounts.google.com", "apple.com", "icloud.com",
-        "microsoft.com", "live.com", "outlook.com", "login.microsoftonline.com",
+        "microsoft.com", "live.com", "outlook.com", "office.com", "login.microsoftonline.com",
         "amazon.com", "paypal.com", "github.com", "netflix.com",
         "spotify.com", "facebook.com", "instagram.com", "twitter.com", "x.com",
         "proton.me", "protonmail.com", "chase.com", "bankofamerica.com",
         "wellsfargo.com", "citi.com", "coinbase.com", "binance.com",
         "dropbox.com", "slack.com", "notion.so", "figma.com",
-        "openai.com", "chatgpt.com", "anthropic.com", "discord.com"
+        "openai.com", "chatgpt.com", "anthropic.com", "claude.ai", "discord.com",
+        "gemini.com", "youtube.com", "gmail.com", "kloak.app"
+    ]
+
+    private let knownBrands: [KnownBrandItem] = [
+        KnownBrandItem(name: "google", legitDomains: ["google.com", "google.co.uk", "google.ca", "google.co.in", "google.co.jp", "googleapis.com", "gstatic.com", "youtube.com", "gmail.com", "googleusercontent.com", "deepmind.google"]),
+        KnownBrandItem(name: "gemini", legitDomains: ["gemini.com", "google.com"]),
+        KnownBrandItem(name: "apple", legitDomains: ["apple.com", "icloud.com", "me.com"]),
+        KnownBrandItem(name: "microsoft", legitDomains: ["microsoft.com", "live.com", "outlook.com", "office.com", "microsoftonline.com", "azure.com", "bing.com", "msn.com"]),
+        KnownBrandItem(name: "paypal", legitDomains: ["paypal.com", "paypal.me"]),
+        KnownBrandItem(name: "amazon", legitDomains: ["amazon.com", "amazon.co.uk", "amazon.de", "amazon.in", "aws.amazon.com"]),
+        KnownBrandItem(name: "netflix", legitDomains: ["netflix.com"]),
+        KnownBrandItem(name: "spotify", legitDomains: ["spotify.com"]),
+        KnownBrandItem(name: "github", legitDomains: ["github.com", "github.io", "githubassets.com"]),
+        KnownBrandItem(name: "openai", legitDomains: ["openai.com", "chatgpt.com"]),
+        KnownBrandItem(name: "chatgpt", legitDomains: ["openai.com", "chatgpt.com"]),
+        KnownBrandItem(name: "claude", legitDomains: ["anthropic.com", "claude.ai"]),
+        KnownBrandItem(name: "anthropic", legitDomains: ["anthropic.com", "claude.ai"]),
+        KnownBrandItem(name: "coinbase", legitDomains: ["coinbase.com"]),
+        KnownBrandItem(name: "binance", legitDomains: ["binance.com"]),
+        KnownBrandItem(name: "chase", legitDomains: ["chase.com"]),
+        KnownBrandItem(name: "facebook", legitDomains: ["facebook.com", "fb.com", "meta.com"]),
+        KnownBrandItem(name: "instagram", legitDomains: ["instagram.com"]),
+        KnownBrandItem(name: "discord", legitDomains: ["discord.com", "discord.gg"])
     ]
 
     private let highRiskTLDs: Set<String> = [
@@ -35,7 +68,40 @@ public final class ThreatDetectorService: Sendable {
         "support-", "billing-update", "recover-password", "session-expired"
     ]
 
+    private let multiPartTLDs: Set<String> = [
+        "co.uk", "gov.uk", "ac.uk", "org.uk",
+        "com.au", "net.au", "org.au", "edu.au",
+        "co.jp", "ne.jp", "ac.jp", "go.jp",
+        "co.in", "net.in", "org.in", "gen.in", "firm.in", "ind.in",
+        "com.br", "net.br", "gov.br",
+        "com.sg", "edu.sg", "gov.sg",
+        "com.mx", "edu.mx",
+        "co.nz", "net.nz", "org.nz",
+        "co.za", "org.za"
+    ]
+
     private init() {}
+
+    public func getBaseDomain(_ hostname: String) -> String {
+        let host = hostname.lowercased()
+        let parts = host.components(separatedBy: ".")
+        if parts.count <= 2 { return host }
+
+        let lastTwo = parts.suffix(2).joined(separator: ".")
+        if multiPartTLDs.contains(lastTwo) && parts.count >= 3 {
+            return parts.suffix(3).joined(separator: ".")
+        }
+        return parts.suffix(2).joined(separator: ".")
+    }
+
+    public func getSLD(_ baseDomain: String) -> String {
+        return baseDomain.components(separatedBy: ".").first ?? baseDomain
+    }
+
+    private func isLegitSubdomainOrDomain(host: String, targetDomain: String) -> Bool {
+        let cleanTarget = targetDomain.replacingOccurrences(of: "www.", with: "").lowercased()
+        return host == cleanTarget || host.hasSuffix("." + cleanTarget)
+    }
 
     public func analyzeUrl(_ urlString: String) -> ThreatAnalysisResult {
         guard let url = URL(string: urlString), let host = url.host?.lowercased() else {
@@ -49,9 +115,13 @@ public final class ThreatDetectorService: Sendable {
             )
         }
 
+        let cleanHost = host.replacingOccurrences(of: "www.", with: "")
+        let baseDomain = getBaseDomain(cleanHost)
+        let sld = getSLD(baseDomain)
+
         var riskScore = 0
         var reasons: [String] = []
-        var targetedLegitDomain: String? = nil
+        var targetedLegitDomain: String? = cleanHost
 
         // 1. Check IP Host
         if isIPAddress(host) {
@@ -76,37 +146,77 @@ public final class ThreatDetectorService: Sendable {
             }
         }
 
-        // 4. Typosquatting / Impersonation Check
-        let cleanHost = host.replacingOccurrences(of: "www.", with: "")
+        // 4. Official Verified Domain & Subdomain Recognition
+        var isOfficialDomain = false
         for target in highProfileDomains {
-            let targetClean = target.replacingOccurrences(of: "www.", with: "")
-            if cleanHost == targetClean {
-                // Exact legit match -> score reduced to 0
-                return ThreatAnalysisResult(
-                    isSuspicious: false,
-                    riskScore: 0,
-                    targetDomain: targetClean,
-                    reasons: [],
-                    suggestedAction: "safe",
-                    suggestedAliasEmail: nil
-                )
-            }
-
-            // Subdomain deception (e.g. google.com.phishing-site.xyz or google-login.com)
-            if cleanHost.contains(targetClean) && cleanHost != targetClean {
-                riskScore += 50
-                targetedLegitDomain = targetClean
-                reasons.append("Possible brand impersonation of \(targetClean)")
+            if isLegitSubdomainOrDomain(host: cleanHost, targetDomain: target) {
+                isOfficialDomain = true
+                targetedLegitDomain = target.replacingOccurrences(of: "www.", with: "")
                 break
             }
+        }
 
-            // Edit Distance / Typosquatting (e.g. g00gle.com, paypa1.com, micros0ft.com)
-            let distance = levenshteinDistance(cleanHost, targetClean)
-            if distance > 0 && distance <= 2 && abs(cleanHost.count - targetClean.count) <= 2 {
-                riskScore += 65
-                targetedLegitDomain = targetClean
-                reasons.append("Typosquatting detected: resembles official domain '\(targetClean)' (distance: \(distance))")
-                break
+        if !isOfficialDomain {
+            for brand in knownBrands {
+                if brand.legitDomains.contains(where: { isLegitSubdomainOrDomain(host: cleanHost, targetDomain: $0) }) {
+                    isOfficialDomain = true
+                    targetedLegitDomain = brand.legitDomains.first
+                    break
+                }
+            }
+        }
+
+        // If host is confirmed legitimate and official, do not perform impersonation/typosquatting checks
+        if !isOfficialDomain {
+            var addedReasons = Set<String>()
+
+            for brand in knownBrands {
+                let isLegitForThisBrand = brand.legitDomains.contains(where: { isLegitSubdomainOrDomain(host: cleanHost, targetDomain: $0) })
+                if isLegitForThisBrand { continue }
+
+                // Check A: Subdomain spoofing
+                for ld in brand.legitDomains {
+                    if cleanHost.contains(ld + ".") || cleanHost.contains(ld + "-") {
+                        riskScore += 65
+                        targetedLegitDomain = ld
+                        let msg = "Potential brand impersonation of \(ld) via deceptive subdomain"
+                        if !addedReasons.contains(msg) {
+                            addedReasons.insert(msg)
+                            reasons.append(msg)
+                        }
+                        break
+                    }
+                }
+
+                // Check B: Base domain contains brand name with hyphens / keywords
+                if sld.contains(brand.name) && sld != brand.name {
+                    if sld.contains("\(brand.name)-") || sld.contains("-\(brand.name)") || sld.contains("_\(brand.name)") {
+                        riskScore += 60
+                        targetedLegitDomain = brand.legitDomains.first
+                        let msg = "Potential brand hijacking: domain resembles '\(brand.name)' brand (\(brand.legitDomains.first ?? brand.name))"
+                        if !addedReasons.contains(msg) {
+                            addedReasons.insert(msg)
+                            reasons.append(msg)
+                        }
+                        break
+                    }
+                }
+
+                // Check C: Typosquatting on SLD
+                let brandSLD = brand.name
+                if brandSLD.count >= 4 {
+                    let distance = levenshteinDistance(sld, brandSLD)
+                    if distance > 0 && distance <= 2 && abs(sld.count - brandSLD.count) <= 2 {
+                        riskScore += 65
+                        targetedLegitDomain = brand.legitDomains.first
+                        let msg = "Typosquatting detected: '\(sld)' is a deceptive lookalike of '\(brandSLD)' (\(brand.legitDomains.first ?? brandSLD))"
+                        if !addedReasons.contains(msg) {
+                            addedReasons.insert(msg)
+                            reasons.append(msg)
+                        }
+                        break
+                    }
+                }
             }
         }
 
@@ -118,7 +228,6 @@ public final class ThreatDetectorService: Sendable {
 
         let isSuspicious = riskScore >= 40
         let suggestedAction = isSuspicious ? "mask_email" : (riskScore > 20 ? "warn" : "safe")
-
         let alias = isSuspicious ? generateMaskedAlias(for: host) : nil
 
         return ThreatAnalysisResult(
