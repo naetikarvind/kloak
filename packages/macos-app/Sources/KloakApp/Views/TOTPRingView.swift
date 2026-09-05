@@ -79,6 +79,7 @@ public struct TOTPRingView: View {
         .background(Color.black.opacity(0.25))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .onAppear { updateCode() }
+        .onChange(of: secret) { updateCode() }
         .onReceive(timer) { _ in updateCode() }
     }
 
@@ -183,6 +184,7 @@ public struct MiniTOTPRowView: View {
         .buttonStyle(.plain)
         .help("Click to copy 2FA code")
         .onAppear { updateCode() }
+        .onChange(of: secret) { updateCode() }
         .onReceive(timer) { _ in updateCode() }
     }
 

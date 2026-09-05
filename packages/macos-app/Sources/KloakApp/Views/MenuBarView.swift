@@ -620,21 +620,8 @@ public struct SuggestedHeroRow: View {
             Spacer()
 
             HStack(spacing: 4) {
-                if item.totpSecret != nil {
-                    Button(action: onCopyTotp) {
-                        HStack(spacing: 3) {
-                            Image(systemName: copiedFeedback == "totp_\(item.id)" ? "checkmark" : "timer")
-                            Text("2FA")
-                        }
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(copiedFeedback == "totp_\(item.id)" ? LiquidGlassTheme.emeraldAccent : .primary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Copy 2FA Token")
+                if let totp = item.totpSecret, !totp.isEmpty {
+                    MiniTOTPRowView(secret: totp)
                 }
 
                 if item.password != nil {
