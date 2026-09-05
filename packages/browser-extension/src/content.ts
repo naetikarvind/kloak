@@ -1,6 +1,6 @@
 /**
  * Kloak Browser Extension — Content Script
- * Adaptive Proximity-Aware Autofill Popup, In-Page Password Inspector,
+ * Compact Adaptive Autofill Popup, In-Page Password Inspector,
  * Contextual Generator & AI Certificate / Domain Owner Threat Inspector.
  */
 
@@ -20,11 +20,9 @@ let activePopup: HTMLElement | null = null;
 let currentTargetInput: HTMLInputElement | null = null;
 let cachedCredentialsForSite: any[] = [];
 let hasFetchedCredentials = false;
-let currentPasswordLength = 20;
+let currentPasswordLength = 18;
 let currentGeneratedPassword = '';
 let isRevealingPasswordMap: { [key: string]: boolean } = {};
-let lastPointerPos = { x: 0, y: 0 };
-let proximityThrottleTimer: any = null;
 let cachedAiEvaluation: any = null;
 let isAiDrawerExpanded = false;
 
@@ -253,7 +251,7 @@ function handleTotpSync(totpSecret?: string) {
     if (res && res.success && res.token) {
       try {
         navigator.clipboard.writeText(res.token);
-        showToastNotification(`✨ Filled credentials & copied 2FA code (${res.token})!`);
+        showToastNotification(`✨ Filled & copied 2FA (${res.token})!`);
       } catch {}
     }
   });
@@ -272,7 +270,7 @@ function ensureShadowRoot(): ShadowRoot {
 }
 
 // ── Password Generator Helper ──
-function generateRandomPassword(length: number = 20): string {
+function generateRandomPassword(length: number = 18): string {
   const lower = 'abcdefghijkmnopqrstuvwxyz';
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const digits = '23456789';
@@ -288,7 +286,7 @@ function generateRandomPassword(length: number = 20): string {
   return pwd;
 }
 
-// ── In-Page Popup Styles ──
+// ── Compact In-Page Popup Styles ──
 const POPUP_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   
@@ -296,28 +294,28 @@ const POPUP_STYLES = `
     position: fixed;
     background: #14121F;
     border: 1px solid rgba(109, 74, 255, 0.4);
-    border-radius: 12px;
-    box-shadow: 0 20px 48px rgba(0,0,0,0.65), 0 0 24px rgba(109, 74, 255, 0.2);
+    border-radius: 10px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.65), 0 0 20px rgba(109, 74, 255, 0.18);
     color: #FFFFFF;
     z-index: 2147483647;
-    font-size: 13px;
+    font-size: 12px;
     backdrop-filter: blur(20px);
     overflow: hidden;
-    animation: kloakPop 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 340px;
-    transition: top 0.15s ease, left 0.15s ease;
+    animation: kloakPop 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    width: 285px;
+    transition: top 0.12s ease, left 0.12s ease;
   }
 
   @keyframes kloakPop {
-    0% { opacity: 0; transform: translateY(-4px) scale(0.97); }
+    0% { opacity: 0; transform: translateY(-3px) scale(0.98); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
 
   .kloak-field-badge {
     position: fixed;
-    width: 20px;
-    height: 20px;
-    border-radius: 5px;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
     background: #14121F;
     border: 1px solid rgba(109, 74, 255, 0.4);
     display: flex;
@@ -325,11 +323,11 @@ const POPUP_STYLES = `
     justify-content: center;
     cursor: pointer;
     z-index: 2147483646;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    transition: transform 0.15s ease, background 0.15s ease;
   }
   .kloak-field-badge:hover {
-    transform: scale(1.12);
+    transform: scale(1.1);
     background: #242135;
     border-color: #6D4AFF;
   }
@@ -338,7 +336,7 @@ const POPUP_STYLES = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 12px 8px 12px;
+    padding: 7px 10px;
     background: #1C1929;
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
@@ -346,17 +344,17 @@ const POPUP_STYLES = `
   .kloak-brand {
     display: flex;
     align-items: center;
-    gap: 7px;
-    font-size: 11px;
+    gap: 6px;
+    font-size: 10px;
     font-weight: 700;
     color: #A5A1B2;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.5px;
   }
 
   .kloak-brand-icon {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     fill: #6D4AFF;
   }
 
@@ -365,10 +363,10 @@ const POPUP_STYLES = `
     border: none;
     color: #9E9AA8;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 11px;
     line-height: 1;
-    padding: 3px 5px;
-    border-radius: 4px;
+    padding: 2px 4px;
+    border-radius: 3px;
     transition: all 0.15s;
   }
   .kloak-close-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.12); }
@@ -376,7 +374,7 @@ const POPUP_STYLES = `
   .kloak-body {
     display: flex;
     flex-direction: column;
-    max-height: 460px;
+    max-height: 380px;
     overflow-y: auto;
   }
 
@@ -386,35 +384,35 @@ const POPUP_STYLES = `
   }
 
   .kloak-section-title {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #7A758B;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 8px 12px 4px 12px;
+    padding: 6px 10px 3px 10px;
   }
 
   .kloak-notice-badge {
-    margin: 8px 12px 0 12px;
-    padding: 6px 10px;
+    margin: 6px 10px 0 10px;
+    padding: 4px 8px;
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.35);
-    border-radius: 6px;
+    border-radius: 5px;
     color: #34D399;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
   }
 
-  /* ── Account Items ── */
+  /* ── Compact Account Items ── */
   .kloak-card {
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     background: transparent;
     transition: background 0.15s;
   }
@@ -425,21 +423,22 @@ const POPUP_STYLES = `
   .kloak-card-top {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .kloak-item-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
     background: rgba(109, 74, 255, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
     color: #6D4AFF;
     overflow: hidden;
+    flex-shrink: 0;
   }
   .kloak-item-avatar img {
     width: 100%;
@@ -453,7 +452,7 @@ const POPUP_STYLES = `
     cursor: pointer;
   }
   .kloak-item-username {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #FFFFFF;
     white-space: nowrap;
@@ -461,7 +460,7 @@ const POPUP_STYLES = `
     text-overflow: ellipsis;
   }
   .kloak-item-title {
-    font-size: 10px;
+    font-size: 9px;
     color: #9E9AA8;
   }
 
@@ -469,17 +468,17 @@ const POPUP_STYLES = `
     background: #6D4AFF;
     color: #FFFFFF;
     border: none;
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 11px;
+    border-radius: 5px;
+    padding: 3px 10px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s;
-    box-shadow: 0 2px 6px rgba(109, 74, 255, 0.3);
+    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.3);
   }
   .kloak-btn-fill:hover {
     background: #7C5CFF;
-    transform: scale(1.03);
+    transform: scale(1.02);
   }
 
   .kloak-pwd-row {
@@ -487,24 +486,25 @@ const POPUP_STYLES = `
     align-items: center;
     justify-content: space-between;
     background: rgba(0,0,0,0.25);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
+    border-radius: 5px;
+    padding: 3px 6px;
+    font-size: 10px;
   }
   .kloak-pwd-label {
     color: #7A758B;
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     text-transform: uppercase;
   }
   .kloak-pwd-value {
     font-family: 'SF Mono', 'Fira Code', monospace;
     color: #D1CFDA;
-    letter-spacing: 1px;
-    max-width: 140px;
+    letter-spacing: 0.5px;
+    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 10px;
   }
   .kloak-pwd-value.revealed {
     color: #00D2B4;
@@ -514,7 +514,7 @@ const POPUP_STYLES = `
   .kloak-pwd-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
   }
 
   .kloak-mini-btn {
@@ -522,9 +522,9 @@ const POPUP_STYLES = `
     border: none;
     color: #9E9AA8;
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 4px;
-    font-size: 12px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    font-size: 11px;
     display: flex;
     align-items: center;
     transition: all 0.15s;
@@ -534,13 +534,13 @@ const POPUP_STYLES = `
     background: rgba(255,255,255,0.12);
   }
 
-  /* ── Generator Card ── */
+  /* ── Compact Generator Card ── */
   .kloak-gen-box {
-    padding: 10px 12px;
+    padding: 7px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     background: rgba(109, 74, 255, 0.04);
   }
 
@@ -554,7 +554,7 @@ const POPUP_STYLES = `
   }
 
   .kloak-len-badge {
-    font-size: 10px;
+    font-size: 9px;
     color: #9E9AA8;
   }
   .kloak-len-badge strong {
@@ -566,15 +566,15 @@ const POPUP_STYLES = `
     align-items: center;
     background: #1C1929;
     border: 1px solid rgba(109,74,255,0.3);
-    border-radius: 6px;
-    padding: 6px 8px;
-    gap: 6px;
+    border-radius: 5px;
+    padding: 4px 6px;
+    gap: 5px;
   }
 
   .kloak-gen-pwd-text {
     flex: 1;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #00D2B4;
     white-space: nowrap;
@@ -588,27 +588,27 @@ const POPUP_STYLES = `
     border: none;
     color: #9E9AA8;
     cursor: pointer;
-    padding: 3px;
+    padding: 2px;
     display: flex;
     align-items: center;
-    border-radius: 4px;
-    font-size: 11px;
+    border-radius: 3px;
+    font-size: 10px;
     transition: all 0.15s;
   }
   .kloak-icon-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.1); }
-  .kloak-icon-btn svg { width: 13px; height: 13px; fill: currentColor; }
+  .kloak-icon-btn svg { width: 11px; height: 11px; fill: currentColor; }
 
   .kloak-gen-slider-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    font-size: 10px;
+    font-size: 9px;
     color: #7A758B;
-    gap: 8px;
+    gap: 6px;
   }
   .kloak-gen-slider-row input[type="range"] {
     flex: 1;
-    height: 4px;
+    height: 3px;
     accent-color: #6D4AFF;
     cursor: pointer;
   }
@@ -618,24 +618,23 @@ const POPUP_STYLES = `
     background: #6D4AFF;
     color: #FFFFFF;
     border: none;
-    border-radius: 6px;
-    padding: 7px 10px;
-    font-size: 11px;
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 10px;
     font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
     transition: all 0.15s;
-    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.35);
+    box-shadow: 0 1px 6px rgba(109, 74, 255, 0.3);
   }
   .kloak-btn-primary:hover {
     background: #7C5CFF;
-    transform: scale(1.01);
   }
 
-  /* ── AI Certificate & Owner Inspector ── */
+  /* ── Compact AI Certificate & Owner Inspector ── */
   .kloak-ai-inspector-section {
     border-bottom: 1px solid rgba(255,255,255,0.06);
     background: #181528;
@@ -645,13 +644,13 @@ const POPUP_STYLES = `
     width: 100%;
     background: transparent;
     border: none;
-    padding: 8px 12px;
+    padding: 6px 10px;
     color: #FFFFFF;
     display: flex;
     align-items: center;
     justify-content: space-between;
     cursor: pointer;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     transition: background 0.15s;
   }
@@ -662,23 +661,23 @@ const POPUP_STYLES = `
   .kloak-ai-toggle-left {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
 
   .kloak-ai-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: #10B981;
-    box-shadow: 0 0 6px #10B981;
+    box-shadow: 0 0 5px #10B981;
   }
-  .kloak-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 6px #F59E0B; }
-  .kloak-ai-dot.red { background: #EF4444; box-shadow: 0 0 6px #EF4444; }
+  .kloak-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 5px #F59E0B; }
+  .kloak-ai-dot.red { background: #EF4444; box-shadow: 0 0 5px #EF4444; }
 
   .kloak-ai-status-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
     font-weight: 700;
     background: rgba(16, 185, 129, 0.15);
     color: #34D399;
@@ -696,48 +695,48 @@ const POPUP_STYLES = `
   }
 
   .kloak-ai-drawer {
-    padding: 10px 12px 12px 12px;
+    padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     background: #131120;
     border-top: 1px solid rgba(255,255,255,0.04);
-    animation: kloakPop 0.15s ease;
+    animation: kloakPop 0.14s ease;
   }
 
   .kloak-ai-summary-card {
     background: rgba(109, 74, 255, 0.08);
     border: 1px solid rgba(109, 74, 255, 0.25);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 11px;
-    line-height: 1.4;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 10px;
+    line-height: 1.35;
     color: #D1CFDA;
   }
 
   .kloak-ai-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 4px;
   }
 
   .kloak-ai-metric-card {
     background: #1C1929;
     border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 6px;
-    padding: 6px 8px;
+    border-radius: 5px;
+    padding: 4px 6px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
   }
   .kloak-ai-metric-label {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 700;
     color: #7A758B;
     text-transform: uppercase;
   }
   .kloak-ai-metric-value {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: #FFFFFF;
     white-space: nowrap;
@@ -748,15 +747,15 @@ const POPUP_STYLES = `
   .kloak-ai-chips-wrap {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px;
+    gap: 3px;
+    margin-top: 1px;
   }
 
   .kloak-ai-chip {
-    font-size: 9px;
+    font-size: 8px;
     font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: 1px 5px;
+    border-radius: 3px;
     background: rgba(16, 185, 129, 0.1);
     border: 1px solid rgba(16, 185, 129, 0.25);
     color: #34D399;
@@ -767,9 +766,9 @@ const POPUP_STYLES = `
     color: #F87171;
   }
 
-  /* ── Custom Alias Footer (ALWAYS PRESENT) ── */
+  /* ── Compact Custom Alias Footer (ALWAYS PRESENT) ── */
   .kloak-alias-footer {
-    padding: 8px 12px 10px 12px;
+    padding: 6px 10px;
     background: #181624;
     border-top: 1px solid rgba(255,255,255,0.06);
   }
@@ -778,8 +777,8 @@ const POPUP_STYLES = `
     width: 100%;
     background: rgba(0, 210, 180, 0.08);
     border: 1px solid rgba(0, 210, 180, 0.3);
-    border-radius: 8px;
-    padding: 7px 10px;
+    border-radius: 6px;
+    padding: 5px 8px;
     color: #FFFFFF;
     cursor: pointer;
     display: flex;
@@ -791,17 +790,16 @@ const POPUP_STYLES = `
   .kloak-btn-alias:hover {
     background: rgba(0, 210, 180, 0.16);
     border-color: #00D2B4;
-    transform: scale(1.01);
   }
 
   .kloak-alias-btn-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
   }
 
   .kloak-alias-icon {
-    font-size: 14px;
+    font-size: 12px;
     line-height: 1;
   }
 
@@ -812,18 +810,18 @@ const POPUP_STYLES = `
   }
 
   .kloak-alias-title {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: #00D2B4;
   }
 
   .kloak-alias-sub {
-    font-size: 9px;
+    font-size: 8px;
     color: #9E9AA8;
   }
 
   .kloak-alias-arrow {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 700;
     color: #00D2B4;
   }
@@ -831,18 +829,18 @@ const POPUP_STYLES = `
   /* ── Toast Notification ── */
   .kloak-toast {
     position: fixed;
-    bottom: 24px;
-    right: 24px;
+    bottom: 20px;
+    right: 20px;
     background: #14121F;
     border: 1px solid #10B981;
-    border-radius: 8px;
-    padding: 10px 16px;
+    border-radius: 6px;
+    padding: 8px 12px;
     color: #FFFFFF;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
     z-index: 2147483647;
-    animation: kloakPop 0.2s ease;
+    animation: kloakPop 0.15s ease;
   }
 `;
 
@@ -879,18 +877,18 @@ function isRegistrationOrSignupPage(): boolean {
   return false;
 }
 
-// ── Position Calculator ──
-function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 260): { top: number; left: number } {
-  const popupWidth = 340;
+// ── Solid Stable Position Calculator ──
+function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 200): { top: number; left: number } {
+  const popupWidth = 285;
   let left = rect.left;
-  if (left + popupWidth > window.innerWidth - 12) {
-    left = window.innerWidth - popupWidth - 12;
+  if (left + popupWidth > window.innerWidth - 10) {
+    left = window.innerWidth - popupWidth - 10;
   }
-  if (left < 12) left = 12;
+  if (left < 10) left = 10;
 
-  let top = rect.bottom + 6;
+  let top = rect.bottom + 4;
   if (top + estimatedHeight > window.innerHeight && rect.top - estimatedHeight > 10) {
-    top = rect.top - estimatedHeight - 6;
+    top = rect.top - estimatedHeight - 4;
   }
 
   return { top, left };
@@ -899,7 +897,7 @@ function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 260): {
 function updateActivePopupPosition() {
   if (!activePopup || !currentTargetInput) return;
   const rect = currentTargetInput.getBoundingClientRect();
-  const height = activePopup.offsetHeight || 260;
+  const height = activePopup.offsetHeight || 200;
   const { top, left } = calculatePopupPosition(rect, height);
   activePopup.style.top = `${top}px`;
   activePopup.style.left = `${left}px`;
@@ -919,7 +917,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
 
   const rect = input.getBoundingClientRect();
   const isSignup = isRegistrationOrSignupPage();
-  const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 320 : 250);
+  const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 240 : 180);
 
   container.style.top = `${top}px`;
   container.style.left = `${left}px`;
@@ -1063,7 +1061,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
   if (isSignup) {
     const banner = document.createElement('div');
     banner.className = 'kloak-notice-badge';
-    banner.innerHTML = `<span>✨ Create Account Detected</span> • Fill new password`;
+    banner.innerHTML = `<span>✨ Create Account Detected</span> • Fill password`;
     bodyContainer.appendChild(banner);
   }
 
@@ -1138,7 +1136,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     try {
       navigator.clipboard.writeText(currentGeneratedPassword);
     } catch {}
-    showToastNotification('⚡ Generated password filled into password field & copied to clipboard!');
+    showToastNotification('⚡ Generated password filled & copied to clipboard!');
     container.remove();
     activePopup = null;
   });
@@ -1151,21 +1149,21 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     <button class="kloak-ai-toggle-btn" id="kloak-ai-toggle-btn">
       <div class="kloak-ai-toggle-left">
         <span class="kloak-ai-dot" id="kloak-ai-dot"></span>
-        <span>🧠 AI Security & Certificate Inspector</span>
+        <span>🧠 AI Security Inspector</span>
       </div>
       <span class="kloak-ai-status-badge" id="kloak-ai-badge">Analyzing...</span>
     </button>
     <div class="kloak-ai-drawer" id="kloak-ai-drawer" style="display: ${isAiDrawerExpanded ? 'flex' : 'none'};">
       <div class="kloak-ai-summary-card" id="kloak-ai-summary">
-        Fetching real-time SSL/TLS certificate and domain owner records...
+        Fetching TLS certificate and domain owner records...
       </div>
       <div class="kloak-ai-grid" id="kloak-ai-grid" style="display: none;">
         <div class="kloak-ai-metric-card">
-          <span class="kloak-ai-metric-label">🔒 TLS Certificate</span>
+          <span class="kloak-ai-metric-label">🔒 Certificate</span>
           <span class="kloak-ai-metric-value" id="kloak-ai-cert-val">-</span>
         </div>
         <div class="kloak-ai-metric-card">
-          <span class="kloak-ai-metric-label">🏢 Domain Owner</span>
+          <span class="kloak-ai-metric-label">🏢 Domain</span>
           <span class="kloak-ai-metric-value" id="kloak-ai-owner-val">-</span>
         </div>
       </div>
@@ -1193,7 +1191,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     }
   });
 
-  // Populate AI Inspector Data
   const renderAiEvaluation = (evalData: any) => {
     if (!evalData) return;
     const isSafe = evalData.threatLevel === 'VERIFIED_SAFE' || evalData.riskScore < 30;
@@ -1228,7 +1225,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     }
 
     if (ownerValEl && evalData.domainIntel) {
-      const ageStr = evalData.domainIntel.domainAgeYears ? `${evalData.domainIntel.domainAgeYears} yrs` : `${evalData.domainIntel.domainAgeDays} days`;
+      const ageStr = evalData.domainIntel.domainAgeYears ? `${evalData.domainIntel.domainAgeYears} yrs` : `${evalData.domainIntel.domainAgeDays}d`;
       ownerValEl.textContent = `${evalData.domainIntel.registrantOrg || evalData.domainIntel.registrarName} • ${ageStr}`;
       ownerValEl.title = evalData.ownerVerdict || '';
     }
@@ -1266,7 +1263,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         <span class="kloak-alias-icon">🛡️</span>
         <div class="kloak-alias-text-wrap">
           <div class="kloak-alias-title">Generate Custom Alias for ${hostname}</div>
-          <div class="kloak-alias-sub">Masks your real email • Auto-forwards to inbox</div>
+          <div class="kloak-alias-sub">Masks real email • Auto-forwards to inbox</div>
         </div>
       </div>
       <span class="kloak-alias-arrow">→</span>
@@ -1355,48 +1352,7 @@ function triggerCredentialPopupForInput(input: HTMLInputElement) {
   });
 }
 
-// ── Proximity Calculation Engine ──
-function findClosestCredentialField(x: number, y: number): { input: HTMLInputElement; distance: number } | null {
-  const fields = getAllCredentialInputs();
-  if (fields.length === 0) return null;
-
-  let closest: HTMLInputElement | null = null;
-  let minDistance = Infinity;
-
-  fields.forEach(field => {
-    const rect = field.getBoundingClientRect();
-    const cx = Math.max(rect.left, Math.min(x, rect.right));
-    const cy = Math.max(rect.top, Math.min(y, rect.bottom));
-    const dist = Math.hypot(x - cx, y - cy);
-
-    if (dist < minDistance) {
-      minDistance = dist;
-      closest = field;
-    }
-  });
-
-  if (!closest) return null;
-  return { input: closest, distance: minDistance };
-}
-
-// ── Pointer Proximity & Focus Event Listeners ──
-document.addEventListener('mousemove', (e) => {
-  lastPointerPos = { x: e.clientX, y: e.clientY };
-
-  if (proximityThrottleTimer) return;
-  proximityThrottleTimer = setTimeout(() => {
-    proximityThrottleTimer = null;
-
-    const closest = findClosestCredentialField(lastPointerPos.x, lastPointerPos.y);
-    if (!closest) return;
-
-    if (closest.distance < 50 && activePopup && currentTargetInput !== closest.input) {
-      currentTargetInput = closest.input;
-      buildPopupUI(cachedCredentialsForSite, closest.input);
-    }
-  }, 60);
-});
-
+// ── Rock-Solid Direct Focus Event Listeners (NO JITTERING) ──
 document.addEventListener('focusin', (e) => {
   const target = e.target as HTMLElement;
   if (target && target.tagName === 'INPUT' && isCredentialField(target as HTMLInputElement)) {
@@ -1430,7 +1386,7 @@ function updateInFieldIcons() {
       iconEl.className = 'kloak-field-badge';
       iconEl.title = 'Kloak: Click to autofill or generate credentials';
       iconEl.innerHTML = `
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="#6D4AFF">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="#6D4AFF">
           <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
         </svg>
       `;
@@ -1446,9 +1402,9 @@ function updateInFieldIcons() {
     const rect = field.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0 && isVisible(field)) {
       iconEl.style.display = 'flex';
-      const iconSize = 20;
+      const iconSize = 18;
       const top = rect.top + (rect.height - iconSize) / 2;
-      const left = rect.right - iconSize - 6;
+      const left = rect.right - iconSize - 5;
       iconEl.style.top = `${top}px`;
       iconEl.style.left = `${left}px`;
     } else {
@@ -1487,7 +1443,7 @@ function showThreatBanner(analysis: any, aiEvaluation?: any, connectedAccount?: 
   banner.id = 'kloak-threat-banner';
   banner.style.cssText = `
     position: fixed;
-    top: 12px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 2147483647;
@@ -1495,11 +1451,11 @@ function showThreatBanner(analysis: any, aiEvaluation?: any, connectedAccount?: 
     border: 1px solid rgba(239, 68, 68, 0.6);
     backdrop-filter: blur(16px);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(239, 68, 68, 0.25);
-    border-radius: 12px;
-    padding: 12px 18px;
+    border-radius: 10px;
+    padding: 10px 14px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: #f3f4f6;
     max-width: 90vw;
@@ -1508,44 +1464,44 @@ function showThreatBanner(analysis: any, aiEvaluation?: any, connectedAccount?: 
 
   const domainDisplay = analysis?.targetDomain || aiEvaluation?.domain || window.location.hostname;
   const riskScore = aiEvaluation?.riskScore || analysis?.riskScore || 65;
-  const certDetail = aiEvaluation?.certificate ? `Cert: ${aiEvaluation.certificate.issuerOrg} (${aiEvaluation.certificate.certificateAgeDays}d old)` : '';
-  const domainAge = aiEvaluation?.domainIntel ? `Domain: ${aiEvaluation.domainIntel.domainAgeDays}d old` : '';
+  const certDetail = aiEvaluation?.certificate ? `Cert: ${aiEvaluation.certificate.issuerOrg}` : '';
+  const domainAge = aiEvaluation?.domainIntel ? `Age: ${aiEvaluation.domainIntel.domainAgeDays}d` : '';
   const reasonSummary = aiEvaluation?.aiSummary || analysis?.reasons?.[0] || 'Potential phishing or unverified login form';
 
   banner.innerHTML = `
-    <div style="font-size: 24px; line-height: 1;">⚠️</div>
+    <div style="font-size: 20px; line-height: 1;">⚠️</div>
     <div style="display: flex; flex-direction: column; gap: 2px;">
-      <div style="font-size: 13px; font-weight: 700; color: #fca5a5; display: flex; align-items: center; gap: 6px;">
-        Kloak AI Threat Shield: Suspicious Website (${domainDisplay})
-        <span style="font-size: 10px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1px 6px; border-radius: 99px; color: #f87171;">Risk: ${riskScore}%</span>
-        ${certDetail ? `<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #d1d5db;">${certDetail}</span>` : ''}
-        ${domainAge ? `<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #d1d5db;">${domainAge}</span>` : ''}
+      <div style="font-size: 12px; font-weight: 700; color: #fca5a5; display: flex; align-items: center; gap: 6px;">
+        Kloak AI Threat Shield (${domainDisplay})
+        <span style="font-size: 9px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1px 5px; border-radius: 99px; color: #f87171;">Risk: ${riskScore}%</span>
+        ${certDetail ? `<span style="font-size: 9px; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; color: #d1d5db;">${certDetail}</span>` : ''}
+        ${domainAge ? `<span style="font-size: 9px; background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 4px; color: #d1d5db;">${domainAge}</span>` : ''}
       </div>
-      <div style="font-size: 11px; color: #d1d5db;">
-        ${reasonSummary}. Protect your real email with a custom disposable alias.
+      <div style="font-size: 10px; color: #d1d5db;">
+        ${reasonSummary}
       </div>
     </div>
     <button id="kloak-btn-protect" style="
       background: linear-gradient(135deg, #10b981, #059669);
       color: white;
       border: none;
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 10px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
-      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
-    ">🛡️ Protect with Masked Alias</button>
+      gap: 5px;
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.4);
+    ">🛡️ Masked Alias</button>
     <button id="kloak-threat-close" style="
       background: transparent;
       border: none;
       color: #9ca3af;
-      font-size: 16px;
+      font-size: 14px;
       cursor: pointer;
-      padding: 4px;
+      padding: 3px;
     ">✕</button>
   `;
 
