@@ -55,24 +55,28 @@ function isSearchOrNonCredentialInput(input) {
     return false;
 }
 function isCredentialField(input) {
+    if (!input || input.disabled || input.readOnly)
+        return false;
     if (!isVisible(input))
         return false;
     if (isSearchOrNonCredentialInput(input))
         return false;
-    const type = (input.type || '').toLowerCase();
+    const type = (input.type || 'text').toLowerCase();
     const autocomplete = (input.autocomplete || '').toLowerCase();
     if (type === 'password')
         return true;
     if (['username', 'email', 'current-password', 'new-password'].includes(autocomplete))
         return true;
-    const container = input.form || input.closest('form') || input.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="signup"]') || document.body;
-    const passwords = Array.from(container.querySelectorAll('input[type="password"]')).filter(el => isVisible(el));
-    if (passwords.length > 0) {
-        const textLike = ['text', 'email', ''];
+    // If there is ANY password field visible on the page, visible text/email inputs are credential inputs
+    const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter(el => isVisible(el));
+    if (allPasswords.length > 0) {
+        const textLike = ['text', 'email', 'tel', ''];
         if (textLike.includes(type))
             return true;
     }
-    if (type === 'email' || (type === 'text' && /user|email|login|account|identifier/i.test(input.name + input.id + input.placeholder))) {
+    const identifierPattern = /user|email|login|account|identifier|admission|roll|uid|uname|member|student|id|usr/i;
+    const nameIdPlaceholder = (input.name || '') + ' ' + (input.id || '') + ' ' + (input.placeholder || '') + ' ' + (input.getAttribute('aria-label') || '') + ' ' + (input.className || '');
+    if (identifierPattern.test(nameIdPlaceholder)) {
         return true;
     }
     return false;
@@ -840,11 +844,14 @@ function triggerCredentialPopupForInput(input) {
         return;
     currentTargetInput = input;
     chrome.runtime.sendMessage({ type: 'GET_CREDENTIALS', url: window.location.href }, (response) => {
-        if (response && response.isUnlocked) {
-            cachedCredentialsForSite = Array.isArray(response.items) ? response.items : [];
-            hasFetchedCredentials = true;
-            buildPopupUI(cachedCredentialsForSite, input);
+        if (response && Array.isArray(response.items)) {
+            cachedCredentialsForSite = response.items;
         }
+        else {
+            cachedCredentialsForSite = [];
+        }
+        hasFetchedCredentials = true;
+        buildPopupUI(cachedCredentialsForSite, input);
     });
 }
 // ── Proximity Calculation Engine ──

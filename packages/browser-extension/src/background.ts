@@ -365,15 +365,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const urlStr = message.url || sender.tab?.url || '';
         try {
           await refreshVaultState();
-          if (!isVaultUnlocked) {
-            sendResponse({ success: true, isUnlocked: false, items: [] });
-            return;
-          }
 
           let matches: any[] = [];
-          const nativeMatches = await sendNativeRequest('vault.matchByUrl', { url: urlStr });
-          if (Array.isArray(nativeMatches) && nativeMatches.length > 0) {
-            matches = strictMatch(nativeMatches, urlStr);
+          if (isVaultUnlocked) {
+            const nativeMatches = await sendNativeRequest('vault.matchByUrl', { url: urlStr });
+            if (Array.isArray(nativeMatches) && nativeMatches.length > 0) {
+              matches = strictMatch(nativeMatches, urlStr);
+            }
           }
           
           if (matches.length === 0) {
@@ -381,7 +379,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             matches = strictMatch(pool, urlStr);
           }
 
-          sendResponse({ success: true, isUnlocked: true, items: matches });
+          sendResponse({ success: true, isUnlocked: isVaultUnlocked, items: matches });
         } catch {
           sendResponse({ success: true, isUnlocked: isVaultUnlocked, items: [] });
         }
