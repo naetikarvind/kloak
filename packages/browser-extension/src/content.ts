@@ -157,51 +157,117 @@ function analyzeFormContext(focusedInput: HTMLInputElement): FormContext {
 
 // ── Smart Credential Injection ──
 function setInputValue(el: HTMLInputElement, val: string) {
-  const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
-  if (descriptor && descriptor.set) {
-    descriptor.set.call(el, val);
-  } else {
-    el.value = val;
+  if (!el) return;
+
+  try {
+    el.focus();
+  } catch {}
+
+  const lastValue = el.value;
+  el.value = val;
+
+  // React 15/16/17/18+ value tracker hack
+  const tracker = (el as any)._valueTracker;
+  if (tracker) {
+    tracker.setValue(lastValue);
   }
-  el.dispatchEvent(new Event('input', { bubbles: true }));
-  el.dispatchEvent(new Event('change', { bubbles: true }));
-  el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+
+  // HTMLInputElement prototype setter
+  const prototypeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+  if (prototypeSetter) {
+    prototypeSetter.call(el, val);
+  }
+
+  // Dispatch full suite of input events for React, Angular, Vue, and vanilla DOM
+  try {
+    el.dispatchEvent(new Event('focus', { bubbles: true, composed: true }));
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertReplacementText', data: val }));
+    el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
+  } catch (e) {
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
 }
 
 function injectCredentials(username?: string, password?: string, targetInput?: HTMLInputElement, totpSecret?: string) {
-  let context: FormContext | null = null;
+  const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
+  const allInputs = Array.from(document.querySelectorAll('input')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
+
+  let userField: HTMLInputElement | null = null;
+  let passField: HTMLInputElement | null = null;
+
+  // 1. Check focused or target input
   if (targetInput) {
-    context = analyzeFormContext(targetInput);
-  } else {
-    const activeElement = document.activeElement as HTMLInputElement;
-    if (activeElement && activeElement.tagName === 'INPUT') {
-      context = analyzeFormContext(activeElement);
+    if (targetInput.type === 'password') {
+      passField = targetInput;
+    } else {
+      userField = targetInput;
     }
   }
 
-  if (targetInput) {
-    if (targetInput.type === 'password' && password) {
-      setInputValue(targetInput, password);
-      handleTotpSync(totpSecret);
-      return;
-    } else if (username && targetInput.type !== 'password') {
-      setInputValue(targetInput, username);
-      if (password && context && context.passwordFields.length > 0) {
-        setInputValue(context.passwordFields[0], password);
+  // 2. Find associated password field
+  if (!passField) {
+    if (userField) {
+      const container = userField.form || userField.closest('form') || userField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || userField.parentElement?.parentElement || document.body;
+      const passwordsInContainer = Array.from(container.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
+      if (passwordsInContainer.length > 0) {
+        passField = passwordsInContainer[0];
       }
-      handleTotpSync(totpSecret);
-      return;
+    }
+    if (!passField && allPasswords.length > 0) {
+      passField = allPasswords[0];
     }
   }
 
-  if (context) {
-    if (username && context.usernameFields.length > 0) {
-      setInputValue(context.usernameFields[0], username);
+  // 3. Find associated username field
+  if (!userField) {
+    if (passField) {
+      const container = passField.form || passField.closest('form') || passField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || passField.parentElement?.parentElement || document.body;
+      const inputsInContainer = Array.from(container.querySelectorAll('input')).filter(i => i !== passField && isCredentialField(i as HTMLInputElement)) as HTMLInputElement[];
+      if (inputsInContainer.length > 0) {
+        userField = inputsInContainer[0];
+      }
     }
-    if (password && context.passwordFields.length > 0) {
-      setInputValue(context.passwordFields[0], password);
+    if (!userField) {
+      const candidates = allInputs.filter(i => i.type !== 'password' && isCredentialField(i));
+      if (candidates.length > 0) {
+        userField = candidates[0];
+      }
     }
+  }
+
+  // 4. Fill both fields simultaneously
+  let filledUsername = false;
+  let filledPassword = false;
+
+  if (username && userField) {
+    setInputValue(userField, username);
+    filledUsername = true;
+  }
+
+  if (password && passField) {
+    setInputValue(passField, password);
+    filledPassword = true;
+  }
+
+  // Fallback if targetInput was provided but missed above
+  if (targetInput) {
+    if (password && !filledPassword && targetInput.type === 'password') {
+      setInputValue(targetInput, password);
+    } else if (username && !filledUsername && targetInput.type !== 'password') {
+      setInputValue(targetInput, username);
+    }
+  }
+
+  // Visual feedback toast
+  if (username && password) {
+    showToastNotification(`✨ Filled username (${username}) and password!`);
+  } else if (username) {
+    showToastNotification(`👤 Filled username (${username})`);
+  } else if (password) {
+    showToastNotification(`🔑 Filled password`);
   }
 
   handleTotpSync(totpSecret);
@@ -721,6 +787,13 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
 
       // Fill action
       card.querySelector(`#fill-btn-${itemId}`)?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        injectCredentials(item.username, item.password, input, item.totpSecret);
+        container.remove();
+        activePopup = null;
+      });
+
+      card.querySelector('.kloak-item-info')?.addEventListener('click', (e) => {
         e.stopPropagation();
         injectCredentials(item.username, item.password, input, item.totpSecret);
         container.remove();

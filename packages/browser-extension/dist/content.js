@@ -67,91 +67,95 @@
     const inputs = Array.from(document.querySelectorAll("input"));
     return inputs.filter((i) => isCredentialField(i));
   }
-  function scoreUsernameField(input) {
-    let score = 0;
-    const type = (input.type || "").toLowerCase();
-    const name = (input.name || "").toLowerCase();
-    const id = (input.id || "").toLowerCase();
-    const autocomplete = (input.autocomplete || "").toLowerCase();
-    const placeholder = (input.placeholder || "").toLowerCase();
-    if (autocomplete === "username" || autocomplete === "email") score += 100;
-    if (type === "email") score += 50;
-    const pattern = /user|email|login|account|mail|handle|identifier/i;
-    if (pattern.test(name) || pattern.test(id)) score += 30;
-    if (pattern.test(placeholder)) score += 20;
-    return score;
-  }
-  function scorePasswordField(input) {
-    let score = 0;
-    const autocomplete = (input.autocomplete || "").toLowerCase();
-    if (input.type === "password") score += 1e3;
-    if (autocomplete === "current-password" || autocomplete === "new-password") score += 100;
-    return score;
-  }
-  function analyzeFormContext(focusedInput) {
-    const form = focusedInput.form || focusedInput.closest("form") || null;
-    const container = form || focusedInput.closest('div[class*="login"], div[class*="auth"]') || document.body;
-    const allInputs = Array.from(container.querySelectorAll("input")).filter((el) => isVisible(el));
-    const usernameFields = allInputs.filter((i) => {
-      const type = (i.type || "").toLowerCase();
-      return type !== "password" && type !== "hidden" && type !== "submit" && type !== "button" && type !== "checkbox" && type !== "radio" && !isSearchOrNonCredentialInput(i);
-    }).sort((a, b) => scoreUsernameField(b) - scoreUsernameField(a));
-    const passwordFields = allInputs.filter((i) => (i.type || "").toLowerCase() === "password").sort((a, b) => scorePasswordField(b) - scorePasswordField(a));
-    const submitButtons = Array.from(container.querySelectorAll('button[type="submit"], input[type="submit"], button:not([type="button"])'));
-    const isMultiStep = allInputs.length === 1;
-    const isEmailFirst = usernameFields.length > 0 && passwordFields.length === 0;
-    return {
-      form,
-      usernameFields,
-      passwordFields,
-      submitButtons,
-      isMultiStep,
-      isEmailFirst
-    };
-  }
   function setInputValue(el, val) {
-    const descriptor = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value");
-    if (descriptor && descriptor.set) {
-      descriptor.set.call(el, val);
-    } else {
-      el.value = val;
+    if (!el) return;
+    try {
+      el.focus();
+    } catch {
     }
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-    el.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", bubbles: true }));
+    const lastValue = el.value;
+    el.value = val;
+    const tracker = el._valueTracker;
+    if (tracker) {
+      tracker.setValue(lastValue);
+    }
+    const prototypeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    if (prototypeSetter) {
+      prototypeSetter.call(el, val);
+    }
+    try {
+      el.dispatchEvent(new Event("focus", { bubbles: true, composed: true }));
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertReplacementText", data: val }));
+      el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      el.dispatchEvent(new Event("blur", { bubbles: true, composed: true }));
+    } catch (e) {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
   }
   function injectCredentials(username, password, targetInput, totpSecret) {
-    let context = null;
+    const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => isVisible(el));
+    const allInputs = Array.from(document.querySelectorAll("input")).filter((el) => isVisible(el));
+    let userField = null;
+    let passField = null;
     if (targetInput) {
-      context = analyzeFormContext(targetInput);
-    } else {
-      const activeElement = document.activeElement;
-      if (activeElement && activeElement.tagName === "INPUT") {
-        context = analyzeFormContext(activeElement);
+      if (targetInput.type === "password") {
+        passField = targetInput;
+      } else {
+        userField = targetInput;
       }
     }
-    if (targetInput) {
-      if (targetInput.type === "password" && password) {
-        setInputValue(targetInput, password);
-        handleTotpSync(totpSecret);
-        return;
-      } else if (username && targetInput.type !== "password") {
-        setInputValue(targetInput, username);
-        if (password && context && context.passwordFields.length > 0) {
-          setInputValue(context.passwordFields[0], password);
+    if (!passField) {
+      if (userField) {
+        const container = userField.form || userField.closest("form") || userField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || userField.parentElement?.parentElement || document.body;
+        const passwordsInContainer = Array.from(container.querySelectorAll('input[type="password"]')).filter((el) => isVisible(el));
+        if (passwordsInContainer.length > 0) {
+          passField = passwordsInContainer[0];
         }
-        handleTotpSync(totpSecret);
-        return;
+      }
+      if (!passField && allPasswords.length > 0) {
+        passField = allPasswords[0];
       }
     }
-    if (context) {
-      if (username && context.usernameFields.length > 0) {
-        setInputValue(context.usernameFields[0], username);
+    if (!userField) {
+      if (passField) {
+        const container = passField.form || passField.closest("form") || passField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || passField.parentElement?.parentElement || document.body;
+        const inputsInContainer = Array.from(container.querySelectorAll("input")).filter((i) => i !== passField && isCredentialField(i));
+        if (inputsInContainer.length > 0) {
+          userField = inputsInContainer[0];
+        }
       }
-      if (password && context.passwordFields.length > 0) {
-        setInputValue(context.passwordFields[0], password);
+      if (!userField) {
+        const candidates = allInputs.filter((i) => i.type !== "password" && isCredentialField(i));
+        if (candidates.length > 0) {
+          userField = candidates[0];
+        }
       }
+    }
+    let filledUsername = false;
+    let filledPassword = false;
+    if (username && userField) {
+      setInputValue(userField, username);
+      filledUsername = true;
+    }
+    if (password && passField) {
+      setInputValue(passField, password);
+      filledPassword = true;
+    }
+    if (targetInput) {
+      if (password && !filledPassword && targetInput.type === "password") {
+        setInputValue(targetInput, password);
+      } else if (username && !filledUsername && targetInput.type !== "password") {
+        setInputValue(targetInput, username);
+      }
+    }
+    if (username && password) {
+      showToastNotification(`\u2728 Filled username (${username}) and password!`);
+    } else if (username) {
+      showToastNotification(`\u{1F464} Filled username (${username})`);
+    } else if (password) {
+      showToastNotification(`\u{1F511} Filled password`);
     }
     handleTotpSync(totpSecret);
   }
@@ -635,6 +639,12 @@
         </div>
       `;
         card.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          injectCredentials(item.username, item.password, input, item.totpSecret);
+          container.remove();
+          activePopup = null;
+        });
+        card.querySelector(".kloak-item-info")?.addEventListener("click", (e) => {
           e.stopPropagation();
           injectCredentials(item.username, item.password, input, item.totpSecret);
           container.remove();
