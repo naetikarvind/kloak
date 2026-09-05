@@ -581,6 +581,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'OPEN_EXTENSION_GENERATOR': {
+        const tabId = sender.tab?.id || lastActiveTabId;
+        if (tabId) {
+          lastActiveTabId = tabId;
+        }
+        await chrome.storage.local.set({ defaultTab: 'generator', pendingAutofillTabId: tabId });
+
+        let opened = false;
+        try {
+          if (chrome.action && typeof (chrome.action as any).openPopup === 'function') {
+            await (chrome.action as any).openPopup();
+            opened = true;
+          }
+        } catch {}
+
+        if (!opened) {
+          try {
+            const popupUrl = chrome.runtime.getURL('popup/popup.html?tab=generator');
+            if (chrome.windows && chrome.windows.create) {
+              await chrome.windows.create({
+                url: popupUrl,
+                type: 'popup',
+                width: 640,
+                height: 520,
+                focused: true
+              });
+              opened = true;
+            }
+          } catch {}
+        }
+
+        if (!opened) {
+          try {
+            const popupUrl = chrome.runtime.getURL('popup/popup.html?tab=generator');
+            await chrome.tabs.create({ url: popupUrl });
+          } catch {}
+        }
+
+        sendResponse({ success: true });
+        break;
+      }
+
       default:
         sendResponse({ error: 'Unknown message type' });
     }

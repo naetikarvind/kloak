@@ -32,6 +32,90 @@ const PROTON_COLORS = {
 let activeTabUrl = '';
 let activeDomain = '';
 
+// ── Password Generator State & Functions ──
+let isGeneratorOpen = false;
+let genLength = 20;
+let genUseUpper = true;
+let genUseLower = true;
+let genUseDigits = true;
+let genUseSymbols = true;
+let genAvoidAmbiguous = false;
+let genMode: 'password' | 'passphrase' = 'password';
+let genPassphraseWords = 4;
+let currentGenPassword = '';
+let passwordHistory: { password: string; timestamp: number }[] = [];
+
+const WORDLIST = [
+  'amber', 'anchor', 'apple', 'apron', 'arctic', 'arrow', 'atlas', 'autumn', 'bamboo', 'beacon',
+  'breeze', 'bridge', 'bronze', 'canyon', 'castle', 'cedar', 'cipher', 'cloud', 'cobalt', 'comet',
+  'copper', 'coral', 'cosmos', 'crater', 'crystal', 'delta', 'desert', 'diamond', 'dolphin', 'dragon',
+  'echo', 'ember', 'falcon', 'feather', 'forest', 'fossil', 'galaxy', 'garden', 'glacier', 'granite',
+  'harbor', 'haven', 'horizon', 'island', 'jasper', 'jungle', 'lagoon', 'lantern', 'lotus', 'lunar',
+  'matrix', 'meadow', 'meteor', 'mirage', 'mountain', 'nebula', 'oasis', 'ocean', 'orbit', 'orchid',
+  'peak', 'pearl', 'phoenix', 'planet', 'prism', 'pulse', 'pyramid', 'quantum', 'quartz', 'radar',
+  'radiant', 'rainbow', 'raven', 'ripple', 'river', 'rocket', 'ruby', 'safari', 'sail', 'sapphire',
+  'shadow', 'shield', 'sierra', 'silver', 'solar', 'spark', 'sphinx', 'spirit', 'spring', 'star',
+  'stone', 'summit', 'sunset', 'temple', 'thunder', 'timber', 'topaz', 'torrent', 'tower', 'tulip',
+  'valley', 'velvet', 'vessel', 'vertex', 'violet', 'vortex', 'voyage', 'wave', 'whisper', 'zenith'
+];
+
+function generatePassphrase(wordCount = 4, separator = '-'): string {
+  const chosen: string[] = [];
+  for (let i = 0; i < wordCount; i++) {
+    const idx = Math.floor(Math.random() * WORDLIST.length);
+    chosen.push(WORDLIST[idx]);
+  }
+  return chosen.join(separator);
+}
+
+function generateSecurePassword(): string {
+  if (genMode === 'passphrase') {
+    return generatePassphrase(genPassphraseWords, '-');
+  }
+  let chars = '';
+  if (genUseLower) chars += genAvoidAmbiguous ? 'abcdefghijkmnopqrstuvwxyz' : 'abcdefghijklmnopqrstuvwxyz';
+  if (genUseUpper) chars += genAvoidAmbiguous ? 'ABCDEFGHJKLMNPQRSTUVWXYZ' : 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (genUseDigits) chars += genAvoidAmbiguous ? '23456789' : '0123456789';
+  if (genUseSymbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+  if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+  const array = new Uint32Array(genLength);
+  crypto.getRandomValues(array);
+  let result = '';
+  for (let i = 0; i < genLength; i++) {
+    result += chars.charAt(array[i] % chars.length);
+  }
+  return result;
+}
+
+function calculateEntropy(pwd: string): { bits: number; label: string; score: number; color: string } {
+  if (!pwd) return { bits: 0, label: 'None', score: 0, color: '#F54A4A' };
+  let poolSize = 0;
+  if (/[a-z]/.test(pwd)) poolSize += 26;
+  if (/[A-Z]/.test(pwd)) poolSize += 26;
+  if (/[0-9]/.test(pwd)) poolSize += 10;
+  if (/[^a-zA-Z0-9]/.test(pwd)) poolSize += 32;
+  if (poolSize === 0) poolSize = 26;
+  const bits = Math.round(pwd.length * Math.log2(poolSize));
+  let label = 'Weak';
+  let score = 1;
+  let color = '#F54A4A';
+  if (bits >= 90) {
+    label = 'Very Strong';
+    score = 4;
+    color = '#29C98F';
+  } else if (bits >= 65) {
+    label = 'Strong';
+    score = 3;
+    color = '#29C98F';
+  } else if (bits >= 45) {
+    label = 'Good';
+    score = 2;
+    color = '#FFB800';
+  }
+  return { bits, label, score, color };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   currentTabId = tab?.id;
@@ -45,7 +129,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSearch();
   setupAddDropdown();
   setupSortDropdown();
+  setupFilters();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const requestedTab = urlParams.get('tab');
+  const stored = await chrome.storage?.local?.get(['defaultTab']);
+  const storedTab = stored?.defaultTab;
+  if (storedTab) {
+    await chrome.storage?.local?.remove('defaultTab');
+  }
+
   await loadLogins();
+
+  if (requestedTab === 'generator' || storedTab === 'generator') {
+    showGeneratorView();
+  }
 });
 
 let currentSortMode: 'recent' | 'alpha' | 'newest' | 'oldest' = 'recent';
@@ -54,14 +152,41 @@ let currentSortMode: 'recent' | 'alpha' | 'newest' | 'oldest' = 'recent';
 function setupSearch() {
   const searchInput = document.getElementById('search-input') as HTMLInputElement;
   searchInput?.addEventListener('input', () => {
+    if (isGeneratorOpen) {
+      isGeneratorOpen = false;
+      document.getElementById('filter-generator')?.classList.remove('active');
+      document.getElementById('filter-all')?.classList.add('active');
+    }
     applyFilterAndSort();
   });
+}
 
+function setupFilters() {
   const filterAllBtn = document.getElementById('filter-all');
+  const filterGenBtn = document.getElementById('filter-generator');
+  const headerGenBtn = document.getElementById('btn-header-gen');
+
   filterAllBtn?.addEventListener('click', () => {
+    isGeneratorOpen = false;
+    const searchInput = document.getElementById('search-input') as HTMLInputElement;
     if (searchInput) searchInput.value = '';
     filterAllBtn.classList.add('active');
+    filterGenBtn?.classList.remove('active');
     applyFilterAndSort();
+    if (allItems.length > 0) {
+      selectItem(allItems[0]);
+    } else {
+      const container = document.getElementById('detail-pane');
+      if (container) container.innerHTML = '<div class="detail-empty">Select an item to view details</div>';
+    }
+  });
+
+  filterGenBtn?.addEventListener('click', () => {
+    showGeneratorView();
+  });
+
+  headerGenBtn?.addEventListener('click', () => {
+    showGeneratorView();
   });
 }
 
@@ -174,9 +299,12 @@ function setupAddDropdown() {
 }
 
 // ── Proton Pass Creation Pages ──
-function showAddForm(type: string) {
+function showAddForm(type: string, initialValues?: { title?: string; username?: string; password?: string; url?: string }) {
   const container = document.getElementById('detail-pane');
   if (!container) return;
+  isGeneratorOpen = false;
+  document.getElementById('filter-generator')?.classList.remove('active');
+  document.getElementById('filter-all')?.classList.add('active');
   if (totpInterval) { clearInterval(totpInterval); totpInterval = null; }
   if (addTotpInterval) { clearInterval(addTotpInterval); addTotpInterval = null; }
 
@@ -592,6 +720,28 @@ function showAddForm(type: string) {
     const strengthBox = document.getElementById('strength-box');
     const genPanel = document.getElementById('gen-panel');
 
+    if (initialValues?.title && titleInput) {
+      titleInput.value = initialValues.title;
+      const avatarBox = document.getElementById('title-avatar-box');
+      if (avatarBox) {
+        const domain = initialValues.title.includes('.') ? initialValues.title : `${initialValues.title.toLowerCase().replace(/\s+/g, '')}.com`;
+        avatarBox.innerHTML = `<img src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" style="width: 20px; height: 20px; border-radius: 4px;" onerror="this.remove()">`;
+      }
+    }
+    if (initialValues?.username) {
+      const userInput = document.getElementById('field-username') as HTMLInputElement;
+      if (userInput) userInput.value = initialValues.username;
+    }
+    if (initialValues?.password && pwdInput) {
+      pwdInput.value = initialValues.password;
+      if (strengthBox) strengthBox.style.display = 'flex';
+      updateStrengthMeter(initialValues.password);
+    }
+    if (initialValues?.url) {
+      const urlInput = document.querySelector('.url-input') as HTMLInputElement;
+      if (urlInput) urlInput.value = initialValues.url;
+    }
+
     titleInput?.addEventListener('input', () => {
       const val = titleInput.value.trim();
       const avatarBox = document.getElementById('title-avatar-box');
@@ -882,6 +1032,330 @@ function startAddTotpLivePreview(secret: string) {
   addTotpInterval = window.setInterval(update, 1000);
 }
 
+// ── Dedicated Password Generator View ──
+function showGeneratorView() {
+  const container = document.getElementById('detail-pane');
+  if (!container) return;
+  if (totpInterval) { clearInterval(totpInterval); totpInterval = null; }
+  if (addTotpInterval) { clearInterval(addTotpInterval); addTotpInterval = null; }
+
+  isGeneratorOpen = true;
+  activeItem = null;
+  document.getElementById('filter-all')?.classList.remove('active');
+  document.getElementById('filter-generator')?.classList.add('active');
+  document.querySelectorAll('.list-item').forEach(el => el.classList.remove('active'));
+
+  if (!currentGenPassword) {
+    currentGenPassword = generateSecurePassword();
+  }
+
+  renderGeneratorUI(container);
+}
+
+function renderGeneratorUI(container: HTMLElement) {
+  const entropy = calculateEntropy(currentGenPassword);
+  
+  let formattedPasswordHtml = '';
+  if (genMode === 'passphrase') {
+    formattedPasswordHtml = currentGenPassword.split('-').map(w => `<span class="char-upper">${w}</span>`).join('<span class="char-symbol">-</span>');
+  } else {
+    for (let i = 0; i < currentGenPassword.length; i++) {
+      const char = currentGenPassword[i];
+      if (/[0-9]/.test(char)) {
+        formattedPasswordHtml += `<span class="char-digit">${char}</span>`;
+      } else if (/[A-Z]/.test(char)) {
+        formattedPasswordHtml += `<span class="char-upper">${char}</span>`;
+      } else if (/[^a-zA-Z0-9]/.test(char)) {
+        formattedPasswordHtml += `<span class="char-symbol">${char}</span>`;
+      } else {
+        formattedPasswordHtml += `<span>${char}</span>`;
+      }
+    }
+  }
+
+  container.innerHTML = `
+    <div class="generator-view">
+      <div class="detail-header" style="margin-bottom: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="card-icon" style="color: var(--accent); margin-right: 0;">
+            <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+          </div>
+          <div>
+            <div class="detail-title" style="font-size: 16px;">Password Generator</div>
+            <div style="font-size: 11px; color: var(--text-muted);">Zero-knowledge random key generator</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Result & Strength Card -->
+      <div class="gen-main-card">
+        <div class="gen-display-row">
+          <div class="gen-password-text" id="gen-live-text">${formattedPasswordHtml}</div>
+          <div class="gen-actions-group">
+            <button class="gen-btn-round" id="btn-view-regen" title="Regenerate Password">
+              <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+            <button class="gen-btn-round" id="btn-view-copy" title="Copy to clipboard">
+              <svg viewBox="0 0 24 24" style="width: 15px; height: 15px; fill: currentColor;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="gen-strength-meter">
+          <div class="gen-strength-header">
+            <span class="gen-strength-label" style="color: ${entropy.color};">${entropy.label}</span>
+            <span class="gen-strength-entropy">${entropy.bits} bits of entropy</span>
+          </div>
+          <div class="gen-strength-track">
+            <div class="gen-strength-seg" style="background: ${entropy.score >= 1 ? entropy.color : 'rgba(255,255,255,0.08)'};"></div>
+            <div class="gen-strength-seg" style="background: ${entropy.score >= 2 ? entropy.color : 'rgba(255,255,255,0.08)'};"></div>
+            <div class="gen-strength-seg" style="background: ${entropy.score >= 3 ? entropy.color : 'rgba(255,255,255,0.08)'};"></div>
+            <div class="gen-strength-seg" style="background: ${entropy.score >= 4 ? entropy.color : 'rgba(255,255,255,0.08)'};"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Action Buttons -->
+      <div class="gen-actions-row">
+        <button class="btn-gen-primary" id="btn-view-fill">
+          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
+          ⚡ Fill on Active Page ${activeDomain ? `(${activeDomain})` : ''}
+        </button>
+        <div class="gen-sub-actions">
+          <button class="btn-gen-sub" id="btn-view-copy-full">
+            📋 Copy Password
+          </button>
+          <button class="btn-gen-sub" id="btn-view-save-login">
+            ➕ Save as New Login
+          </button>
+        </div>
+      </div>
+
+      <!-- Config Card -->
+      <div class="gen-config-card">
+        <div class="gen-mode-toggle">
+          <button class="gen-mode-btn ${genMode === 'password' ? 'active' : ''}" id="mode-btn-pwd">Password</button>
+          <button class="gen-mode-btn ${genMode === 'passphrase' ? 'active' : ''}" id="mode-btn-phrase">Passphrase</button>
+        </div>
+
+        ${genMode === 'password' ? `
+          <div class="gen-slider-wrapper">
+            <div class="gen-slider-head">
+              <span>Password Length</span>
+              <span class="gen-len-val" id="gen-view-len-num">${genLength}</span>
+            </div>
+            <input type="range" class="gen-slider" id="gen-view-slider" min="8" max="64" value="${genLength}">
+            <div class="gen-presets-row">
+              <span class="gen-preset-chip" data-len="16">16</span>
+              <span class="gen-preset-chip" data-len="20">20</span>
+              <span class="gen-preset-chip" data-len="24">24</span>
+              <span class="gen-preset-chip" data-len="32">32</span>
+              <span class="gen-preset-chip" data-len="48">48</span>
+            </div>
+          </div>
+
+          <div class="gen-options-row" style="margin-top: 4px;">
+            <label class="gen-chip ${genUseUpper ? 'active' : ''}" id="chip-v-upper"><input type="checkbox" ${genUseUpper ? 'checked' : ''} id="chk-v-upper"> A-Z</label>
+            <label class="gen-chip ${genUseLower ? 'active' : ''}" id="chip-v-lower"><input type="checkbox" ${genUseLower ? 'checked' : ''} id="chk-v-lower"> a-z</label>
+            <label class="gen-chip ${genUseDigits ? 'active' : ''}" id="chip-v-digits"><input type="checkbox" ${genUseDigits ? 'checked' : ''} id="chk-v-digits"> 0-9</label>
+            <label class="gen-chip ${genUseSymbols ? 'active' : ''}" id="chip-v-symbols"><input type="checkbox" ${genUseSymbols ? 'checked' : ''} id="chk-v-symbols"> !@#$%</label>
+            <label class="gen-chip ${genAvoidAmbiguous ? 'active' : ''}" id="chip-v-ambig" title="Avoid 1, l, I, 0, O"><input type="checkbox" ${genAvoidAmbiguous ? 'checked' : ''} id="chk-v-ambig"> Avoid Ambiguous</label>
+          </div>
+        ` : `
+          <div class="gen-slider-wrapper">
+            <div class="gen-slider-head">
+              <span>Number of Words</span>
+              <span class="gen-len-val" id="gen-view-words-num">${genPassphraseWords}</span>
+            </div>
+            <input type="range" class="gen-slider" id="gen-view-words-slider" min="3" max="8" value="${genPassphraseWords}">
+            <div class="gen-presets-row">
+              <span class="gen-preset-chip" data-words="3">3 words</span>
+              <span class="gen-preset-chip" data-words="4">4 words</span>
+              <span class="gen-preset-chip" data-words="5">5 words</span>
+              <span class="gen-preset-chip" data-words="6">6 words</span>
+            </div>
+          </div>
+        `}
+      </div>
+
+      <!-- Password History Card -->
+      ${passwordHistory.length > 0 ? `
+        <div class="gen-history-card">
+          <div class="gen-history-head">
+            <span>Recent Passwords</span>
+            <span style="font-size: 9px; cursor: pointer; color: var(--text-muted);" id="btn-clear-history">Clear</span>
+          </div>
+          <div class="gen-history-list">
+            ${passwordHistory.slice(0, 4).map(h => `
+              <div class="gen-history-item">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">${h.password}</span>
+                <button class="kloak-mini-btn btn-copy-hist" data-pwd="${h.password}" title="Copy">📋</button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  bindGeneratorEvents(container);
+}
+
+function bindGeneratorEvents(container: HTMLElement) {
+  const regenBtn = container.querySelector('#btn-view-regen');
+  const copyBtn = container.querySelector('#btn-view-copy');
+  const copyFullBtn = container.querySelector('#btn-view-copy-full');
+  const fillBtn = container.querySelector('#btn-view-fill');
+  const saveLoginBtn = container.querySelector('#btn-view-save-login');
+
+  const doRegenerate = () => {
+    if (currentGenPassword && !passwordHistory.some(h => h.password === currentGenPassword)) {
+      passwordHistory.unshift({ password: currentGenPassword, timestamp: Date.now() });
+      if (passwordHistory.length > 10) passwordHistory.pop();
+    }
+    currentGenPassword = generateSecurePassword();
+    if (regenBtn) {
+      regenBtn.classList.add('spinning');
+      setTimeout(() => regenBtn.classList.remove('spinning'), 400);
+    }
+    renderGeneratorUI(container);
+  };
+
+  regenBtn?.addEventListener('click', doRegenerate);
+
+  const doCopy = async (btn: HTMLElement | null) => {
+    if (currentGenPassword) {
+      await copyToClipboardText(currentGenPassword);
+      if (btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = `✓ Copied!`;
+        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+      }
+    }
+  };
+
+  copyBtn?.addEventListener('click', () => doCopy(copyBtn as HTMLElement));
+  copyFullBtn?.addEventListener('click', () => doCopy(copyFullBtn as HTMLElement));
+
+  fillBtn?.addEventListener('click', async () => {
+    if (currentGenPassword) {
+      await copyToClipboardText(currentGenPassword);
+      if (currentTabId) {
+        chrome.tabs.sendMessage(currentTabId, {
+          type: 'INJECT_GENERATED_PASSWORD',
+          password: currentGenPassword
+        }).catch(() => null);
+      }
+      if (fillBtn) {
+        const orig = fillBtn.innerHTML;
+        fillBtn.innerHTML = `✓ Filled into page & copied!`;
+        fillBtn.style.background = '#29C98F';
+        setTimeout(() => {
+          fillBtn.innerHTML = orig;
+          fillBtn.style.background = '';
+        }, 1800);
+      }
+    }
+  });
+
+  saveLoginBtn?.addEventListener('click', () => {
+    const formattedTitle = activeDomain ? (activeDomain.charAt(0).toUpperCase() + activeDomain.slice(1).split('.')[0]) : 'New Login';
+    showAddForm('login', {
+      title: formattedTitle,
+      password: currentGenPassword,
+      url: activeTabUrl
+    });
+  });
+
+  // Mode toggles
+  container.querySelector('#mode-btn-pwd')?.addEventListener('click', () => {
+    if (genMode !== 'password') {
+      genMode = 'password';
+      currentGenPassword = generateSecurePassword();
+      renderGeneratorUI(container);
+    }
+  });
+
+  container.querySelector('#mode-btn-phrase')?.addEventListener('click', () => {
+    if (genMode !== 'passphrase') {
+      genMode = 'passphrase';
+      currentGenPassword = generateSecurePassword();
+      renderGeneratorUI(container);
+    }
+  });
+
+  // Slider & Presets
+  const slider = container.querySelector('#gen-view-slider') as HTMLInputElement;
+  slider?.addEventListener('input', () => {
+    genLength = parseInt(slider.value, 10);
+    const numDisplay = container.querySelector('#gen-view-len-num');
+    if (numDisplay) numDisplay.textContent = String(genLength);
+    currentGenPassword = generateSecurePassword();
+    renderGeneratorUI(container);
+  });
+
+  const wordsSlider = container.querySelector('#gen-view-words-slider') as HTMLInputElement;
+  wordsSlider?.addEventListener('input', () => {
+    genPassphraseWords = parseInt(wordsSlider.value, 10);
+    const numDisplay = container.querySelector('#gen-view-words-num');
+    if (numDisplay) numDisplay.textContent = String(genPassphraseWords);
+    currentGenPassword = generateSecurePassword();
+    renderGeneratorUI(container);
+  });
+
+  container.querySelectorAll('.gen-preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const len = (chip as HTMLElement).dataset.len;
+      const words = (chip as HTMLElement).dataset.words;
+      if (len) {
+        genLength = parseInt(len, 10);
+        currentGenPassword = generateSecurePassword();
+        renderGeneratorUI(container);
+      } else if (words) {
+        genPassphraseWords = parseInt(words, 10);
+        currentGenPassword = generateSecurePassword();
+        renderGeneratorUI(container);
+      }
+    });
+  });
+
+  // Checkboxes
+  const bindCheck = (id: string, propSetter: (v: boolean) => void) => {
+    const chk = container.querySelector(`#${id}`) as HTMLInputElement;
+    chk?.parentElement?.addEventListener('click', (e) => {
+      if (e.target !== chk) chk.checked = !chk.checked;
+      chk.parentElement?.classList.toggle('active', chk.checked);
+      propSetter(chk.checked);
+      currentGenPassword = generateSecurePassword();
+      renderGeneratorUI(container);
+    });
+  };
+
+  bindCheck('chk-v-upper', v => genUseUpper = v);
+  bindCheck('chk-v-lower', v => genUseLower = v);
+  bindCheck('chk-v-digits', v => genUseDigits = v);
+  bindCheck('chk-v-symbols', v => genUseSymbols = v);
+  bindCheck('chk-v-ambig', v => genAvoidAmbiguous = v);
+
+  // History copy & clear
+  container.querySelectorAll('.btn-copy-hist').forEach(b => {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const pwd = (b as HTMLElement).dataset.pwd;
+      if (pwd) {
+        await copyToClipboardText(pwd);
+        b.textContent = '✓';
+        setTimeout(() => b.textContent = '📋', 1200);
+      }
+    });
+  });
+
+  container.querySelector('#btn-clear-history')?.addEventListener('click', () => {
+    passwordHistory = [];
+    renderGeneratorUI(container);
+  });
+}
+
 // ── Global Copy Helper ──
 async function copyToClipboardText(text: string): Promise<boolean> {
   try {
@@ -1043,7 +1517,7 @@ async function loadLogins(retryCount = 0) {
       renderSmartSuggestions(allItems);
       applyFilterAndSort();
       const sorted = sortItems(allItems);
-      if (sorted.length > 0 && !activeItem) selectItem(sorted[0]);
+      if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
       return;
     } else if (!direct.isUnlocked) {
       const container = document.getElementById('sidebar-list');
@@ -1061,7 +1535,7 @@ async function loadLogins(retryCount = 0) {
       renderSmartSuggestions(allItems);
       applyFilterAndSort();
       const sorted = sortItems(allItems);
-      if (sorted.length > 0 && !activeItem) selectItem(sorted[0]);
+      if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
     } else if (searchRes && searchRes.isUnlocked) {
       allItems = searchRes.items || [];
       renderSmartSuggestions(allItems);
@@ -1357,7 +1831,10 @@ function renderSidebarList(items: any[]) {
 }
 
 function selectItem(item: any) {
+  isGeneratorOpen = false;
   activeItem = item;
+  document.getElementById('filter-generator')?.classList.remove('active');
+  document.getElementById('filter-all')?.classList.add('active');
   if (totpInterval) { clearInterval(totpInterval); totpInterval = null; }
   if (addTotpInterval) { clearInterval(addTotpInterval); addTotpInterval = null; }
   renderSidebarList(allItems);

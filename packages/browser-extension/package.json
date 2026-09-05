@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Kloak Cross-Browser Extension (MV3)",
   "scripts": {
-    "build": "npx esbuild src/background.ts --bundle --outfile=dist/background.js --target=chrome110 && npx esbuild src/content.ts --bundle --outfile=dist/content.js --target=chrome110"
+    "build": "npx esbuild src/background.ts --bundle --outfile=dist/background.js --target=chrome110 && npx esbuild src/content.ts --bundle --outfile=dist/content.js --target=chrome110 && npx esbuild src/popup.ts --bundle --outfile=dist/popup.js --target=chrome110 && npx esbuild src/sidepanel.ts --bundle --outfile=dist/sidepanel.js --target=chrome110 && npx esbuild src/options.ts --bundle --outfile=dist/options.js --target=chrome110"
   },
   "dependencies": {},
   "devDependencies": {

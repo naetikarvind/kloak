@@ -974,6 +974,283 @@
       display: flex; justify-content: space-between; padding: 6px 12px;
       font-size: 10px; color: var(--text-muted);
     }
+
+    /* ── DEDICATED PASSWORD GENERATOR VIEW ── */
+    .generator-view {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      animation: paneSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gen-main-card {
+      background: linear-gradient(135deg, rgba(109, 74, 255, 0.12) 0%, rgba(33, 31, 45, 0.98) 100%);
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    }
+    .gen-display-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+      padding: 10px 14px;
+      gap: 10px;
+    }
+    .gen-password-text {
+      font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: #FFFFFF;
+      letter-spacing: 1px;
+      word-break: break-all;
+      flex: 1;
+      user-select: all;
+    }
+    .gen-password-text .char-symbol { color: #FF884D; font-weight: 700; }
+    .gen-password-text .char-digit { color: #00D2B4; font-weight: 700; }
+    .gen-password-text .char-upper { color: #A78BFA; }
+    .gen-actions-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .gen-btn-round {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--bg-btn);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gen-btn-round:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: scale(1.08);
+    }
+    .gen-btn-round.spinning svg {
+      animation: spin 0.4s ease;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    .gen-strength-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .gen-strength-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+    .gen-strength-label {
+      font-weight: 600;
+      color: #29C98F;
+    }
+    .gen-strength-entropy {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+    .gen-strength-track {
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+      display: flex;
+      gap: 3px;
+    }
+    .gen-strength-seg {
+      flex: 1;
+      height: 100%;
+      background: #29C98F;
+      border-radius: 2px;
+      transition: background 0.3s;
+    }
+
+    /* Generator Controls */
+    .gen-config-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .gen-mode-toggle {
+      display: flex;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .gen-mode-btn {
+      flex: 1;
+      padding: 6px 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .gen-mode-btn.active {
+      background: var(--accent);
+      color: #FFFFFF;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(109, 74, 255, 0.35);
+    }
+    .gen-slider-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .gen-slider-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .gen-len-val {
+      font-family: monospace;
+      font-weight: 700;
+      color: var(--accent);
+      font-size: 13px;
+      background: rgba(109, 74, 255, 0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(109, 74, 255, 0.3);
+    }
+    .gen-presets-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .gen-preset-chip {
+      background: var(--bg-btn);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .gen-preset-chip:hover {
+      background: var(--bg-btn-hover);
+      color: #FFFFFF;
+      border-color: var(--accent);
+    }
+
+    /* Buttons Row */
+    .gen-actions-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn-gen-primary {
+      background: var(--accent);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.18s ease;
+      box-shadow: 0 2px 10px rgba(109, 74, 255, 0.35);
+    }
+    .btn-gen-primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+    .gen-sub-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-gen-sub {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      color: var(--text-main);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-gen-sub:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255,255,255,0.2);
+      transform: translateY(-1px);
+    }
+
+    /* History */
+    .gen-history-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 10px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .gen-history-head {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gen-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .gen-history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.25);
+      padding: 5px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #D1CFDA;
+    }
+    .gen-history-item:hover {
+      background: rgba(0,0,0,0.4);
+      color: #FFFFFF;
+    }
   </style>
 </head>
 <body>
@@ -986,6 +1263,9 @@
     </div>
     
     <div class="header-right">
+      <button class="btn-icon" id="btn-header-gen" title="Password Generator">
+        <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+      </button>
       <button class="btn-icon purple" id="btn-add">
         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
         <!-- Proton Pass Official Style Add Menu -->
@@ -1070,6 +1350,10 @@
         <button class="filter-btn active" id="filter-all">
           <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z"/></svg>
           All
+        </button>
+        <button class="filter-btn" id="filter-generator" title="Password Generator">
+          <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+          Generator
         </button>
         <div class="sort-wrapper">
           <button class="filter-btn" id="btn-sort" title="Sort items">

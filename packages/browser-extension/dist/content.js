@@ -466,104 +466,75 @@
     background: rgba(255,255,255,0.12);
   }
 
-  /* \u2500\u2500 Compact Generator Card \u2500\u2500 */
-  .kloak-gen-box {
-    padding: 7px 10px;
+  /* \u2500\u2500 Compact Password Generator Button \u2500\u2500 */
+  .kloak-gen-btn-box {
+    padding: 6px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
     background: rgba(109, 74, 255, 0.04);
   }
 
-  .kloak-gen-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .kloak-gen-header .kloak-section-title {
-    padding: 0;
-  }
-
-  .kloak-len-badge {
-    font-size: 9px;
-    color: #9E9AA8;
-  }
-  .kloak-len-badge strong {
-    color: #6D4AFF;
-  }
-
-  .kloak-gen-preview-row {
-    display: flex;
-    align-items: center;
-    background: #1C1929;
-    border: 1px solid rgba(109,74,255,0.3);
-    border-radius: 5px;
-    padding: 4px 6px;
-    gap: 5px;
-  }
-
-  .kloak-gen-pwd-text {
-    flex: 1;
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    color: #00D2B4;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    user-select: all;
-  }
-
-  .kloak-icon-btn {
-    background: transparent;
-    border: none;
-    color: #9E9AA8;
-    cursor: pointer;
-    padding: 2px;
-    display: flex;
-    align-items: center;
-    border-radius: 3px;
-    font-size: 10px;
-    transition: all 0.15s;
-  }
-  .kloak-icon-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.1); }
-  .kloak-icon-btn svg { width: 11px; height: 11px; fill: currentColor; }
-
-  .kloak-gen-slider-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    font-size: 9px;
-    color: #7A758B;
-    gap: 6px;
-  }
-  .kloak-gen-slider-row input[type="range"] {
-    flex: 1;
-    height: 3px;
-    accent-color: #6D4AFF;
-    cursor: pointer;
-  }
-
-  .kloak-btn-primary {
+  .kloak-btn-generator {
     width: 100%;
-    background: #6D4AFF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #252233;
+    border: 1px solid rgba(109, 74, 255, 0.35);
+    border-radius: 6px;
+    padding: 6px 8px;
     color: #FFFFFF;
-    border: none;
-    border-radius: 5px;
-    padding: 5px 8px;
-    font-size: 10px;
-    font-weight: 600;
     cursor: pointer;
+    transition: all 0.16s ease;
+    font-family: inherit;
+    text-align: left;
+    box-sizing: border-box;
+  }
+  .kloak-btn-generator:hover {
+    background: #2E2942;
+    border-color: #6D4AFF;
+    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.25);
+    transform: translateY(-1px);
+  }
+  .kloak-btn-generator:active {
+    transform: translateY(0);
+  }
+
+  .kloak-gen-btn-left {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .kloak-gen-key-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: rgba(109, 74, 255, 0.2);
+    color: #A78BFA;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    transition: all 0.15s;
-    box-shadow: 0 1px 6px rgba(109, 74, 255, 0.3);
+    font-size: 11px;
+    flex-shrink: 0;
   }
-  .kloak-btn-primary:hover {
-    background: #7C5CFF;
+  .kloak-gen-btn-texts {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .kloak-gen-btn-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #F3F4F6;
+  }
+  .kloak-gen-btn-sub {
+    font-size: 9px;
+    color: #9E9AA8;
+  }
+  .kloak-gen-btn-arrow {
+    font-size: 11px;
+    color: #A78BFA;
+    font-weight: 600;
+    opacity: 0.8;
   }
 
   /* \u2500\u2500 Compact AI Certificate & Owner Inspector \u2500\u2500 */
@@ -959,70 +930,30 @@
       bodyContainer.appendChild(banner);
     }
     const genSection = document.createElement("div");
-    genSection.className = "kloak-gen-box";
-    const genTitle = items.length === 0 ? "Generate Password" : isSignup ? "New Account Password" : "Password Generator";
+    genSection.className = "kloak-gen-btn-box";
+    const genTitle = items.length === 0 ? "Generate Strong Password" : isSignup ? "New Account Password" : "Password Generator";
     genSection.innerHTML = `
-    <div class="kloak-gen-header">
-      <span class="kloak-section-title">${genTitle}</span>
-      <span class="kloak-len-badge"><strong id="kloak-len-num">${currentPasswordLength}</strong> chars</span>
-    </div>
-
-    <div class="kloak-gen-preview-row">
-      <div class="kloak-gen-pwd-text" id="kloak-pwd-display">${currentGeneratedPassword}</div>
-      <button class="kloak-icon-btn" id="kloak-btn-regen" title="Regenerate Password">
-        <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-      </button>
-      <button class="kloak-icon-btn" id="kloak-btn-copy-gen" title="Copy Generated Password">
-        \u{1F4CB}
-      </button>
-    </div>
-
-    <div class="kloak-gen-slider-row">
-      <span>10</span>
-      <input type="range" id="kloak-len-slider" min="10" max="40" value="${currentPasswordLength}">
-      <span>40</span>
-    </div>
-
-    <button class="kloak-btn-primary" id="kloak-btn-use-pwd">
-      \u26A1 Fill Generated Password
+    <button class="kloak-btn-generator" id="kloak-btn-open-gen" title="Open Password Generator tab in Kloak Extension">
+      <div class="kloak-gen-btn-left">
+        <span class="kloak-gen-key-icon">\u26A1</span>
+        <div class="kloak-gen-btn-texts">
+          <div class="kloak-gen-btn-title">${genTitle}</div>
+          <div class="kloak-gen-btn-sub">Open Generator in Kloak App</div>
+        </div>
+      </div>
+      <span class="kloak-gen-btn-arrow">\u2197</span>
     </button>
   `;
     bodyContainer.appendChild(genSection);
-    const pwdDisplay = genSection.querySelector("#kloak-pwd-display");
-    const lenNum = genSection.querySelector("#kloak-len-num");
-    const slider = genSection.querySelector("#kloak-len-slider");
-    genSection.querySelector("#kloak-btn-regen")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      currentGeneratedPassword = generateRandomPassword(currentPasswordLength);
-      if (pwdDisplay) pwdDisplay.textContent = currentGeneratedPassword;
-    });
-    genSection.querySelector("#kloak-btn-copy-gen")?.addEventListener("click", (e) => {
+    genSection.querySelector("#kloak-btn-open-gen")?.addEventListener("click", (e) => {
       e.stopPropagation();
       try {
-        navigator.clipboard.writeText(currentGeneratedPassword);
-        showToastNotification("\u{1F4CB} Generated password copied to clipboard!");
+        chrome.runtime.sendMessage({
+          type: "OPEN_EXTENSION_GENERATOR",
+          domain: window.location.hostname
+        });
       } catch {
       }
-    });
-    slider?.addEventListener("input", () => {
-      currentPasswordLength = parseInt(slider.value, 10);
-      if (lenNum) lenNum.textContent = String(currentPasswordLength);
-      currentGeneratedPassword = generateRandomPassword(currentPasswordLength);
-      if (pwdDisplay) pwdDisplay.textContent = currentGeneratedPassword;
-    });
-    genSection.querySelector("#kloak-btn-use-pwd")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => isVisible(el));
-      if (allPasswords.length > 0) {
-        allPasswords.forEach((pField) => setInputValue(pField, currentGeneratedPassword));
-      } else if (input) {
-        setInputValue(input, currentGeneratedPassword);
-      }
-      try {
-        navigator.clipboard.writeText(currentGeneratedPassword);
-      } catch {
-      }
-      showToastNotification("\u26A1 Generated password filled & copied to clipboard!");
       container.remove();
       activePopup = null;
     });
@@ -1369,6 +1300,17 @@
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "INJECT_CREDENTIALS") {
       injectCredentials(message.username, message.password);
+      sendResponse({ success: true });
+    } else if (message.type === "INJECT_GENERATED_PASSWORD") {
+      if (message.password) {
+        const pwds = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => isVisible(el));
+        if (pwds.length > 0) {
+          pwds.forEach((p) => setInputValue(p, message.password));
+        } else if (currentTargetInput) {
+          setInputValue(currentTargetInput, message.password);
+        }
+        showToastNotification("\u26A1 Generated password filled into page!");
+      }
       sendResponse({ success: true });
     } else if (message.type === "THREAT_DETECTED") {
       showThreatBanner(message.analysis, message.aiEvaluation, message.connectedAccount);
