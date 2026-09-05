@@ -6,25 +6,13 @@ echo "============================="
 echo "  Kloak Icon Format Builder"
 echo "============================="
 
-# 1. Handle Apple Icon Composer .icon bundle/file
+# 1. Handle Apple Icon Composer .icon bundle/file directly
 if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
-    echo "→ Detected Apple Icon Composer AppIcon.icon..."
+    echo "→ Syncing Apple Icon Composer AppIcon.icon..."
     mkdir -p "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources"
     rm -rf "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
     cp -R "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
-    if [ -f "$REPO_ROOT/scripts/build-icon-composer.mjs" ]; then
-        node "$REPO_ROOT/scripts/build-icon-composer.mjs"
-    fi
-    echo "✓ AppIcon.icon synced to macOS app resources"
-fi
-
-# 2. Render iconset PNGs if needed
-if [ -x "$REPO_ROOT/scripts/render-icon" ]; then
-    echo "→ Rendering master iconset resolutions..."
-    "$REPO_ROOT/scripts/render-icon"
-elif [ -f "$REPO_ROOT/render_icon.swift" ]; then
-    echo "→ Rendering iconset via Swift..."
-    swift "$REPO_ROOT/render_icon.swift" 2>/dev/null || true
+    echo "✓ AppIcon.icon synced directly to macOS app resources"
 fi
 
 # 3. Compile Apple ICNS format

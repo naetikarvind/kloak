@@ -36,12 +36,11 @@ echo "✓ Binary copied"
 cp "$MACOS_APP_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 echo "✓ Info.plist copied"
 
-# ── 5. Copy app icon (.icon, .icns, .png) ──────────────────────────────────
+# ── 5. Copy app icon (.icon) ──────────────────────────────────────────
 ICON_FOUND=false
 ICON_DIR_OR_FILE="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
-ICNS="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns"
 
-# Check for modern Apple Icon Composer AppIcon.icon bundle or file
+# Check for Apple Icon Composer AppIcon.icon
 if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
     mkdir -p "$MACOS_APP_DIR/Sources/KloakApp/Resources"
     rm -rf "$ICON_DIR_OR_FILE"
@@ -49,26 +48,18 @@ if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
 fi
 
 if [ -e "$ICON_DIR_OR_FILE" ]; then
-    rm -rf "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+    rm -rf "$APP_BUNDLE/Contents/Resources/AppIcon.icon" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     cp -R "$ICON_DIR_OR_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
-    echo "✓ AppIcon.icon (Apple Icon Composer) copied"
+    echo "✓ AppIcon.icon (Apple Icon Composer) bundled directly"
     ICON_FOUND=true
-fi
-
-# Compile .icns from .iconset if needed
-if [ ! -f "$ICNS" ] && [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
-    echo "→ Compiling AppIcon.icns from AppIcon.iconset..."
-    iconutil -c icns "$REPO_ROOT/AppIcon.iconset" -o "$ICNS"
-fi
-
-if [ -f "$ICNS" ]; then
-    cp "$ICNS" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+elif [ -f "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns" ]; then
+    cp "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
     echo "✓ AppIcon.icns copied"
     ICON_FOUND=true
 fi
 
 if [ "$ICON_FOUND" = false ]; then
-    echo "⚠ No AppIcon.icon or AppIcon.icns found, skipping icon"
+    echo "⚠ No AppIcon.icon found, skipping icon"
 fi
 
 # ── 6. Copy Swift resources bundle (if it exists) ─────────────────────────────
