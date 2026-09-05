@@ -37,13 +37,6 @@ public struct KloakLogoView: View {
         if let img = NSImage(named: "AppIcon") {
             return img
         }
-        if let bundleUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "png"),
-           let img = NSImage(contentsOf: bundleUrl) {
-            return img
-        }
-        if let img = NSImage(contentsOfFile: "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/packages/macos-app/Sources/KloakApp/Resources/AppIcon.png") {
-            return img
-        }
         return nil
     }
 }

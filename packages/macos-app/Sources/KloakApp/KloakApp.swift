@@ -6,10 +6,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Load icon from bundle or dev assets to ensure Dock icon is always set
-        if let icon = NSImage(named: "AppIcon") ??
-            Bundle.main.image(forResource: "AppIcon") ??
-            NSImage(contentsOfFile: "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/packages/macos-app/Sources/KloakApp/Resources/AppIcon.png") {
+        if let icon = NSImage(named: "AppIcon") ?? Bundle.main.image(forResource: "AppIcon") {
             NSApp.applicationIconImage = icon
         }
 
