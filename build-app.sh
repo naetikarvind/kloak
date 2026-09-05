@@ -38,13 +38,19 @@ echo "✓ Info.plist copied"
 
 # ── 5. Copy app icon (.icon, .icns, .png) ──────────────────────────────────
 ICON_FOUND=false
-ICON_FILE="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
+ICON_DIR_OR_FILE="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
 ICNS="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns"
 
-# Check for modern Apple Icon Composer .icon file
-if [ -f "$ICON_FILE" ] || [ -f "$REPO_ROOT/AppIcon.icon" ]; then
-    [ -f "$REPO_ROOT/AppIcon.icon" ] && cp "$REPO_ROOT/AppIcon.icon" "$ICON_FILE"
-    cp "$ICON_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+# Check for modern Apple Icon Composer AppIcon.icon bundle or file
+if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
+    mkdir -p "$MACOS_APP_DIR/Sources/KloakApp/Resources"
+    rm -rf "$ICON_DIR_OR_FILE"
+    cp -R "$REPO_ROOT/AppIcon.icon" "$ICON_DIR_OR_FILE"
+fi
+
+if [ -e "$ICON_DIR_OR_FILE" ]; then
+    rm -rf "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+    cp -R "$ICON_DIR_OR_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
     echo "✓ AppIcon.icon (Apple Icon Composer) copied"
     ICON_FOUND=true
 fi

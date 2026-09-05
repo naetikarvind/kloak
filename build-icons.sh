@@ -6,13 +6,28 @@ echo "============================="
 echo "  Kloak Icon Format Builder"
 echo "============================="
 
-# 1. Compile/Sync Apple Icon Composer .icon & ICNS format
-if [ -f "$REPO_ROOT/AppIcon.icon" ]; then
+# 1. Handle Apple Icon Composer .icon bundle/file
+if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
+    echo "→ Detected Apple Icon Composer AppIcon.icon..."
     mkdir -p "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources"
-    cp "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
+    rm -rf "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
+    cp -R "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
+    if [ -f "$REPO_ROOT/scripts/build-icon-composer.mjs" ]; then
+        node "$REPO_ROOT/scripts/build-icon-composer.mjs"
+    fi
     echo "✓ AppIcon.icon synced to macOS app resources"
 fi
 
+# 2. Render iconset PNGs if needed
+if [ -x "$REPO_ROOT/scripts/render-icon" ]; then
+    echo "→ Rendering master iconset resolutions..."
+    "$REPO_ROOT/scripts/render-icon"
+elif [ -f "$REPO_ROOT/render_icon.swift" ]; then
+    echo "→ Rendering iconset via Swift..."
+    swift "$REPO_ROOT/render_icon.swift" 2>/dev/null || true
+fi
+
+# 3. Compile Apple ICNS format
 if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
     echo "→ Compiling Apple ICNS format (AppIcon.icns)..."
     iconutil -c icns "$REPO_ROOT/AppIcon.iconset" -o "$REPO_ROOT/AppIcon.icns"
@@ -21,13 +36,13 @@ if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
     echo "✓ AppIcon.icns built & synced to macOS app resources"
 fi
 
-# 2. Compile Windows/Web ICO format
+# 4. Compile Windows/Web ICO format
 if [ -f "$REPO_ROOT/scripts/build-ico.mjs" ]; then
     echo "→ Compiling ICO format (AppIcon.ico & favicon.ico)..."
     node "$REPO_ROOT/scripts/build-ico.mjs"
 fi
 
-# 3. Verify extension icons
+# 5. Verify extension icons
 mkdir -p "$REPO_ROOT/packages/browser-extension/icons"
 if [ -f "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" ]; then
     cp "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" "$REPO_ROOT/packages/browser-extension/icons/icon-16.png"
@@ -38,4 +53,7 @@ fi
 
 echo ""
 echo "🎉 All icon formats built successfully:"
-ls -lh "$REPO_ROOT/AppIcon.icns" "$REPO_ROOT/AppIcon.ico" "$REPO_ROOT/packages/browser-extension/icons/favicon.ico"
+[ -e "$REPO_ROOT/AppIcon.icon" ] && ls -ld "$REPO_ROOT/AppIcon.icon"
+[ -f "$REPO_ROOT/AppIcon.icns" ] && ls -lh "$REPO_ROOT/AppIcon.icns"
+[ -f "$REPO_ROOT/AppIcon.ico" ] && ls -lh "$REPO_ROOT/AppIcon.ico"
+[ -f "$REPO_ROOT/packages/browser-extension/icons/favicon.ico" ] && ls -lh "$REPO_ROOT/packages/browser-extension/icons/favicon.ico"
