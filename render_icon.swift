@@ -1,100 +1,101 @@
 import Foundation
 import AppKit
 
-let masterSvg = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <defs>
-    <!-- Background Gradient -->
-    <linearGradient id="bg-grad" x1="50%" y1="0%" x2="50%" y2="85%">
-      <stop offset="0%" stop-color="#1962d3"/>
-      <stop offset="100%" stop-color="#070c48"/>
-    </linearGradient>
+let fm = FileManager.default
+let currentDir = URL(fileURLWithPath: fm.currentDirectoryPath)
+let iconDir = currentDir.appendingPathComponent("AppIcon.icon")
+let assetsDir = iconDir.appendingPathComponent("Assets")
 
-    <!-- Shield Left Gradient -->
-    <linearGradient id="shield-left-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#cfd8dc"/>
-      <stop offset="100%" stop-color="#546e7a"/>
-    </linearGradient>
+func loadSvgLayers() -> String {
+    // Read SVGs from AppIcon.icon/Assets if present
+    let svg1Url = assetsDir.appendingPathComponent("gemini-svg (1).svg")
+    let svg2Url = assetsDir.appendingPathComponent("gemini-svg (2).svg")
+    let svg3Url = assetsDir.appendingPathComponent("gemini-svg (3).svg")
+    let svg4Url = assetsDir.appendingPathComponent("gemini-svg (4).svg")
+    let svgKUrl = assetsDir.appendingPathComponent("gemini-svg.svg")
 
-    <!-- Shield Right Gradient -->
-    <linearGradient id="shield-right-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#455a64"/>
-      <stop offset="100%" stop-color="#1a2327"/>
-    </linearGradient>
+    guard let svg1Data = try? Data(contentsOf: svg1Url), let svg1 = String(data: svg1Data, encoding: .utf8),
+          let svg2Data = try? Data(contentsOf: svg2Url), let svg2 = String(data: svg2Data, encoding: .utf8),
+          let svg3Data = try? Data(contentsOf: svg3Url), let svg3 = String(data: svg3Data, encoding: .utf8),
+          let svg4Data = try? Data(contentsOf: svg4Url), let svg4 = String(data: svg4Data, encoding: .utf8),
+          let svgKData = try? Data(contentsOf: svgKUrl), let svgK = String(data: svgKData, encoding: .utf8) else {
+        fatalError("Failed reading AppIcon.icon SVG assets")
+    }
 
-    <!-- K Upper Gradient -->
-    <linearGradient id="k-upper-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#b0bec5"/>
-      <stop offset="100%" stop-color="#37474f"/>
-    </linearGradient>
+    func cleanInner(_ svg: String) -> String {
+        var str = svg
+        if let start = str.range(of: "<svg[^>]*>", options: .regularExpression) {
+            str.removeSubrange(start)
+        }
+        if let end = str.range(of: "</svg>", options: .backwards) {
+            str.removeSubrange(end)
+        }
+        return str
+    }
 
-    <!-- K Lower Gradient -->
-    <linearGradient id="k-lower-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#78909c"/>
-      <stop offset="100%" stop-color="#263238"/>
-    </linearGradient>
+    let inner1 = cleanInner(svg1)
+    let inner2 = cleanInner(svg2)
+    let inner3 = cleanInner(svg3)
+    let inner4 = cleanInner(svg4)
+    let innerK = cleanInner(svgK)
 
-    <!-- Gold Lock Gradient -->
-    <linearGradient id="gold-lock-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff8e1"/>
-      <stop offset="45%" stop-color="#ffb300"/>
-      <stop offset="100%" stop-color="#ff8f00"/>
-    </linearGradient>
+    return """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+      <defs>
+        <!-- Background Gradient from icon.json -->
+        <linearGradient id="bg-grad" x1="50%" y1="0%" x2="50%" y2="85%">
+          <stop offset="0%" stop-color="#5936FF"/>
+          <stop offset="100%" stop-color="#8C19D8"/>
+        </linearGradient>
 
-    <!-- HIG macOS App Icon Drop Shadow for the squircle tile -->
-    <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.4"/>
-    </filter>
+        <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.4"/>
+        </filter>
 
-    <!-- Inner Element Shadow filter -->
-    <filter id="element-shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.4"/>
-    </filter>
+        <filter id="element-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.4"/>
+        </filter>
 
-    <clipPath id="squircle-clip">
-      <rect x="100" y="100" width="824" height="824" rx="185"/>
-    </clipPath>
-  </defs>
+        <clipPath id="squircle-clip">
+          <rect x="100" y="100" width="824" height="824" rx="185"/>
+        </clipPath>
+      </defs>
 
-  <!-- HIG Base Squircle with standard macOS drop shadow -->
-  <g filter="url(#tile-shadow)">
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-grad)"/>
-  </g>
-
-  <!-- Clipped Artwork Layer -->
-  <g clip-path="url(#squircle-clip)">
-    <!-- Inner subtle border highlight -->
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"/>
-
-    <!-- Scaled Artwork -->
-    <g transform="translate(100, 100) scale(1.609375)">
-      <!-- Main Shield Group with Shadow -->
-      <g filter="url(#element-shadow)" transform="translate(0, 8)">
-        <!-- Left Shield -->
-        <path d="M 256 64 Q 160 96 80 112 C 80 304 144 416 256 464 Z" fill="url(#shield-left-grad)"/>
-        <!-- Right Shield -->
-        <path d="M 256 64 Q 352 96 432 112 C 432 304 368 416 256 464 Z" fill="url(#shield-right-grad)"/>
-        
-        <!-- K Metallic Wings -->
-        <path d="M 256 216 L 336 120 L 416 120 L 288 256 Z" fill="url(#k-upper-grad)"/>
-        <path d="M 256 280 L 288 240 L 416 376 L 336 376 Z" fill="url(#k-lower-grad)"/>
+      <!-- Base Squircle -->
+      <g filter="url(#tile-shadow)">
+        <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-grad)"/>
       </g>
 
-      <!-- Golden Lock in Center -->
-      <g filter="url(#element-shadow)">
-        <!-- Shackle -->
-        <path d="M 216 256 V 208 A 40 40 0 0 1 296 208 V 256" fill="none" stroke="url(#gold-lock-grad)" stroke-width="24" stroke-linecap="round"/>
-        <!-- Lock Body -->
-        <rect x="176" y="256" width="160" height="128" rx="32" fill="url(#gold-lock-grad)"/>
-        <!-- Keyhole Base -->
-        <circle cx="256" cy="304" r="16" fill="#1c262b"/>
-        <!-- Keyhole Stem -->
-        <path d="M 248 312 L 240 352 H 272 L 264 312 Z" fill="#1c262b"/>
+      <g clip-path="url(#squircle-clip)">
+        <!-- Inner highlight -->
+        <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="4"/>
+
+        <!-- Shackle Layer -->
+        <g filter="url(#element-shadow)" transform="translate(-0.64, -50.06)">
+          \(inner3)
+        </g>
+
+        <!-- Shield Body (Left & Right) -->
+        <g filter="url(#element-shadow)" transform="translate(0, -15.88) scale(1.06)" transform-origin="512 512">
+          \(inner2)
+          \(inner1)
+        </g>
+
+        <!-- Shield Outline -->
+        <g transform="translate(0, -17.84) scale(1.08)" transform-origin="512 512">
+          \(inner4)
+        </g>
+
+        <!-- Glowing K Layer -->
+        <g filter="url(#element-shadow)">
+          \(innerK)
+        </g>
       </g>
-    </g>
-  </g>
-</svg>
-"""
+    </svg>
+    """
+}
+
+let masterSvg = loadSvgLayers()
 
 func renderPng(svgString: String, size: CGFloat, targetUrl: URL) -> Bool {
     guard let svgData = svgString.data(using: .utf8),
@@ -141,8 +142,6 @@ func renderPng(svgString: String, size: CGFloat, targetUrl: URL) -> Bool {
 }
 
 // 1. Create iconset directory
-let fm = FileManager.default
-let currentDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let iconsetDir = currentDir.appendingPathComponent("AppIcon.iconset")
 try? fm.createDirectory(at: iconsetDir, withIntermediateDirectories: true)
 
@@ -164,9 +163,9 @@ for (name, size) in sizes {
     _ = renderPng(svgString: masterSvg, size: size, targetUrl: outUrl)
 }
 
-print("Rendered all iconset sizes!")
+print("Rendered all iconset sizes from AppIcon.icon layers!")
 
-// 2. Also output to browser extension icons
+// 2. Output to browser extension icons
 let extIconsDir = currentDir.appendingPathComponent("packages/browser-extension/icons")
 try? fm.createDirectory(at: extIconsDir, withIntermediateDirectories: true)
 _ = renderPng(svgString: masterSvg, size: 16, targetUrl: extIconsDir.appendingPathComponent("icon-16.png"))
@@ -179,4 +178,4 @@ try? fm.createDirectory(at: resDir, withIntermediateDirectories: true)
 try? masterSvg.data(using: .utf8)?.write(to: resDir.appendingPathComponent("KloakIcon.svg"))
 _ = renderPng(svgString: masterSvg, size: 512, targetUrl: resDir.appendingPathComponent("AppIcon.png"))
 
-print("Saved extension and macOS resources!")
+print("Saved new extension and macOS resources!")

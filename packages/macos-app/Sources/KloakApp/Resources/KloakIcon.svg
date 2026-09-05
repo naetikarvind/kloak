@@ -1,48 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <!-- Background Gradient -->
+    <!-- Background Gradient from icon.json -->
     <linearGradient id="bg-grad" x1="50%" y1="0%" x2="50%" y2="85%">
-      <stop offset="0%" stop-color="#1962d3"/>
-      <stop offset="100%" stop-color="#070c48"/>
+      <stop offset="0%" stop-color="#5936FF"/>
+      <stop offset="100%" stop-color="#8C19D8"/>
     </linearGradient>
 
-    <!-- Shield Left Gradient -->
-    <linearGradient id="shield-left-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#cfd8dc"/>
-      <stop offset="100%" stop-color="#546e7a"/>
-    </linearGradient>
-
-    <!-- Shield Right Gradient -->
-    <linearGradient id="shield-right-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#455a64"/>
-      <stop offset="100%" stop-color="#1a2327"/>
-    </linearGradient>
-
-    <!-- K Upper Gradient -->
-    <linearGradient id="k-upper-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#b0bec5"/>
-      <stop offset="100%" stop-color="#37474f"/>
-    </linearGradient>
-
-    <!-- K Lower Gradient -->
-    <linearGradient id="k-lower-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#78909c"/>
-      <stop offset="100%" stop-color="#263238"/>
-    </linearGradient>
-
-    <!-- Gold Lock Gradient -->
-    <linearGradient id="gold-lock-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#fff8e1"/>
-      <stop offset="45%" stop-color="#ffb300"/>
-      <stop offset="100%" stop-color="#ff8f00"/>
-    </linearGradient>
-
-    <!-- HIG macOS App Icon Drop Shadow for the squircle tile -->
     <filter id="tile-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.4"/>
     </filter>
 
-    <!-- Inner Element Shadow filter -->
     <filter id="element-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000000" flood-opacity="0.4"/>
     </filter>
@@ -52,41 +19,86 @@
     </clipPath>
   </defs>
 
-  <!-- HIG Base Squircle with standard macOS drop shadow -->
+  <!-- Base Squircle -->
   <g filter="url(#tile-shadow)">
     <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg-grad)"/>
   </g>
 
-  <!-- Clipped Artwork Layer -->
   <g clip-path="url(#squircle-clip)">
-    <!-- Inner subtle border highlight -->
-    <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"/>
+    <!-- Inner highlight -->
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="4"/>
 
-    <!-- Scaled Artwork -->
-    <g transform="translate(100, 100) scale(1.609375)">
-      <!-- Main Shield Group with Shadow -->
-      <g filter="url(#element-shadow)" transform="translate(0, 8)">
-        <!-- Left Shield -->
-        <path d="M 256 64 Q 160 96 80 112 C 80 304 144 416 256 464 Z" fill="url(#shield-left-grad)"/>
-        <!-- Right Shield -->
-        <path d="M 256 64 Q 352 96 432 112 C 432 304 368 416 256 464 Z" fill="url(#shield-right-grad)"/>
-        
-        <!-- K Metallic Wings -->
-        <path d="M 256 216 L 336 120 L 416 120 L 288 256 Z" fill="url(#k-upper-grad)"/>
-        <path d="M 256 280 L 288 240 L 416 376 L 336 376 Z" fill="url(#k-lower-grad)"/>
-      </g>
+    <!-- Shackle Layer -->
+    <g filter="url(#element-shadow)" transform="translate(-0.64, -50.06)">
+      
+  <defs>
+    <linearGradient id="shackleGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+  </defs>
+  <path d="M 360 400 L 360 280 A 152 152 0 0 1 664 280 L 664 400" 
+        fill="none" stroke="url(#shackleGrad)" stroke-width="64" stroke-linecap="round" />
 
-      <!-- Golden Lock in Center -->
-      <g filter="url(#element-shadow)">
-        <!-- Shackle -->
-        <path d="M 216 256 V 208 A 40 40 0 0 1 296 208 V 256" fill="none" stroke="url(#gold-lock-grad)" stroke-width="24" stroke-linecap="round"/>
-        <!-- Lock Body -->
-        <rect x="176" y="256" width="160" height="128" rx="32" fill="url(#gold-lock-grad)"/>
-        <!-- Keyhole Base -->
-        <circle cx="256" cy="304" r="16" fill="#1c262b"/>
-        <!-- Keyhole Stem -->
-        <path d="M 248 312 L 240 352 H 272 L 264 312 Z" fill="#1c262b"/>
-      </g>
+
+    </g>
+
+    <!-- Shield Body (Left & Right) -->
+    <g filter="url(#element-shadow)" transform="translate(0, -15.88) scale(1.06)" transform-origin="512 512">
+      
+  <defs>
+    <linearGradient id="shieldLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5B21B6" />
+      <stop offset="100%" stop-color="#312E81" />
+    </linearGradient>
+  </defs>
+  <path d="M 512 280 L 224 360 L 224 640 C 224 820 512 940 512 940 Z" 
+        fill="url(#shieldLeft)" />
+
+
+      
+  <defs>
+    <linearGradient id="shieldRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E1065" />
+      <stop offset="100%" stop-color="#1E1B4B" />
+    </linearGradient>
+  </defs>
+  <path d="M 512 280 L 800 360 L 800 640 C 800 820 512 940 512 940 Z" 
+        fill="url(#shieldRight)" />
+
+
+    </g>
+
+    <!-- Shield Outline -->
+    <g transform="translate(0, -17.84) scale(1.08)" transform-origin="512 512">
+      
+  <path d="M 512 280 L 800 360 L 800 640 C 800 820 512 940 512 940 C 512 940 224 820 224 640 L 224 360 Z" 
+        fill="none" stroke="#7DD3FC" stroke-width="16" stroke-linejoin="round" />
+
+
+    </g>
+
+    <!-- Glowing K Layer -->
+    <g filter="url(#element-shadow)">
+      
+  <defs>
+    <filter id="k-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComponentTransfer in="blur" result="glow1">
+        <feFuncA type="linear" slope="0.5" />
+      </feComponentTransfer>
+      <feColorMatrix type="matrix" values="
+        0 0 0 0 0.49
+        0 0 0 0 0.82
+        0 0 0 0 0.98
+        0 0 0 1 0" in="glow1" result="colorGlow" />
+      <feComposite in="SourceGraphic" in2="colorGlow" operator="over" />
+    </filter>
+  </defs>
+  <path d="M 377 440 L 437 440 L 437 760 L 377 760 Z M 437 620 L 557 440 L 637 440 L 487 650 L 647 760 L 557 760 L 437 640 Z" 
+        fill="#FFFFFF" filter="url(#k-glow)" />
+
+
     </g>
   </g>
 </svg>
