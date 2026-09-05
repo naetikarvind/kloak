@@ -1,4 +1,5 @@
 import { analyzeUrl, generateMaskedAlias, ThreatAnalysis } from './threat-detector';
+import { evaluateWebsiteSecurity, AIThreatEvaluation } from './ai-threat-engine';
 
 const NATIVE_HOST = 'app.kloak.native';
 let cachedItems: any[] = [];
@@ -7,6 +8,8 @@ let connectedAccount: { provider: string; email: string; customForwardingEmail?:
   provider: 'google',
   email: 'naetik.arvind@gmail.com'
 };
+
+const aiSecurityCache = new Map<string, AIThreatEvaluation>();
 
 let lastActiveTabId: number | null = null;
 let lastActiveUrl: string | null = null;
@@ -226,9 +229,15 @@ async function updateBadgeForTab(tabId: number, urlStr: string) {
       await chrome.action.setBadgeText({ tabId, text: '⚠️' });
       await chrome.action.setBadgeBackgroundColor({ tabId, color: '#E53935' });
       try {
+        let aiEval = aiSecurityCache.get(urlStr);
+        if (!aiEval) {
+          aiEval = await evaluateWebsiteSecurity(urlStr);
+          aiSecurityCache.set(urlStr, aiEval);
+        }
         await chrome.tabs.sendMessage(tabId, {
           type: 'THREAT_DETECTED',
           analysis: threat,
+          aiEvaluation: aiEval,
           connectedAccount
         });
       } catch {}
@@ -264,7 +273,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'CHECK_THREAT': {
         const url = message.url || (sender.tab?.url ?? '');
         const analysis = analyzeUrl(url);
-        sendResponse({ success: true, analysis, connectedAccount });
+        let aiEvaluation = aiSecurityCache.get(url);
+        if (!aiEvaluation && (analysis.isSuspicious || message.includeAi)) {
+          aiEvaluation = await evaluateWebsiteSecurity(url);
+          aiSecurityCache.set(url, aiEvaluation);
+        }
+        sendResponse({ success: true, analysis, aiEvaluation, connectedAccount });
+        break;
+      }
+
+      case 'AI_INSPECT_WEBSITE': {
+        const url = message.url || (sender.tab?.url ?? '');
+        let evaluation = aiSecurityCache.get(url);
+        if (!evaluation) {
+          evaluation = await evaluateWebsiteSecurity(url);
+          aiSecurityCache.set(url, evaluation);
+        }
+        sendResponse({ success: true, evaluation, connectedAccount });
         break;
       }
 

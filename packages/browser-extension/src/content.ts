@@ -1,6 +1,7 @@
 /**
  * Kloak Browser Extension — Content Script
- * Adaptive Proximity-Aware Autofill Popup, In-Page Password Inspector & Contextual Generator
+ * Adaptive Proximity-Aware Autofill Popup, In-Page Password Inspector,
+ * Contextual Generator & AI Certificate / Domain Owner Threat Inspector.
  */
 
 interface FormContext {
@@ -24,6 +25,8 @@ let currentGeneratedPassword = '';
 let isRevealingPasswordMap: { [key: string]: boolean } = {};
 let lastPointerPos = { x: 0, y: 0 };
 let proximityThrottleTimer: any = null;
+let cachedAiEvaluation: any = null;
+let isAiDrawerExpanded = false;
 
 // ── Active URL Sync ──
 function pushActiveUrl() {
@@ -78,7 +81,6 @@ function isCredentialField(input: HTMLInputElement): boolean {
   if (type === 'password') return true;
   if (['username', 'email', 'current-password', 'new-password'].includes(autocomplete)) return true;
 
-  // If there is ANY password field visible on the page, visible text/email inputs are credential inputs
   const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement));
   if (allPasswords.length > 0) {
     const textLike = ['text', 'email', 'tel', ''];
@@ -155,92 +157,65 @@ function analyzeFormContext(focusedInput: HTMLInputElement): FormContext {
   };
 }
 
-// ── Smart Credential Injection ──
-function setInputValue(el: HTMLInputElement, val: string) {
-  if (!el) return;
-
+// ── Native Setter Dispatcher ──
+function setInputValue(input: HTMLInputElement, value: string) {
   try {
-    el.focus();
-  } catch {}
+    input.focus();
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    if (descriptor && descriptor.set) {
+      descriptor.set.call(input, value);
+    } else {
+      input.value = value;
+    }
 
-  const lastValue = el.value;
-  el.value = val;
+    const valueTracker = (input as any)._valueTracker;
+    if (valueTracker) {
+      valueTracker.setValue(value);
+    }
 
-  // React 15/16/17/18+ value tracker hack
-  const tracker = (el as any)._valueTracker;
-  if (tracker) {
-    tracker.setValue(lastValue);
-  }
-
-  // HTMLInputElement prototype setter
-  const prototypeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-  if (prototypeSetter) {
-    prototypeSetter.call(el, val);
-  }
-
-  // Dispatch full suite of input events for React, Angular, Vue, and vanilla DOM
-  try {
-    el.dispatchEvent(new Event('focus', { bubbles: true, composed: true }));
-    el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertReplacementText', data: val }));
-    el.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
-  } catch (e) {
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'a' }));
+    input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, composed: true, key: 'a' }));
+    input.dispatchEvent(new Event('blur', { bubbles: true, composed: true }));
+  } catch {
+    input.value = value;
   }
 }
 
+// ── Dual-Field Universal Input Filling ──
 function injectCredentials(username?: string, password?: string, targetInput?: HTMLInputElement, totpSecret?: string) {
-  const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
-  const allInputs = Array.from(document.querySelectorAll('input')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
+  const activeInput = targetInput || currentTargetInput || (document.activeElement as HTMLInputElement);
+  const context = activeInput ? analyzeFormContext(activeInput) : {
+    form: null,
+    usernameFields: [],
+    passwordFields: [],
+    submitButtons: [],
+    isMultiStep: false,
+    isEmailFirst: false
+  };
 
-  let userField: HTMLInputElement | null = null;
-  let passField: HTMLInputElement | null = null;
-
-  // 1. Check focused or target input
-  if (targetInput) {
-    if (targetInput.type === 'password') {
-      passField = targetInput;
-    } else {
-      userField = targetInput;
-    }
-  }
-
-  // 2. Find associated password field
-  if (!passField) {
-    if (userField) {
-      const container = userField.form || userField.closest('form') || userField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || userField.parentElement?.parentElement || document.body;
-      const passwordsInContainer = Array.from(container.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
-      if (passwordsInContainer.length > 0) {
-        passField = passwordsInContainer[0];
-      }
-    }
-    if (!passField && allPasswords.length > 0) {
-      passField = allPasswords[0];
-    }
-  }
-
-  // 3. Find associated username field
-  if (!userField) {
-    if (passField) {
-      const container = passField.form || passField.closest('form') || passField.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="card"], div[class*="form"], div[class*="container"]') || passField.parentElement?.parentElement || document.body;
-      const inputsInContainer = Array.from(container.querySelectorAll('input')).filter(i => i !== passField && isCredentialField(i as HTMLInputElement)) as HTMLInputElement[];
-      if (inputsInContainer.length > 0) {
-        userField = inputsInContainer[0];
-      }
-    }
-    if (!userField) {
-      const candidates = allInputs.filter(i => i.type !== 'password' && isCredentialField(i));
-      if (candidates.length > 0) {
-        userField = candidates[0];
-      }
-    }
-  }
-
-  // 4. Fill both fields simultaneously
   let filledUsername = false;
   let filledPassword = false;
+
+  let userField = context.usernameFields[0];
+  let passField = context.passwordFields[0];
+
+  if (!userField || !passField) {
+    const allDocInputs = getAllCredentialInputs();
+    if (!userField) {
+      userField = allDocInputs.find(i => i.type !== 'password' && isCredentialField(i)) as HTMLInputElement;
+    }
+    if (!passField) {
+      passField = allDocInputs.find(i => i.type === 'password') as HTMLInputElement;
+    }
+  }
+
+  if (activeInput && activeInput.type !== 'password') {
+    userField = activeInput;
+  } else if (activeInput && activeInput.type === 'password') {
+    passField = activeInput;
+  }
 
   if (username && userField) {
     setInputValue(userField, username);
@@ -252,7 +227,6 @@ function injectCredentials(username?: string, password?: string, targetInput?: H
     filledPassword = true;
   }
 
-  // Fallback if targetInput was provided but missed above
   if (targetInput) {
     if (password && !filledPassword && targetInput.type === 'password') {
       setInputValue(targetInput, password);
@@ -261,7 +235,6 @@ function injectCredentials(username?: string, password?: string, targetInput?: H
     }
   }
 
-  // Visual feedback toast
   if (username && password) {
     showToastNotification(`✨ Filled username (${username}) and password!`);
   } else if (username) {
@@ -331,7 +304,7 @@ const POPUP_STYLES = `
     backdrop-filter: blur(20px);
     overflow: hidden;
     animation: kloakPop 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 330px;
+    width: 340px;
     transition: top 0.15s ease, left 0.15s ease;
   }
 
@@ -403,7 +376,7 @@ const POPUP_STYLES = `
   .kloak-body {
     display: flex;
     flex-direction: column;
-    max-height: 420px;
+    max-height: 460px;
     overflow-y: auto;
   }
 
@@ -452,28 +425,32 @@ const POPUP_STYLES = `
   .kloak-card-top {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
+    gap: 10px;
   }
 
   .kloak-item-avatar {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 6px;
-    background: #242135;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(109, 74, 255, 0.15);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6D4AFF;
     overflow: hidden;
   }
-  .kloak-item-avatar img { width: 16px; height: 16px; border-radius: 3px; }
-  .kloak-item-avatar span { font-size: 11px; font-weight: 700; color: #6D4AFF; }
+  .kloak-item-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
 
   .kloak-item-info {
     flex: 1;
-    min-width: 0;
+    overflow: hidden;
+    cursor: pointer;
   }
   .kloak-item-username {
     font-size: 12px;
@@ -493,55 +470,51 @@ const POPUP_STYLES = `
     color: #FFFFFF;
     border: none;
     border-radius: 6px;
-    padding: 5px 10px;
+    padding: 5px 12px;
     font-size: 11px;
     font-weight: 600;
     cursor: pointer;
-    flex-shrink: 0;
     transition: all 0.15s;
-    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.35);
+    box-shadow: 0 2px 6px rgba(109, 74, 255, 0.3);
   }
-  .kloak-btn-fill:hover { background: #7C5CFF; transform: scale(1.03); }
+  .kloak-btn-fill:hover {
+    background: #7C5CFF;
+    transform: scale(1.03);
+  }
 
-  /* ── Password Detail Row ── */
   .kloak-pwd-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #1C1929;
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.25);
     border-radius: 6px;
     padding: 4px 8px;
-    font-size: 12px;
-    gap: 6px;
+    font-size: 11px;
   }
-
   .kloak-pwd-label {
-    font-size: 10px;
-    font-weight: 700;
     color: #7A758B;
+    font-size: 9px;
+    font-weight: 700;
     text-transform: uppercase;
   }
-
   .kloak-pwd-value {
-    flex: 1;
     font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    color: #E2E8F0;
-    white-space: nowrap;
+    color: #D1CFDA;
+    letter-spacing: 1px;
+    max-width: 140px;
     overflow: hidden;
     text-overflow: ellipsis;
-    user-select: text;
+    white-space: nowrap;
   }
   .kloak-pwd-value.revealed {
     color: #00D2B4;
+    letter-spacing: 0;
   }
 
   .kloak-pwd-actions {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 4px;
   }
 
   .kloak-mini-btn {
@@ -662,6 +635,138 @@ const POPUP_STYLES = `
     transform: scale(1.01);
   }
 
+  /* ── AI Certificate & Owner Inspector ── */
+  .kloak-ai-inspector-section {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: #181528;
+  }
+
+  .kloak-ai-toggle-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .kloak-ai-toggle-btn:hover {
+    background: rgba(109, 74, 255, 0.12);
+  }
+
+  .kloak-ai-toggle-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .kloak-ai-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 6px #10B981;
+  }
+  .kloak-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 6px #F59E0B; }
+  .kloak-ai-dot.red { background: #EF4444; box-shadow: 0 0 6px #EF4444; }
+
+  .kloak-ai-status-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.15);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+  }
+  .kloak-ai-status-badge.amber {
+    background: rgba(245, 158, 11, 0.15);
+    color: #FBBF24;
+    border-color: rgba(245, 158, 11, 0.3);
+  }
+  .kloak-ai-status-badge.red {
+    background: rgba(239, 68, 68, 0.15);
+    color: #F87171;
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .kloak-ai-drawer {
+    padding: 10px 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #131120;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    animation: kloakPop 0.15s ease;
+  }
+
+  .kloak-ai-summary-card {
+    background: rgba(109, 74, 255, 0.08);
+    border: 1px solid rgba(109, 74, 255, 0.25);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #D1CFDA;
+  }
+
+  .kloak-ai-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .kloak-ai-metric-card {
+    background: #1C1929;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 6px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .kloak-ai-metric-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #7A758B;
+    text-transform: uppercase;
+  }
+  .kloak-ai-metric-value {
+    font-size: 11px;
+    font-weight: 600;
+    color: #FFFFFF;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .kloak-ai-chips-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .kloak-ai-chip {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    color: #34D399;
+  }
+  .kloak-ai-chip.alert {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: #F87171;
+  }
+
   /* ── Custom Alias Footer (ALWAYS PRESENT) ── */
   .kloak-alias-footer {
     padding: 8px 12px 10px 12px;
@@ -775,8 +880,8 @@ function isRegistrationOrSignupPage(): boolean {
 }
 
 // ── Position Calculator ──
-function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 220): { top: number; left: number } {
-  const popupWidth = 330;
+function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 260): { top: number; left: number } {
+  const popupWidth = 340;
   let left = rect.left;
   if (left + popupWidth > window.innerWidth - 12) {
     left = window.innerWidth - popupWidth - 12;
@@ -794,7 +899,7 @@ function calculatePopupPosition(rect: DOMRect, estimatedHeight: number = 220): {
 function updateActivePopupPosition() {
   if (!activePopup || !currentTargetInput) return;
   const rect = currentTargetInput.getBoundingClientRect();
-  const height = activePopup.offsetHeight || 220;
+  const height = activePopup.offsetHeight || 260;
   const { top, left } = calculatePopupPosition(rect, height);
   activePopup.style.top = `${top}px`;
   activePopup.style.left = `${left}px`;
@@ -814,7 +919,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
 
   const rect = input.getBoundingClientRect();
   const isSignup = isRegistrationOrSignupPage();
-  const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 300 : 230);
+  const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 320 : 250);
 
   container.style.top = `${top}px`;
   container.style.left = `${left}px`;
@@ -901,7 +1006,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         </div>
       `;
 
-      // Fill action on Fill button
       card.querySelector(`#fill-btn-${itemId}`)?.addEventListener('click', (e) => {
         e.stopPropagation();
         injectCredentials(item.username, item.password, input, item.totpSecret);
@@ -909,7 +1013,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         activePopup = null;
       });
 
-      // Fill action on card title/username click
       card.querySelector('.kloak-item-info')?.addEventListener('click', (e) => {
         e.stopPropagation();
         injectCredentials(item.username, item.password, input, item.totpSecret);
@@ -917,7 +1020,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         activePopup = null;
       });
 
-      // Reveal / Peek action
       card.querySelector(`#reveal-btn-${itemId}`)?.addEventListener('click', (e) => {
         e.stopPropagation();
         isRevealingPasswordMap[itemId] = !isRevealingPasswordMap[itemId];
@@ -936,7 +1038,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         }
       });
 
-      // Copy password
       card.querySelector(`#copy-pwd-btn-${itemId}`)?.addEventListener('click', (e) => {
         e.stopPropagation();
         if (displayPassword) {
@@ -945,7 +1046,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         }
       });
 
-      // Copy username
       card.querySelector(`#copy-user-btn-${itemId}`)?.addEventListener('click', (e) => {
         e.stopPropagation();
         if (item.username) {
@@ -960,7 +1060,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     bodyContainer.appendChild(savedSection);
   }
 
-  // If on Create Account / Signup page:
   if (isSignup) {
     const banner = document.createElement('div');
     banner.className = 'kloak-notice-badge';
@@ -1030,7 +1129,6 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
 
   genSection.querySelector('#kloak-btn-use-pwd')?.addEventListener('click', (e) => {
     e.stopPropagation();
-    // Fill ONLY password fields with the generated password
     const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
     if (allPasswords.length > 0) {
       allPasswords.forEach(pField => setInputValue(pField, currentGeneratedPassword));
@@ -1045,7 +1143,121 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     activePopup = null;
   });
 
-  // 4. BOTTOM ITEM: Custom Masked Alias Button (ALWAYS PRESENT)
+  // 4. AI SECURITY & CERTIFICATE INSPECTOR DRAWER
+  const aiSection = document.createElement('div');
+  aiSection.className = 'kloak-ai-inspector-section';
+
+  aiSection.innerHTML = `
+    <button class="kloak-ai-toggle-btn" id="kloak-ai-toggle-btn">
+      <div class="kloak-ai-toggle-left">
+        <span class="kloak-ai-dot" id="kloak-ai-dot"></span>
+        <span>🧠 AI Security & Certificate Inspector</span>
+      </div>
+      <span class="kloak-ai-status-badge" id="kloak-ai-badge">Analyzing...</span>
+    </button>
+    <div class="kloak-ai-drawer" id="kloak-ai-drawer" style="display: ${isAiDrawerExpanded ? 'flex' : 'none'};">
+      <div class="kloak-ai-summary-card" id="kloak-ai-summary">
+        Fetching real-time SSL/TLS certificate and domain owner records...
+      </div>
+      <div class="kloak-ai-grid" id="kloak-ai-grid" style="display: none;">
+        <div class="kloak-ai-metric-card">
+          <span class="kloak-ai-metric-label">🔒 TLS Certificate</span>
+          <span class="kloak-ai-metric-value" id="kloak-ai-cert-val">-</span>
+        </div>
+        <div class="kloak-ai-metric-card">
+          <span class="kloak-ai-metric-label">🏢 Domain Owner</span>
+          <span class="kloak-ai-metric-value" id="kloak-ai-owner-val">-</span>
+        </div>
+      </div>
+      <div class="kloak-ai-chips-wrap" id="kloak-ai-chips"></div>
+    </div>
+  `;
+
+  bodyContainer.appendChild(aiSection);
+
+  const toggleBtn = aiSection.querySelector('#kloak-ai-toggle-btn');
+  const drawerEl = aiSection.querySelector('#kloak-ai-drawer') as HTMLElement;
+  const dotEl = aiSection.querySelector('#kloak-ai-dot') as HTMLElement;
+  const badgeEl = aiSection.querySelector('#kloak-ai-badge') as HTMLElement;
+  const summaryEl = aiSection.querySelector('#kloak-ai-summary') as HTMLElement;
+  const gridEl = aiSection.querySelector('#kloak-ai-grid') as HTMLElement;
+  const certValEl = aiSection.querySelector('#kloak-ai-cert-val') as HTMLElement;
+  const ownerValEl = aiSection.querySelector('#kloak-ai-owner-val') as HTMLElement;
+  const chipsEl = aiSection.querySelector('#kloak-ai-chips') as HTMLElement;
+
+  toggleBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isAiDrawerExpanded = !isAiDrawerExpanded;
+    if (drawerEl) {
+      drawerEl.style.display = isAiDrawerExpanded ? 'flex' : 'none';
+    }
+  });
+
+  // Populate AI Inspector Data
+  const renderAiEvaluation = (evalData: any) => {
+    if (!evalData) return;
+    const isSafe = evalData.threatLevel === 'VERIFIED_SAFE' || evalData.riskScore < 30;
+    const isCaution = evalData.threatLevel === 'CAUTION_SUSPICIOUS' || (evalData.riskScore >= 30 && evalData.riskScore < 60);
+
+    if (dotEl && badgeEl) {
+      if (isSafe) {
+        dotEl.className = 'kloak-ai-dot';
+        badgeEl.className = 'kloak-ai-status-badge';
+        badgeEl.textContent = '🟢 0% Risk • Safe';
+      } else if (isCaution) {
+        dotEl.className = 'kloak-ai-dot amber';
+        badgeEl.className = 'kloak-ai-status-badge amber';
+        badgeEl.textContent = `🟡 ${evalData.riskScore}% Risk • Caution`;
+      } else {
+        dotEl.className = 'kloak-ai-dot red';
+        badgeEl.className = 'kloak-ai-status-badge red';
+        badgeEl.textContent = `🚨 ${evalData.riskScore}% Risk • Threat`;
+      }
+    }
+
+    if (summaryEl) {
+      summaryEl.textContent = evalData.aiSummary || 'Security evaluation complete.';
+    }
+
+    if (gridEl) gridEl.style.display = 'grid';
+
+    if (certValEl && evalData.certificate) {
+      const certTier = evalData.certificate.validationLevel ? `(${evalData.certificate.validationLevel})` : '';
+      certValEl.textContent = `${evalData.certificate.issuerOrg || evalData.certificate.issuerName || 'Verified CA'} ${certTier}`;
+      certValEl.title = evalData.certificateVerdict || '';
+    }
+
+    if (ownerValEl && evalData.domainIntel) {
+      const ageStr = evalData.domainIntel.domainAgeYears ? `${evalData.domainIntel.domainAgeYears} yrs` : `${evalData.domainIntel.domainAgeDays} days`;
+      ownerValEl.textContent = `${evalData.domainIntel.registrantOrg || evalData.domainIntel.registrarName} • ${ageStr}`;
+      ownerValEl.title = evalData.ownerVerdict || '';
+    }
+
+    if (chipsEl) {
+      chipsEl.innerHTML = '';
+      const allChips = [...(evalData.trustBadges || []), ...(evalData.redFlags || [])];
+      allChips.forEach((chipText: string) => {
+        const chip = document.createElement('span');
+        const isRed = chipText.includes('🚨') || chipText.includes('⚠️') || chipText.includes('discrepancy');
+        chip.className = `kloak-ai-chip ${isRed ? 'alert' : ''}`;
+        chip.textContent = chipText;
+        chipsEl.appendChild(chip);
+      });
+    }
+  };
+
+  if (cachedAiEvaluation) {
+    renderAiEvaluation(cachedAiEvaluation);
+  } else {
+    chrome.runtime.sendMessage({ type: 'AI_INSPECT_WEBSITE', url: window.location.href }, (res) => {
+      if (res && res.evaluation) {
+        cachedAiEvaluation = res.evaluation;
+        renderAiEvaluation(res.evaluation);
+      }
+    });
+  }
+
+  // 5. BOTTOM ITEM: Custom Masked Alias Button (ALWAYS PRESENT)
   const aliasSection = document.createElement('div');
   aliasSection.className = 'kloak-alias-footer';
   aliasSection.innerHTML = `
@@ -1153,7 +1365,6 @@ function findClosestCredentialField(x: number, y: number): { input: HTMLInputEle
 
   fields.forEach(field => {
     const rect = field.getBoundingClientRect();
-    // Distance to rectangle
     const cx = Math.max(rect.left, Math.min(x, rect.right));
     const cy = Math.max(rect.top, Math.min(y, rect.bottom));
     const dist = Math.hypot(x - cx, y - cy);
@@ -1179,7 +1390,6 @@ document.addEventListener('mousemove', (e) => {
     const closest = findClosestCredentialField(lastPointerPos.x, lastPointerPos.y);
     if (!closest) return;
 
-    // If pointer is close to a field (within 50px) and popup is already active on a different field, re-anchor smoothly
     if (closest.distance < 50 && activePopup && currentTargetInput !== closest.input) {
       currentTargetInput = closest.input;
       buildPopupUI(cachedCredentialsForSite, closest.input);
@@ -1263,14 +1473,14 @@ window.addEventListener('resize', () => {
 
 // ── Threat Banner ──
 function checkThreatShield() {
-  chrome.runtime.sendMessage({ type: 'CHECK_THREAT', url: window.location.href }, (res) => {
-    if (res && res.analysis && res.analysis.isSuspicious) {
-      showThreatBanner(res.analysis, res.connectedAccount);
+  chrome.runtime.sendMessage({ type: 'CHECK_THREAT', url: window.location.href, includeAi: true }, (res) => {
+    if (res && (res.analysis?.isSuspicious || (res.aiEvaluation && res.aiEvaluation.riskScore >= 40))) {
+      showThreatBanner(res.analysis, res.aiEvaluation, res.connectedAccount);
     }
   });
 }
 
-function showThreatBanner(analysis: any, connectedAccount?: any) {
+function showThreatBanner(analysis: any, aiEvaluation?: any, connectedAccount?: any) {
   if (document.getElementById('kloak-threat-banner')) return;
 
   const banner = document.createElement('div');
@@ -1296,15 +1506,20 @@ function showThreatBanner(analysis: any, connectedAccount?: any) {
     width: auto;
   `;
 
-  const domainDisplay = analysis.targetDomain || window.location.hostname;
-  const reasonSummary = analysis.reasons?.[0] || 'Potential phishing or unverified login form';
+  const domainDisplay = analysis?.targetDomain || aiEvaluation?.domain || window.location.hostname;
+  const riskScore = aiEvaluation?.riskScore || analysis?.riskScore || 65;
+  const certDetail = aiEvaluation?.certificate ? `Cert: ${aiEvaluation.certificate.issuerOrg} (${aiEvaluation.certificate.certificateAgeDays}d old)` : '';
+  const domainAge = aiEvaluation?.domainIntel ? `Domain: ${aiEvaluation.domainIntel.domainAgeDays}d old` : '';
+  const reasonSummary = aiEvaluation?.aiSummary || analysis?.reasons?.[0] || 'Potential phishing or unverified login form';
 
   banner.innerHTML = `
     <div style="font-size: 24px; line-height: 1;">⚠️</div>
     <div style="display: flex; flex-direction: column; gap: 2px;">
       <div style="font-size: 13px; font-weight: 700; color: #fca5a5; display: flex; align-items: center; gap: 6px;">
-        Kloak Threat Shield: Suspicious Website (${domainDisplay})
-        <span style="font-size: 10px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1px 6px; border-radius: 99px; color: #f87171;">Risk: ${analysis.riskScore || 65}%</span>
+        Kloak AI Threat Shield: Suspicious Website (${domainDisplay})
+        <span style="font-size: 10px; background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); padding: 1px 6px; border-radius: 99px; color: #f87171;">Risk: ${riskScore}%</span>
+        ${certDetail ? `<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #d1d5db;">${certDetail}</span>` : ''}
+        ${domainAge ? `<span style="font-size: 10px; background: rgba(255,255,255,0.1); padding: 1px 6px; border-radius: 4px; color: #d1d5db;">${domainAge}</span>` : ''}
       </div>
       <div style="font-size: 11px; color: #d1d5db;">
         ${reasonSummary}. Protect your real email with a custom disposable alias.
@@ -1359,6 +1574,9 @@ function showThreatBanner(analysis: any, connectedAccount?: any) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'INJECT_CREDENTIALS') {
     injectCredentials(message.username, message.password);
+    sendResponse({ success: true });
+  } else if (message.type === 'THREAT_DETECTED') {
+    showThreatBanner(message.analysis, message.aiEvaluation, message.connectedAccount);
     sendResponse({ success: true });
   }
 });

@@ -419,6 +419,52 @@ public final class IPCServer: ObservableObject {
                 "suggestedAliasEmail": .string(analysis.suggestedAliasEmail ?? "")
             ]))
 
+        case "shield.aiInspectWebsite":
+            let url = params?["url"]?.stringValue ?? ""
+            let host = URL(string: url)?.host ?? url
+            Task {
+                let analysis = ThreatDetectorService.shared.analyzeUrl(url)
+                let cert = await CertificateInspectorService.shared.inspectCertificate(for: host)
+                let intel = await DomainIntelService.shared.fetchIntel(for: host)
+
+                var reasonsCodable: [AnyCodableValue] = []
+                for r in analysis.reasons {
+                    reasonsCodable.append(.string(r))
+                }
+                var certNotesCodable: [AnyCodableValue] = []
+                for n in cert.notes {
+                    certNotesCodable.append(.string(n))
+                }
+                var trustFactorsCodable: [AnyCodableValue] = []
+                for t in intel.trustFactors {
+                    trustFactorsCodable.append(.string(t))
+                }
+
+                reply(.dictionary([
+                    "threatLevel": .string(analysis.riskScore >= 60 ? "CRITICAL_PHISHING_THREAT" : (analysis.riskScore >= 35 ? "CAUTION_SUSPICIOUS" : "VERIFIED_SAFE")),
+                    "riskScore": .int(analysis.riskScore),
+                    "aiConfidence": .int(90),
+                    "targetDomain": .string(analysis.targetDomain ?? host),
+                    "certificate": .dictionary([
+                        "issuerOrg": .string(cert.issuerOrg),
+                        "validationLevel": .string(cert.validationLevel),
+                        "certificateAgeDays": .int(cert.certificateAgeDays),
+                        "validTo": .string(cert.validTo),
+                        "trustScore": .int(cert.trustScore),
+                        "notes": .array(certNotesCodable)
+                    ]),
+                    "domainIntel": .dictionary([
+                        "domainAgeYears": .double(intel.domainAgeYears),
+                        "domainAgeDays": .int(intel.domainAgeDays),
+                        "registrarName": .string(intel.registrarName),
+                        "registrantOrg": .string(intel.registrantOrg ?? ""),
+                        "reputationScore": .int(intel.reputationScore),
+                        "trustFactors": .array(trustFactorsCodable)
+                    ]),
+                    "reasons": .array(reasonsCodable)
+                ]))
+            }
+
         case "shield.generateProtectedAlias":
             let url = params?["url"]?.stringValue ?? ""
             let targetDomain = params?["domain"]?.stringValue ?? (URL(string: url)?.host ?? "untrusted-site")
