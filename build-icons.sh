@@ -6,7 +6,13 @@ echo "============================="
 echo "  Kloak Icon Format Builder"
 echo "============================="
 
-# 1. Compile Apple ICNS format
+# 1. Compile/Sync Apple Icon Composer .icon & ICNS format
+if [ -f "$REPO_ROOT/AppIcon.icon" ]; then
+    mkdir -p "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources"
+    cp "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
+    echo "✓ AppIcon.icon synced to macOS app resources"
+fi
+
 if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
     echo "→ Compiling Apple ICNS format (AppIcon.icns)..."
     iconutil -c icns "$REPO_ROOT/AppIcon.iconset" -o "$REPO_ROOT/AppIcon.icns"
