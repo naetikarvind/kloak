@@ -179,6 +179,10 @@ public final class VaultStore: ObservableObject {
             self.isUnlocked = true
             self.lastError = nil
 
+            // Store in Keychain for biometric unlock across sessions
+            let keyData = CryptoEngine.shared.keyToData(unwrappedVaultKey)
+            _ = KeychainManager.shared.storeKey(keyData: keyData)
+
             startAutoLockTimer()
             return true
         } catch {
@@ -190,11 +194,19 @@ public final class VaultStore: ObservableObject {
     // MARK: - Unlock with Biometrics (Touch ID)
 
     public var hasBiometricSession: Bool {
-        return sessionVaultKey != nil
+        return sessionVaultKey != nil || KeychainManager.shared.retrieveKey() != nil
     }
 
     public func unlockWithBiometrics() async -> Bool {
-        guard let validKey = sessionVaultKey else {
+        let candidateKey: SymmetricKey? = {
+            if let key = sessionVaultKey { return key }
+            if let data = KeychainManager.shared.retrieveKey() {
+                return CryptoEngine.shared.keyFromData(data)
+            }
+            return nil
+        }()
+
+        guard let validKey = candidateKey else {
             self.lastError = "Enter master password once to activate Touch ID for this session."
             return false
         }
@@ -225,6 +237,7 @@ public final class VaultStore: ObservableObject {
                         let payload = try JSONDecoder().decode(VaultPayload.self, from: decryptedPayloadData)
 
                         self.vaultKey = validKey
+                        self.sessionVaultKey = validKey
                         self.cachedHeader = vaultFile.header
                         self.items = payload.items
                         self.folders = payload.folders
