@@ -44,24 +44,23 @@ function isVisible(el: HTMLElement): boolean {
 
 function isSearchOrNonCredentialInput(input: HTMLInputElement): boolean {
   const type = (input.type || '').toLowerCase();
-  const nonCredentialTypes = ['search', 'number', 'tel', 'date', 'datetime-local', 'time', 'file', 'range', 'color', 'checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'hidden'];
+  const nonCredentialTypes = ['search', 'number', 'date', 'datetime-local', 'time', 'file', 'range', 'color', 'checkbox', 'radio', 'submit', 'button', 'reset', 'image', 'hidden'];
   if (nonCredentialTypes.includes(type)) return true;
 
   const role = (input.getAttribute('role') || '').toLowerCase();
-  if (role === 'search' || role === 'searchbox' || role === 'combobox') return true;
+  if (role === 'search' || role === 'searchbox') return true;
 
   const autocomplete = (input.autocomplete || '').toLowerCase();
   if (autocomplete === 'off' && input.name === 'q') return true;
-  if (['postal-code', 'country', 'street-address', 'cc-number', 'cc-csc', 'cc-exp', 'tel'].includes(autocomplete)) return true;
+  if (['postal-code', 'country', 'street-address', 'cc-csc', 'cc-exp'].includes(autocomplete)) return true;
 
-  const pattern = /search|query|find|filter|coupon|promo|discount|voucher|postal|zipcode|captcha|verification|sms|cvv|cvc|card-number|phone|comment|chat|message|quantity|amount|qty/i;
-  const name = (input.name || '').toLowerCase();
-  const id = (input.id || '').toLowerCase();
-  const placeholder = (input.placeholder || '').toLowerCase();
-  const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
-  const className = (input.className || '').toLowerCase();
+  const nameIdPlaceholder = ((input.name || '') + ' ' + (input.id || '') + ' ' + (input.placeholder || '') + ' ' + (input.getAttribute('aria-label') || '')).toLowerCase();
+  if (/user|login|email|pass|auth|usr|uid|uname|admission|roll|student/i.test(nameIdPlaceholder)) {
+    return false;
+  }
 
-  if (pattern.test(name) || pattern.test(id) || pattern.test(placeholder) || pattern.test(ariaLabel) || pattern.test(className)) {
+  const pattern = /search|query|find|filter|coupon|promo|discount|voucher|postal|zipcode|captcha|sms|cvv|cvc|comment|chat|quantity|amount|qty/i;
+  if (pattern.test(nameIdPlaceholder)) {
     if (type !== 'password') return true;
   }
 
@@ -273,6 +272,27 @@ const POPUP_STYLES = `
   @keyframes kloakPop {
     0% { opacity: 0; transform: translateY(-4px) scale(0.97); }
     100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .kloak-field-badge {
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: #14121F;
+    border: 1px solid rgba(109, 74, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2147483646;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .kloak-field-badge:hover {
+    transform: scale(1.12);
+    background: #242135;
+    border-color: #6D4AFF;
   }
 
   .kloak-header {
@@ -967,16 +987,64 @@ document.addEventListener('click', (e) => {
   }
 });
 
+// ── In-Field Kloak Badges ──
+function updateInFieldIcons() {
+  const fields = getAllCredentialInputs();
+  const root = ensureShadowRoot();
+
+  fields.forEach(field => {
+    let fieldId = field.getAttribute('data-kloak-id');
+    if (!fieldId) {
+      fieldId = `field-${Math.random().toString(36).substring(2, 9)}`;
+      field.setAttribute('data-kloak-id', fieldId);
+    }
+
+    let iconEl = root.getElementById(`kloak-icon-${fieldId}`);
+    if (!iconEl) {
+      iconEl = document.createElement('div');
+      iconEl.id = `kloak-icon-${fieldId}`;
+      iconEl.className = 'kloak-field-badge';
+      iconEl.title = 'Kloak: Click to autofill or generate credentials';
+      iconEl.innerHTML = `
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="#6D4AFF">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+        </svg>
+      `;
+      iconEl.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        field.focus();
+        triggerCredentialPopupForInput(field);
+      });
+      root.appendChild(iconEl);
+    }
+
+    const rect = field.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0 && isVisible(field)) {
+      iconEl.style.display = 'flex';
+      const iconSize = 20;
+      const top = rect.top + (rect.height - iconSize) / 2;
+      const left = rect.right - iconSize - 6;
+      iconEl.style.top = `${top}px`;
+      iconEl.style.left = `${left}px`;
+    } else {
+      iconEl.style.display = 'none';
+    }
+  });
+}
+
 window.addEventListener('scroll', () => {
   if (activePopup && currentTargetInput) {
     requestAnimationFrame(updateActivePopupPosition);
   }
+  requestAnimationFrame(updateInFieldIcons);
 }, { passive: true });
 
 window.addEventListener('resize', () => {
   if (activePopup && currentTargetInput) {
     requestAnimationFrame(updateActivePopupPosition);
   }
+  requestAnimationFrame(updateInFieldIcons);
 }, { passive: true });
 
 // ── Threat Banner ──
@@ -1081,5 +1149,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-// Run threat detection check
+// Run threat detection check & field scans
 checkThreatShield();
+
+// Check DOM mutations for dynamic forms
+const domObserver = new MutationObserver(() => {
+  updateInFieldIcons();
+});
+if (document.body) {
+  domObserver.observe(document.body, { childList: true, subtree: true });
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.body) {
+      domObserver.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+}
+
+setTimeout(updateInFieldIcons, 300);
+setTimeout(updateInFieldIcons, 1000);
+setInterval(updateInFieldIcons, 2500);
