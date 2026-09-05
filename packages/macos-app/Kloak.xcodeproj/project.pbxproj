@@ -7,74 +7,76 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		63D3146B66754AC6A66F41E8 /* LiquidGlassTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B281A7C3F1754732B3DFFA50 /* LiquidGlassTheme.swift */; };
-		B46444E94F6B4222B7D88C99 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 953728605D61449FA5973D79 /* FaviconView.swift */; };
-		569646A160414A459C3E7820 /* VaultModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A73BA1828F64E7CB674EF93 /* VaultModels.swift */; };
-		6EF56A306B6941499750FE67 /* KloakApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BACAE1D661D44F7E8D028837 /* KloakApp.swift */; };
-		21F87B9D9D374AAF939930DE /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5F1195AD5A94BF9B487B651 /* SetupView.swift */; };
-		D0DE83DB134648AF9900282A /* GeneratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AA9A9D1C8094F4B85F30350 /* GeneratorView.swift */; };
-		966C2E03F6A546B78BEABF28 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 566711305AD6446E9F402B79 /* SettingsView.swift */; };
-		B1415185AAA34409B43FB2FE /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 290AB4A6371C482A9336EB20 /* ItemDetailView.swift */; };
-		AA1B5B8F9BBC47FD8AFC1BA8 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F142CB4ECE5475E91B2BCD7 /* MenuBarView.swift */; };
-		23EFAC409A61438E9F06A61F /* VaultMainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06623476EEB3450B84B55F06 /* VaultMainView.swift */; };
-		AD497D114F8848F599831BB2 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F99560BDBBC54213A2A88B06 /* SidebarView.swift */; };
-		3CBB44FF9BA74036AA06FAF6 /* ImportExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F235EAB52C0B4591A4870DA8 /* ImportExportView.swift */; };
-		4BF03712A7224F19AE484446 /* KloakLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8AF517C14210466D9F7BEB02 /* KloakLogoView.swift */; };
-		ABE1CE34D396492F8CF23B02 /* ItemListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3EEAC8CA0BD74CBEA53FD342 /* ItemListView.swift */; };
-		EC49A052A07649D99F17D5A0 /* UnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D24E9356FA24AC0BBFDF7BF /* UnlockView.swift */; };
-		19AFA78B8B5C4A91909B495F /* TOTPRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76CF1FA1BC004A96BD0D748E /* TOTPRingView.swift */; };
-		2FA3E5D1155F4E38A838E81B /* WindowSizeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 714F7457BB5A43F0BA7FC9AC /* WindowSizeManager.swift */; };
-		3684A260D18F42C69D0E395A /* CertificateInspectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE4CF35ED2794D639B88B607 /* CertificateInspectorService.swift */; };
-		F1AA3AB248CE422FBEF25184 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30A0091D0D60415CA3BA6FF3 /* KeychainManager.swift */; };
-		24464B2D57DE48E090533AE8 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C474B4F4F894FCC81BD1939 /* BiometricAuth.swift */; };
-		090641EF99524059886391BB /* LogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B150F63334BC493AB77878E3 /* LogoService.swift */; };
-		5F468E48E8734D8DA54D944A /* IPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7305E6733601407097D8B08F /* IPCServer.swift */; };
-		7E377E5CDA164AA3B6C8A554 /* DomainIntelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D8BD526FA545CA8E98E321 /* DomainIntelService.swift */; };
-		C8E371940DBC4A1BAE57CB5A /* TOTPEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 274355B980BC4546BEB367A2 /* TOTPEngine.swift */; };
-		25AD71C7165E4A7A87ED3F7A /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB652F0318FA43AF9906182D /* VaultStore.swift */; };
-		6A06CCFFF7B94EC1915F8667 /* ActiveContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E819AAA59A81444D86126445 /* ActiveContextService.swift */; };
-		78E5F4183E1442D2A6AF24F5 /* CryptoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05201A61573143988D724F41 /* CryptoEngine.swift */; };
-		C87DFD0C6DC6495FBD4D6F75 /* ThreatDetectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E93DED93D2744879DC80745 /* ThreatDetectorService.swift */; };
-		62657A2D426542068E721034 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 077C5ECBEEE1462E885313A6 /* AppIcon.icon */; };
+		008ABBACEFAC4EE9BC4052B3 /* LiquidGlassTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38C7EEFC17F44C12BBF5F1ED /* LiquidGlassTheme.swift */; };
+		6EFD26871F674098AF7989E5 /* FaviconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F178333681F4E40A0174A78 /* FaviconView.swift */; };
+		E5CBEBC2F2C048A7BE8FDB11 /* VaultModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 592B35FE4BE64F8D9C3DE66B /* VaultModels.swift */; };
+		AF0B22B9505042E78E0A245F /* KloakApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F518609028F465588EBF35C /* KloakApp.swift */; };
+		7A81E46D63C44150B30F1E03 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 317A5F57A0DB47A98CB8BB03 /* SetupView.swift */; };
+		B8ECDE5E412D44CA94B8613A /* GeneratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A1A0433D86430FB5AE6263 /* GeneratorView.swift */; };
+		03B69D2A1F6E4B80A8F90EC1 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D73B1CB50784F008F5B323A /* SettingsView.swift */; };
+		9E27D501A330448D83AD9FD9 /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D12C75DB06840A6A7D9527A /* ItemDetailView.swift */; };
+		70C7B1B12B714A92AF8D4564 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9655A9544F78404B90C69DAB /* MenuBarView.swift */; };
+		AF30CA086B3B42C09AB16A41 /* VaultMainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF7A72B028CA4CA48C541630 /* VaultMainView.swift */; };
+		ACF86DC1C2284D65B19B8CB6 /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CD927F741F4BC991B0BD0D /* SidebarView.swift */; };
+		F1A97FC7FC8E443A99ABC28A /* ImportExportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5107302AB6B34839A91E6B02 /* ImportExportView.swift */; };
+		BF28076F60D14E51AC32A750 /* KloakLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CFD68F9D4134266A8C0159B /* KloakLogoView.swift */; };
+		E47EE2EE3F004B58B7C8659F /* ItemListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35995E8F4F234FBAA5568049 /* ItemListView.swift */; };
+		A139F033649042D7ACF8D701 /* UnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4C89B3292D74131A110380B /* UnlockView.swift */; };
+		E5F5FAF2F8CF4E44A8F590A7 /* TOTPRingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82D044373CD043488C1F6D50 /* TOTPRingView.swift */; };
+		ABD9DC53E5CA4068B56D8D17 /* WindowSizeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C80512DC88444C0890789830 /* WindowSizeManager.swift */; };
+		3AA2DF9DF74744C89DA566FE /* CertificateInspectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 818AF5B7C7014B628C4486F1 /* CertificateInspectorService.swift */; };
+		CEAAEC3AD0FD4FDEB1214152 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD1C025A82C64157BB3000E5 /* KeychainManager.swift */; };
+		8B480CE33961483CB78F6B70 /* BiometricAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = 192E6DFA07C94F79A0478EDD /* BiometricAuth.swift */; };
+		2483CBFF690D48F69B121902 /* LogoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303BF98947AC44F2B1C02D90 /* LogoService.swift */; };
+		19C0CB485E9F488B8582A29F /* IPCServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2E8F1F3633F40A99BED5405 /* IPCServer.swift */; };
+		37FFF8211AF84B35B4889363 /* DomainIntelService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320C196C84944D3CB3689D1B /* DomainIntelService.swift */; };
+		FE304A0AECAD49EA9F2E5916 /* TOTPEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F93089756F4BFE885FA2E3 /* TOTPEngine.swift */; };
+		7BA2109696224547ACEE17D3 /* VaultStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2DCC2D6F674F9B9A74A81C /* VaultStore.swift */; };
+		D9F49CE61C28492EA3AE1AE3 /* ActiveContextService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42DF172EA04B4A8C93F50FD6 /* ActiveContextService.swift */; };
+		87B0EAEEE68547D9B270D7EC /* CryptoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF2063E8129645C4A4854146 /* CryptoEngine.swift */; };
+		5D7883DD7B0E48A7837C4CAF /* ThreatDetectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C652165A994C5CAE4F6D5D /* ThreatDetectorService.swift */; };
+		65771F54776A4D149CF153B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 09EEAD3D3B7A4A4FBC3627B7 /* Assets.xcassets */; };
+		049FA45578AE4BEF8D5F843D /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = A0DD91E0D58147E9A5E6FFB3 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		B281A7C3F1754732B3DFFA50 /* LiquidGlassTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/UI/LiquidGlassTheme.swift"; sourceTree = "<group>"; };
-		953728605D61449FA5973D79 /* FaviconView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/UI/FaviconView.swift"; sourceTree = "<group>"; };
-		3A73BA1828F64E7CB674EF93 /* VaultModels.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Models/VaultModels.swift"; sourceTree = "<group>"; };
-		BACAE1D661D44F7E8D028837 /* KloakApp.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/KloakApp.swift"; sourceTree = "<group>"; };
-		A5F1195AD5A94BF9B487B651 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SetupView.swift"; sourceTree = "<group>"; };
-		7AA9A9D1C8094F4B85F30350 /* GeneratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/GeneratorView.swift"; sourceTree = "<group>"; };
-		566711305AD6446E9F402B79 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SettingsView.swift"; sourceTree = "<group>"; };
-		290AB4A6371C482A9336EB20 /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ItemDetailView.swift"; sourceTree = "<group>"; };
-		2F142CB4ECE5475E91B2BCD7 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/MenuBarView.swift"; sourceTree = "<group>"; };
-		06623476EEB3450B84B55F06 /* VaultMainView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/VaultMainView.swift"; sourceTree = "<group>"; };
-		F99560BDBBC54213A2A88B06 /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SidebarView.swift"; sourceTree = "<group>"; };
-		F235EAB52C0B4591A4870DA8 /* ImportExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ImportExportView.swift"; sourceTree = "<group>"; };
-		8AF517C14210466D9F7BEB02 /* KloakLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/KloakLogoView.swift"; sourceTree = "<group>"; };
-		3EEAC8CA0BD74CBEA53FD342 /* ItemListView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ItemListView.swift"; sourceTree = "<group>"; };
-		8D24E9356FA24AC0BBFDF7BF /* UnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/UnlockView.swift"; sourceTree = "<group>"; };
-		76CF1FA1BC004A96BD0D748E /* TOTPRingView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/TOTPRingView.swift"; sourceTree = "<group>"; };
-		714F7457BB5A43F0BA7FC9AC /* WindowSizeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/WindowSizeManager.swift"; sourceTree = "<group>"; };
-		DE4CF35ED2794D639B88B607 /* CertificateInspectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/CertificateInspectorService.swift"; sourceTree = "<group>"; };
-		30A0091D0D60415CA3BA6FF3 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/KeychainManager.swift"; sourceTree = "<group>"; };
-		5C474B4F4F894FCC81BD1939 /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/BiometricAuth.swift"; sourceTree = "<group>"; };
-		B150F63334BC493AB77878E3 /* LogoService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/LogoService.swift"; sourceTree = "<group>"; };
-		7305E6733601407097D8B08F /* IPCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/IPCServer.swift"; sourceTree = "<group>"; };
-		89D8BD526FA545CA8E98E321 /* DomainIntelService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/DomainIntelService.swift"; sourceTree = "<group>"; };
-		274355B980BC4546BEB367A2 /* TOTPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/TOTPEngine.swift"; sourceTree = "<group>"; };
-		CB652F0318FA43AF9906182D /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/VaultStore.swift"; sourceTree = "<group>"; };
-		E819AAA59A81444D86126445 /* ActiveContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/ActiveContextService.swift"; sourceTree = "<group>"; };
-		05201A61573143988D724F41 /* CryptoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/CryptoEngine.swift"; sourceTree = "<group>"; };
-		4E93DED93D2744879DC80745 /* ThreatDetectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/ThreatDetectorService.swift"; sourceTree = "<group>"; };
-		077C5ECBEEE1462E885313A6 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = "folder"; path = "AppIcon.icon"; sourceTree = "<group>"; };
-		670F929BD0E142F5877B7F1E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.xml"; path = "Info.plist"; sourceTree = "<group>"; };
-		41DCD07C2DF446F7A1A97D59 /* Kloak.entitlements */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.entitlements"; path = "Kloak.entitlements"; sourceTree = "<group>"; };
-		4CE44372B4D14D799DD87406 /* Kloak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kloak.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		38C7EEFC17F44C12BBF5F1ED /* LiquidGlassTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/UI/LiquidGlassTheme.swift"; sourceTree = "<group>"; };
+		2F178333681F4E40A0174A78 /* FaviconView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/UI/FaviconView.swift"; sourceTree = "<group>"; };
+		592B35FE4BE64F8D9C3DE66B /* VaultModels.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Models/VaultModels.swift"; sourceTree = "<group>"; };
+		7F518609028F465588EBF35C /* KloakApp.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/KloakApp.swift"; sourceTree = "<group>"; };
+		317A5F57A0DB47A98CB8BB03 /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SetupView.swift"; sourceTree = "<group>"; };
+		88A1A0433D86430FB5AE6263 /* GeneratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/GeneratorView.swift"; sourceTree = "<group>"; };
+		3D73B1CB50784F008F5B323A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SettingsView.swift"; sourceTree = "<group>"; };
+		4D12C75DB06840A6A7D9527A /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ItemDetailView.swift"; sourceTree = "<group>"; };
+		9655A9544F78404B90C69DAB /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/MenuBarView.swift"; sourceTree = "<group>"; };
+		BF7A72B028CA4CA48C541630 /* VaultMainView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/VaultMainView.swift"; sourceTree = "<group>"; };
+		11CD927F741F4BC991B0BD0D /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SidebarView.swift"; sourceTree = "<group>"; };
+		5107302AB6B34839A91E6B02 /* ImportExportView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ImportExportView.swift"; sourceTree = "<group>"; };
+		5CFD68F9D4134266A8C0159B /* KloakLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/KloakLogoView.swift"; sourceTree = "<group>"; };
+		35995E8F4F234FBAA5568049 /* ItemListView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ItemListView.swift"; sourceTree = "<group>"; };
+		A4C89B3292D74131A110380B /* UnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/UnlockView.swift"; sourceTree = "<group>"; };
+		82D044373CD043488C1F6D50 /* TOTPRingView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/TOTPRingView.swift"; sourceTree = "<group>"; };
+		C80512DC88444C0890789830 /* WindowSizeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/WindowSizeManager.swift"; sourceTree = "<group>"; };
+		818AF5B7C7014B628C4486F1 /* CertificateInspectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/CertificateInspectorService.swift"; sourceTree = "<group>"; };
+		DD1C025A82C64157BB3000E5 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/KeychainManager.swift"; sourceTree = "<group>"; };
+		192E6DFA07C94F79A0478EDD /* BiometricAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/BiometricAuth.swift"; sourceTree = "<group>"; };
+		303BF98947AC44F2B1C02D90 /* LogoService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/LogoService.swift"; sourceTree = "<group>"; };
+		B2E8F1F3633F40A99BED5405 /* IPCServer.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/IPCServer.swift"; sourceTree = "<group>"; };
+		320C196C84944D3CB3689D1B /* DomainIntelService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/DomainIntelService.swift"; sourceTree = "<group>"; };
+		46F93089756F4BFE885FA2E3 /* TOTPEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/TOTPEngine.swift"; sourceTree = "<group>"; };
+		1A2DCC2D6F674F9B9A74A81C /* VaultStore.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/VaultStore.swift"; sourceTree = "<group>"; };
+		42DF172EA04B4A8C93F50FD6 /* ActiveContextService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/ActiveContextService.swift"; sourceTree = "<group>"; };
+		DF2063E8129645C4A4854146 /* CryptoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/CryptoEngine.swift"; sourceTree = "<group>"; };
+		F3C652165A994C5CAE4F6D5D /* ThreatDetectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/ThreatDetectorService.swift"; sourceTree = "<group>"; };
+		09EEAD3D3B7A4A4FBC3627B7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = "folder.assetcatalog"; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		A0DD91E0D58147E9A5E6FFB3 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = "folder"; path = "AppIcon.icon"; sourceTree = "<group>"; };
+		6CB691C12CDF4E66A8A90DDE /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.xml"; path = "Info.plist"; sourceTree = "<group>"; };
+		9D7B54582872435998326F36 /* Kloak.entitlements */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.entitlements"; path = "Kloak.entitlements"; sourceTree = "<group>"; };
+		3F35AD8C30644C5B812FA3ED /* Kloak.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kloak.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		21AD6013A24846B7B2696A53 /* Frameworks */ = {
+		9420A7DDC2544D2A8E40D01E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -84,48 +86,49 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AD606A51874245699BDE7804 = {
+		BB2D5AC16D4D4CADB8AFD4A6 = {
 			isa = PBXGroup;
 			children = (
-				B281A7C3F1754732B3DFFA50 /* LiquidGlassTheme.swift */,
-				953728605D61449FA5973D79 /* FaviconView.swift */,
-				3A73BA1828F64E7CB674EF93 /* VaultModels.swift */,
-				BACAE1D661D44F7E8D028837 /* KloakApp.swift */,
-				A5F1195AD5A94BF9B487B651 /* SetupView.swift */,
-				7AA9A9D1C8094F4B85F30350 /* GeneratorView.swift */,
-				566711305AD6446E9F402B79 /* SettingsView.swift */,
-				290AB4A6371C482A9336EB20 /* ItemDetailView.swift */,
-				2F142CB4ECE5475E91B2BCD7 /* MenuBarView.swift */,
-				06623476EEB3450B84B55F06 /* VaultMainView.swift */,
-				F99560BDBBC54213A2A88B06 /* SidebarView.swift */,
-				F235EAB52C0B4591A4870DA8 /* ImportExportView.swift */,
-				8AF517C14210466D9F7BEB02 /* KloakLogoView.swift */,
-				3EEAC8CA0BD74CBEA53FD342 /* ItemListView.swift */,
-				8D24E9356FA24AC0BBFDF7BF /* UnlockView.swift */,
-				76CF1FA1BC004A96BD0D748E /* TOTPRingView.swift */,
-				714F7457BB5A43F0BA7FC9AC /* WindowSizeManager.swift */,
-				DE4CF35ED2794D639B88B607 /* CertificateInspectorService.swift */,
-				30A0091D0D60415CA3BA6FF3 /* KeychainManager.swift */,
-				5C474B4F4F894FCC81BD1939 /* BiometricAuth.swift */,
-				B150F63334BC493AB77878E3 /* LogoService.swift */,
-				7305E6733601407097D8B08F /* IPCServer.swift */,
-				89D8BD526FA545CA8E98E321 /* DomainIntelService.swift */,
-				274355B980BC4546BEB367A2 /* TOTPEngine.swift */,
-				CB652F0318FA43AF9906182D /* VaultStore.swift */,
-				E819AAA59A81444D86126445 /* ActiveContextService.swift */,
-				05201A61573143988D724F41 /* CryptoEngine.swift */,
-				4E93DED93D2744879DC80745 /* ThreatDetectorService.swift */,
-				077C5ECBEEE1462E885313A6 /* AppIcon.icon */,
-				670F929BD0E142F5877B7F1E /* Info.plist */,
-				41DCD07C2DF446F7A1A97D59 /* Kloak.entitlements */,
-				61F648774682406FB6540B50 /* Products */,
+				38C7EEFC17F44C12BBF5F1ED /* LiquidGlassTheme.swift */,
+				2F178333681F4E40A0174A78 /* FaviconView.swift */,
+				592B35FE4BE64F8D9C3DE66B /* VaultModels.swift */,
+				7F518609028F465588EBF35C /* KloakApp.swift */,
+				317A5F57A0DB47A98CB8BB03 /* SetupView.swift */,
+				88A1A0433D86430FB5AE6263 /* GeneratorView.swift */,
+				3D73B1CB50784F008F5B323A /* SettingsView.swift */,
+				4D12C75DB06840A6A7D9527A /* ItemDetailView.swift */,
+				9655A9544F78404B90C69DAB /* MenuBarView.swift */,
+				BF7A72B028CA4CA48C541630 /* VaultMainView.swift */,
+				11CD927F741F4BC991B0BD0D /* SidebarView.swift */,
+				5107302AB6B34839A91E6B02 /* ImportExportView.swift */,
+				5CFD68F9D4134266A8C0159B /* KloakLogoView.swift */,
+				35995E8F4F234FBAA5568049 /* ItemListView.swift */,
+				A4C89B3292D74131A110380B /* UnlockView.swift */,
+				82D044373CD043488C1F6D50 /* TOTPRingView.swift */,
+				C80512DC88444C0890789830 /* WindowSizeManager.swift */,
+				818AF5B7C7014B628C4486F1 /* CertificateInspectorService.swift */,
+				DD1C025A82C64157BB3000E5 /* KeychainManager.swift */,
+				192E6DFA07C94F79A0478EDD /* BiometricAuth.swift */,
+				303BF98947AC44F2B1C02D90 /* LogoService.swift */,
+				B2E8F1F3633F40A99BED5405 /* IPCServer.swift */,
+				320C196C84944D3CB3689D1B /* DomainIntelService.swift */,
+				46F93089756F4BFE885FA2E3 /* TOTPEngine.swift */,
+				1A2DCC2D6F674F9B9A74A81C /* VaultStore.swift */,
+				42DF172EA04B4A8C93F50FD6 /* ActiveContextService.swift */,
+				DF2063E8129645C4A4854146 /* CryptoEngine.swift */,
+				F3C652165A994C5CAE4F6D5D /* ThreatDetectorService.swift */,
+				09EEAD3D3B7A4A4FBC3627B7 /* Assets.xcassets */,
+				A0DD91E0D58147E9A5E6FFB3 /* AppIcon.icon */,
+				6CB691C12CDF4E66A8A90DDE /* Info.plist */,
+				9D7B54582872435998326F36 /* Kloak.entitlements */,
+				EF8C52B8BF1648F8A8BEECF8 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		61F648774682406FB6540B50 /* Products */ = {
+		EF8C52B8BF1648F8A8BEECF8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4CE44372B4D14D799DD87406 /* Kloak.app */,
+				3F35AD8C30644C5B812FA3ED /* Kloak.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -133,13 +136,13 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		F0113EABA6A346C9A7D11DD9 /* Kloak */ = {
+		033837B2A1EC4CC38AAF02D3 /* Kloak */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 8E0C114485584CE1B5BAA1B7 /* Build configuration list for PBXNativeTarget "Kloak" */;
+			buildConfigurationList = EB882D55534940569D69BF38 /* Build configuration list for PBXNativeTarget "Kloak" */;
 			buildPhases = (
-				9999E2529B66431CB7138DA6 /* Sources */,
-				21AD6013A24846B7B2696A53 /* Frameworks */,
-				65FA0C078FED4F699D923E2F /* Resources */,
+				FE094A4BFED74C84898FEE4B /* Sources */,
+				9420A7DDC2544D2A8E40D01E /* Frameworks */,
+				CB09CBABB48244EC938DD4DC /* Resources */,
 			);
 			buildRules = (
 			);
@@ -147,19 +150,19 @@
 			);
 			name = Kloak;
 			productName = Kloak;
-			productReference = 4CE44372B4D14D799DD87406 /* Kloak.app */;
+			productReference = 3F35AD8C30644C5B812FA3ED /* Kloak.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		9E3253C6074645098D42AE53 /* Project object */ = {
+		DCDAEA8CE8AC4400B0F75A83 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastUpgradeCheck = 1600;
 			};
-			buildConfigurationList = 70359DAE34DD48D8956BB9E6 /* Build configuration list for PBXProject "Kloak" */;
+			buildConfigurationList = 1FB7F1B9DF2C4857915B2D38 /* Build configuration list for PBXProject "Kloak" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -167,67 +170,68 @@
 				en,
 				Base,
 			);
-			mainGroup = AD606A51874245699BDE7804;
-			productRefGroup = 61F648774682406FB6540B50 /* Products */;
+			mainGroup = BB2D5AC16D4D4CADB8AFD4A6;
+			productRefGroup = EF8C52B8BF1648F8A8BEECF8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				F0113EABA6A346C9A7D11DD9 /* Kloak */,
+				033837B2A1EC4CC38AAF02D3 /* Kloak */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		65FA0C078FED4F699D923E2F /* Resources */ = {
+		CB09CBABB48244EC938DD4DC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				62657A2D426542068E721034 /* AppIcon.icon in Resources */,
+				65771F54776A4D149CF153B1 /* Assets.xcassets in Resources */,
+				049FA45578AE4BEF8D5F843D /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		9999E2529B66431CB7138DA6 /* Sources */ = {
+		FE094A4BFED74C84898FEE4B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				63D3146B66754AC6A66F41E8 /* LiquidGlassTheme.swift in Sources */,
-				B46444E94F6B4222B7D88C99 /* FaviconView.swift in Sources */,
-				569646A160414A459C3E7820 /* VaultModels.swift in Sources */,
-				6EF56A306B6941499750FE67 /* KloakApp.swift in Sources */,
-				21F87B9D9D374AAF939930DE /* SetupView.swift in Sources */,
-				D0DE83DB134648AF9900282A /* GeneratorView.swift in Sources */,
-				966C2E03F6A546B78BEABF28 /* SettingsView.swift in Sources */,
-				B1415185AAA34409B43FB2FE /* ItemDetailView.swift in Sources */,
-				AA1B5B8F9BBC47FD8AFC1BA8 /* MenuBarView.swift in Sources */,
-				23EFAC409A61438E9F06A61F /* VaultMainView.swift in Sources */,
-				AD497D114F8848F599831BB2 /* SidebarView.swift in Sources */,
-				3CBB44FF9BA74036AA06FAF6 /* ImportExportView.swift in Sources */,
-				4BF03712A7224F19AE484446 /* KloakLogoView.swift in Sources */,
-				ABE1CE34D396492F8CF23B02 /* ItemListView.swift in Sources */,
-				EC49A052A07649D99F17D5A0 /* UnlockView.swift in Sources */,
-				19AFA78B8B5C4A91909B495F /* TOTPRingView.swift in Sources */,
-				2FA3E5D1155F4E38A838E81B /* WindowSizeManager.swift in Sources */,
-				3684A260D18F42C69D0E395A /* CertificateInspectorService.swift in Sources */,
-				F1AA3AB248CE422FBEF25184 /* KeychainManager.swift in Sources */,
-				24464B2D57DE48E090533AE8 /* BiometricAuth.swift in Sources */,
-				090641EF99524059886391BB /* LogoService.swift in Sources */,
-				5F468E48E8734D8DA54D944A /* IPCServer.swift in Sources */,
-				7E377E5CDA164AA3B6C8A554 /* DomainIntelService.swift in Sources */,
-				C8E371940DBC4A1BAE57CB5A /* TOTPEngine.swift in Sources */,
-				25AD71C7165E4A7A87ED3F7A /* VaultStore.swift in Sources */,
-				6A06CCFFF7B94EC1915F8667 /* ActiveContextService.swift in Sources */,
-				78E5F4183E1442D2A6AF24F5 /* CryptoEngine.swift in Sources */,
-				C87DFD0C6DC6495FBD4D6F75 /* ThreatDetectorService.swift in Sources */,
+				008ABBACEFAC4EE9BC4052B3 /* LiquidGlassTheme.swift in Sources */,
+				6EFD26871F674098AF7989E5 /* FaviconView.swift in Sources */,
+				E5CBEBC2F2C048A7BE8FDB11 /* VaultModels.swift in Sources */,
+				AF0B22B9505042E78E0A245F /* KloakApp.swift in Sources */,
+				7A81E46D63C44150B30F1E03 /* SetupView.swift in Sources */,
+				B8ECDE5E412D44CA94B8613A /* GeneratorView.swift in Sources */,
+				03B69D2A1F6E4B80A8F90EC1 /* SettingsView.swift in Sources */,
+				9E27D501A330448D83AD9FD9 /* ItemDetailView.swift in Sources */,
+				70C7B1B12B714A92AF8D4564 /* MenuBarView.swift in Sources */,
+				AF30CA086B3B42C09AB16A41 /* VaultMainView.swift in Sources */,
+				ACF86DC1C2284D65B19B8CB6 /* SidebarView.swift in Sources */,
+				F1A97FC7FC8E443A99ABC28A /* ImportExportView.swift in Sources */,
+				BF28076F60D14E51AC32A750 /* KloakLogoView.swift in Sources */,
+				E47EE2EE3F004B58B7C8659F /* ItemListView.swift in Sources */,
+				A139F033649042D7ACF8D701 /* UnlockView.swift in Sources */,
+				E5F5FAF2F8CF4E44A8F590A7 /* TOTPRingView.swift in Sources */,
+				ABD9DC53E5CA4068B56D8D17 /* WindowSizeManager.swift in Sources */,
+				3AA2DF9DF74744C89DA566FE /* CertificateInspectorService.swift in Sources */,
+				CEAAEC3AD0FD4FDEB1214152 /* KeychainManager.swift in Sources */,
+				8B480CE33961483CB78F6B70 /* BiometricAuth.swift in Sources */,
+				2483CBFF690D48F69B121902 /* LogoService.swift in Sources */,
+				19C0CB485E9F488B8582A29F /* IPCServer.swift in Sources */,
+				37FFF8211AF84B35B4889363 /* DomainIntelService.swift in Sources */,
+				FE304A0AECAD49EA9F2E5916 /* TOTPEngine.swift in Sources */,
+				7BA2109696224547ACEE17D3 /* VaultStore.swift in Sources */,
+				D9F49CE61C28492EA3AE1AE3 /* ActiveContextService.swift in Sources */,
+				87B0EAEEE68547D9B270D7EC /* CryptoEngine.swift in Sources */,
+				5D7883DD7B0E48A7837C4CAF /* ThreatDetectorService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		88324800BFE746A1AF62575F /* Debug */ = {
+		69DF9D8C59E34036B9B0679F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -238,7 +242,7 @@
 			};
 			name = Debug;
 		};
-		02AD9C0F27B34548AF746D7D /* Release */ = {
+		9EEF4737B4FC47BA882CBD16 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -249,7 +253,7 @@
 			};
 			name = Release;
 		};
-		C19DF3B204414452B7CE4E54 /* Debug */ = {
+		16D3E10052F84CDBB7EA707A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -273,7 +277,7 @@
 			};
 			name = Debug;
 		};
-		46B6834210044ECB9526429F /* Release */ = {
+		6E240691A02F43898972DB77 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -300,20 +304,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		70359DAE34DD48D8956BB9E6 /* Build configuration list for PBXProject "Kloak" */ = {
+		1FB7F1B9DF2C4857915B2D38 /* Build configuration list for PBXProject "Kloak" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				88324800BFE746A1AF62575F /* Debug */,
-				02AD9C0F27B34548AF746D7D /* Release */,
+				69DF9D8C59E34036B9B0679F /* Debug */,
+				9EEF4737B4FC47BA882CBD16 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		8E0C114485584CE1B5BAA1B7 /* Build configuration list for PBXNativeTarget "Kloak" */ = {
+		EB882D55534940569D69BF38 /* Build configuration list for PBXNativeTarget "Kloak" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C19DF3B204414452B7CE4E54 /* Debug */,
-				46B6834210044ECB9526429F /* Release */,
+				16D3E10052F84CDBB7EA707A /* Debug */,
+				6E240691A02F43898972DB77 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -321,5 +325,5 @@
 /* End XCConfigurationList section */
 
 	};
-	rootObject = 9E3253C6074645098D42AE53 /* Project object */;
+	rootObject = DCDAEA8CE8AC4400B0F75A83 /* Project object */;
 }
