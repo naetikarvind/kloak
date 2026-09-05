@@ -36,30 +36,25 @@ echo "✓ Binary copied"
 cp "$MACOS_APP_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
 echo "✓ Info.plist copied"
 
-# ── 5. Copy app icon (.icon) ──────────────────────────────────────────
-ICON_FOUND=false
-ICON_DIR_OR_FILE="$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
-
-# Check for Apple Icon Composer AppIcon.icon
+# ── 5. Copy app icon (.icns & .icon) ──────────────────────────────────
+mkdir -p "$MACOS_APP_DIR/Sources/KloakApp/Resources"
+if [ -f "$REPO_ROOT/AppIcon.icns" ]; then
+    cp "$REPO_ROOT/AppIcon.icns" "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns"
+fi
 if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
-    mkdir -p "$MACOS_APP_DIR/Sources/KloakApp/Resources"
-    rm -rf "$ICON_DIR_OR_FILE"
-    cp -R "$REPO_ROOT/AppIcon.icon" "$ICON_DIR_OR_FILE"
+    rm -rf "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
+    cp -R "$REPO_ROOT/AppIcon.icon" "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon"
 fi
 
-if [ -e "$ICON_DIR_OR_FILE" ]; then
-    rm -rf "$APP_BUNDLE/Contents/Resources/AppIcon.icon" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-    cp -R "$ICON_DIR_OR_FILE" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
-    echo "✓ AppIcon.icon (Apple Icon Composer) bundled directly"
-    ICON_FOUND=true
-elif [ -f "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns" ]; then
+if [ -f "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns" ]; then
     cp "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
-    echo "✓ AppIcon.icns copied"
-    ICON_FOUND=true
+    echo "✓ AppIcon.icns copied (Dock & Finder icon)"
 fi
 
-if [ "$ICON_FOUND" = false ]; then
-    echo "⚠ No AppIcon.icon found, skipping icon"
+if [ -e "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon" ]; then
+    rm -rf "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+    cp -R "$MACOS_APP_DIR/Sources/KloakApp/Resources/AppIcon.icon" "$APP_BUNDLE/Contents/Resources/AppIcon.icon"
+    echo "✓ AppIcon.icon copied (Liquid Glass asset)"
 fi
 
 # ── 6. Copy Swift resources bundle (if it exists) ─────────────────────────────

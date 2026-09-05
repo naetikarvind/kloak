@@ -17,7 +17,7 @@
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleIconFile</key>
-    <string>AppIcon.icon</string>
+    <string>AppIcon</string>
     <key>CFBundleIconName</key>
     <string>AppIcon</string>
     <key>NSPrincipalClass</key>
