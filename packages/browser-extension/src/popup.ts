@@ -194,18 +194,34 @@ function setupFilters() {
 function setupSortDropdown() {
   const btnSort = document.getElementById('btn-sort');
   const sortDropdown = document.getElementById('sort-dropdown');
-  const sortLabel = document.getElementById('sort-label');
+  const sortWrapper = document.getElementById('sort-wrapper');
   if (!btnSort || !sortDropdown) return;
 
   btnSort.addEventListener('click', (e) => {
     e.stopPropagation();
     document.getElementById('add-dropdown')?.classList.remove('open');
-    sortDropdown.classList.toggle('open');
+    const isOpen = sortDropdown.classList.toggle('open');
+    sortWrapper?.classList.toggle('open', isOpen);
   });
 
   document.addEventListener('click', () => {
     sortDropdown.classList.remove('open');
+    sortWrapper?.classList.remove('open');
   });
+
+  const titles: Record<string, string> = {
+    recent: 'Sort: Recently used',
+    alpha: 'Sort: Alphabetical (A to Z)',
+    newest: 'Sort: Newest to oldest',
+    oldest: 'Sort: Oldest to newest'
+  };
+
+  const sortIcons: Record<string, string> = {
+    recent: '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>',
+    alpha: '<path d="M9.25 5l-4.5 12h2.09l.94-2.75h4.44l.94 2.75h2.09L10.75 5h-1.5zm-.53 7.42l1.53-4.5 1.53 4.5H8.72zM15 15h6v1.75h-6V15zm0-3.5h6v1.75h-6V11.5zm0-3.5h6v1.75h-6V8z"/>',
+    newest: '<path d="M19 15l-1.41-1.41L13 18.17V2h-2v16.17l-4.59-4.59L5 15l7 7 7-7z"/>',
+    oldest: '<path d="M5 9l1.41 1.41L11 5.83V22h2V5.83l4.59 4.59L19 9l-7-7-7 7z"/>'
+  };
 
   sortDropdown.querySelectorAll('.sort-item').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -216,23 +232,12 @@ function setupSortDropdown() {
         sortDropdown.querySelectorAll('.sort-item').forEach(si => si.classList.remove('active'));
         item.classList.add('active');
 
-        const labels: Record<string, string> = {
-          recent: 'Recent',
-          alpha: 'A to Z',
-          newest: 'Newest',
-          oldest: 'Oldest'
-        };
-        const sortIcons: Record<string, string> = {
-          recent: '<path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/>',
-          alpha: '<path d="M9.25 5l-4.5 12h2.09l.94-2.75h4.44l.94 2.75h2.09L10.75 5h-1.5zm-.53 7.42l1.53-4.5 1.53 4.5H8.72zM15 15h6v1.75h-6V15zm0-3.5h6v1.75h-6V11.5zm0-3.5h6v1.75h-6V8z"/>',
-          newest: '<path d="M19 15l-1.41-1.41L13 18.17V2h-2v16.17l-4.59-4.59L5 15l7 7 7-7z"/>',
-          oldest: '<path d="M5 9l1.41 1.41L11 5.83V22h2V5.83l4.59 4.59L19 9l-7-7-7 7z"/>'
-        };
-        if (sortLabel) sortLabel.textContent = labels[sort] || 'Sort';
+        btnSort.title = titles[sort] || 'Sort items';
         const btnIcon = document.getElementById('sort-btn-icon');
         if (btnIcon && sortIcons[sort]) btnIcon.innerHTML = sortIcons[sort];
 
         sortDropdown.classList.remove('open');
+        sortWrapper?.classList.remove('open');
         applyFilterAndSort();
       }
     });

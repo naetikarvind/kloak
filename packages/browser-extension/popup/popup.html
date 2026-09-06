@@ -516,45 +516,72 @@
 
     .sidebar-filters {
       display: flex;
-      padding: 10px 12px;
-      gap: 6px;
+      padding: 8px 10px;
+      gap: 5px;
       align-items: center;
       flex-shrink: 0;
     }
 
     .filter-btn {
-      display: flex; align-items: center; gap: 6px;
-      height: 28px; padding: 0 10px; border-radius: 6px;
+      display: flex; align-items: center; gap: 5px;
+      height: 28px; padding: 0 8px; border-radius: 6px;
       background: transparent; border: 1px solid transparent;
-      color: var(--text-muted); font-size: 12px; font-weight: 500; cursor: pointer;
+      color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer;
       transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      white-space: nowrap;
+      user-select: none;
     }
-    .filter-btn:hover { background: var(--bg-btn); transform: translateY(-1px); }
+    .filter-btn:hover { background: var(--bg-btn); color: var(--text-main); }
     .filter-btn.active {
       background: rgba(109,74,255,0.16); color: var(--text-main);
       border-color: rgba(109,74,255,0.35);
     }
-    .filter-btn svg { width: 13px; height: 13px; fill: currentColor; }
+    .filter-btn svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
+
+    .filter-btn.icon-only-btn {
+      padding: 0 5px;
+      height: 28px;
+      gap: 2px;
+      justify-content: center;
+    }
+    .filter-btn.icon-only-btn .sort-btn-chevron {
+      width: 9px;
+      height: 9px;
+      fill: var(--text-muted);
+      margin-left: 1px;
+      transition: transform 0.18s ease;
+    }
+    .filter-btn.icon-only-btn:hover .sort-btn-chevron {
+      fill: var(--text-main);
+    }
+    .sort-wrapper.open .sort-btn-chevron {
+      transform: rotate(180deg);
+    }
 
     /* ── SORT DROPDOWN ── */
     .sort-wrapper {
       position: relative;
+      margin-left: auto;
     }
     .sort-dropdown {
       display: none;
       position: absolute;
       top: 32px;
-      left: 0;
-      width: 148px;
-      background: #211F2D;
-      border: 1px solid #2C293D;
+      right: 0;
+      left: auto;
+      min-width: 175px;
+      width: max-content;
+      max-width: 205px;
+      background: #1e1c29;
+      border: 1px solid #2e2a40;
       border-radius: 8px;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.7);
-      z-index: 100;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.05);
+      z-index: 1000;
       padding: 4px;
       flex-direction: column;
-      gap: 1px;
-      transform-origin: top left;
+      gap: 2px;
+      transform-origin: top right;
+      backdrop-filter: blur(16px);
     }
     .sort-dropdown.open {
       display: flex;
@@ -563,7 +590,7 @@
     .sort-item {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       padding: 6px 8px;
       border-radius: 6px;
       font-size: 11px;
@@ -571,13 +598,14 @@
       color: #9E9AA8;
       cursor: pointer;
       transition: all 0.15s ease;
+      white-space: nowrap;
     }
     .sort-item:hover {
       background: rgba(255,255,255,0.06);
       color: #ffffff;
     }
     .sort-item.active {
-      background: rgba(109,74,255,0.15);
+      background: rgba(109,74,255,0.18);
       color: #ffffff;
       font-weight: 600;
     }
@@ -596,8 +624,6 @@
     .sort-item-text {
       flex: 1;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     .sort-check {
       width: 12px;
@@ -605,6 +631,7 @@
       fill: #6D4AFF;
       flex-shrink: 0;
       display: none;
+      margin-left: 4px;
     }
     .sort-item.active .sort-check {
       display: block;
@@ -1361,11 +1388,10 @@
           <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
           Generator
         </button>
-        <div class="sort-wrapper">
-          <button class="filter-btn" id="btn-sort" title="Sort items">
+        <div class="sort-wrapper" id="sort-wrapper">
+          <button class="filter-btn icon-only-btn" id="btn-sort" title="Sort: Recently used">
             <svg viewBox="0 0 24 24" id="sort-btn-icon"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
-            <span id="sort-label">Recent</span>
-            <svg viewBox="0 0 24 24" style="width: 10px; height: 10px; margin-left: 2px; fill: var(--text-muted);"><path d="M7 10l5 5 5-5z"/></svg>
+            <svg class="sort-btn-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
           </button>
           <div class="sort-dropdown" id="sort-dropdown">
             <div class="sort-item active" data-sort="recent">
