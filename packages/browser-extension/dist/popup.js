@@ -864,8 +864,7 @@
       });
       ["chk-upper", "chk-lower", "chk-digits", "chk-symbols"].forEach((id) => {
         const el = document.getElementById(id);
-        el?.parentElement?.addEventListener("click", (e) => {
-          if (e.target !== el) el.checked = !el.checked;
+        el?.addEventListener("change", () => {
           el.parentElement?.classList.toggle("active", el.checked);
           generateAndSetPreview2();
         });
@@ -1090,25 +1089,28 @@ ${notes}`;
     }
     renderGeneratorUI(container);
   }
-  function renderGeneratorUI(container) {
-    const entropy = calculateEntropy(currentGenPassword);
-    let formattedPasswordHtml = "";
-    if (genMode === "passphrase") {
-      formattedPasswordHtml = currentGenPassword.split("-").map((w) => `<span class="char-upper">${w}</span>`).join('<span class="char-symbol">-</span>');
-    } else {
-      for (let i = 0; i < currentGenPassword.length; i++) {
-        const char = currentGenPassword[i];
-        if (/[0-9]/.test(char)) {
-          formattedPasswordHtml += `<span class="char-digit">${char}</span>`;
-        } else if (/[A-Z]/.test(char)) {
-          formattedPasswordHtml += `<span class="char-upper">${char}</span>`;
-        } else if (/[^a-zA-Z0-9]/.test(char)) {
-          formattedPasswordHtml += `<span class="char-symbol">${char}</span>`;
-        } else {
-          formattedPasswordHtml += `<span>${char}</span>`;
-        }
+  function formatPasswordHtml(pwd, mode) {
+    if (mode === "passphrase") {
+      return pwd.split("-").map((w) => `<span class="char-upper">${w}</span>`).join('<span class="char-symbol">-</span>');
+    }
+    let html = "";
+    for (let i = 0; i < pwd.length; i++) {
+      const char = pwd[i];
+      if (/[0-9]/.test(char)) {
+        html += `<span class="char-digit">${char}</span>`;
+      } else if (/[A-Z]/.test(char)) {
+        html += `<span class="char-upper">${char}</span>`;
+      } else if (/[^a-zA-Z0-9]/.test(char)) {
+        html += `<span class="char-symbol">${char}</span>`;
+      } else {
+        html += `<span>${char}</span>`;
       }
     }
+    return html;
+  }
+  function renderGeneratorUI(container) {
+    const entropy = calculateEntropy(currentGenPassword);
+    const formattedPasswordHtml = formatPasswordHtml(currentGenPassword, genMode);
     container.innerHTML = `
     <div class="generator-view">
       <div class="detail-header" style="margin-bottom: 8px;">
@@ -1139,14 +1141,14 @@ ${notes}`;
 
         <div class="gen-strength-meter">
           <div class="gen-strength-header">
-            <span class="gen-strength-label" style="color: ${entropy.color};">${entropy.label}</span>
-            <span class="gen-strength-entropy">${entropy.bits} bits of entropy</span>
+            <span class="gen-strength-label" id="gen-strength-label-text" style="color: ${entropy.color};">${entropy.label}</span>
+            <span class="gen-strength-entropy" id="gen-strength-entropy-text">${entropy.bits} bits of entropy</span>
           </div>
           <div class="gen-strength-track">
-            <div class="gen-strength-seg" style="background: ${entropy.score >= 1 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
-            <div class="gen-strength-seg" style="background: ${entropy.score >= 2 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
-            <div class="gen-strength-seg" style="background: ${entropy.score >= 3 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
-            <div class="gen-strength-seg" style="background: ${entropy.score >= 4 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
+            <div class="gen-strength-seg" id="gen-str-seg-1" style="background: ${entropy.score >= 1 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
+            <div class="gen-strength-seg" id="gen-str-seg-2" style="background: ${entropy.score >= 2 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
+            <div class="gen-strength-seg" id="gen-str-seg-3" style="background: ${entropy.score >= 3 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
+            <div class="gen-strength-seg" id="gen-str-seg-4" style="background: ${entropy.score >= 4 ? entropy.color : "rgba(255,255,255,0.08)"};"></div>
           </div>
         </div>
       </div>
@@ -1174,19 +1176,20 @@ ${notes}`;
           <button class="gen-mode-btn ${genMode === "passphrase" ? "active" : ""}" id="mode-btn-phrase">Passphrase</button>
         </div>
 
-        ${genMode === "password" ? `
+        <!-- Password Controls -->
+        <div id="gen-controls-pwd" style="display: ${genMode === "password" ? "flex" : "none"}; flex-direction: column; gap: 12px;">
           <div class="gen-slider-wrapper">
             <div class="gen-slider-head">
               <span>Password Length</span>
               <span class="gen-len-val" id="gen-view-len-num">${genLength}</span>
             </div>
             <input type="range" class="gen-slider" id="gen-view-slider" min="8" max="64" value="${genLength}">
-            <div class="gen-presets-row">
-              <span class="gen-preset-chip" data-len="16">16</span>
-              <span class="gen-preset-chip" data-len="20">20</span>
-              <span class="gen-preset-chip" data-len="24">24</span>
-              <span class="gen-preset-chip" data-len="32">32</span>
-              <span class="gen-preset-chip" data-len="48">48</span>
+            <div class="gen-presets-row" id="gen-pwd-presets">
+              <span class="gen-preset-chip ${genLength === 16 ? "active" : ""}" data-len="16">16</span>
+              <span class="gen-preset-chip ${genLength === 20 ? "active" : ""}" data-len="20">20</span>
+              <span class="gen-preset-chip ${genLength === 24 ? "active" : ""}" data-len="24">24</span>
+              <span class="gen-preset-chip ${genLength === 32 ? "active" : ""}" data-len="32">32</span>
+              <span class="gen-preset-chip ${genLength === 48 ? "active" : ""}" data-len="48">48</span>
             </div>
           </div>
 
@@ -1197,43 +1200,107 @@ ${notes}`;
             <label class="gen-chip ${genUseSymbols ? "active" : ""}" id="chip-v-symbols"><input type="checkbox" ${genUseSymbols ? "checked" : ""} id="chk-v-symbols"> !@#$%</label>
             <label class="gen-chip ${genAvoidAmbiguous ? "active" : ""}" id="chip-v-ambig" title="Avoid 1, l, I, 0, O"><input type="checkbox" ${genAvoidAmbiguous ? "checked" : ""} id="chk-v-ambig"> Avoid Ambiguous</label>
           </div>
-        ` : `
+        </div>
+
+        <!-- Passphrase Controls -->
+        <div id="gen-controls-phrase" style="display: ${genMode === "passphrase" ? "flex" : "none"}; flex-direction: column; gap: 12px;">
           <div class="gen-slider-wrapper">
             <div class="gen-slider-head">
               <span>Number of Words</span>
               <span class="gen-len-val" id="gen-view-words-num">${genPassphraseWords}</span>
             </div>
             <input type="range" class="gen-slider" id="gen-view-words-slider" min="3" max="8" value="${genPassphraseWords}">
-            <div class="gen-presets-row">
-              <span class="gen-preset-chip" data-words="3">3 words</span>
-              <span class="gen-preset-chip" data-words="4">4 words</span>
-              <span class="gen-preset-chip" data-words="5">5 words</span>
-              <span class="gen-preset-chip" data-words="6">6 words</span>
+            <div class="gen-presets-row" id="gen-phrase-presets">
+              <span class="gen-preset-chip ${genPassphraseWords === 3 ? "active" : ""}" data-words="3">3 words</span>
+              <span class="gen-preset-chip ${genPassphraseWords === 4 ? "active" : ""}" data-words="4">4 words</span>
+              <span class="gen-preset-chip ${genPassphraseWords === 5 ? "active" : ""}" data-words="5">5 words</span>
+              <span class="gen-preset-chip ${genPassphraseWords === 6 ? "active" : ""}" data-words="6">6 words</span>
             </div>
           </div>
-        `}
+        </div>
       </div>
 
-      <!-- Password History Card -->
-      ${passwordHistory.length > 0 ? `
-        <div class="gen-history-card">
-          <div class="gen-history-head">
-            <span>Recent Passwords</span>
-            <span style="font-size: 9px; cursor: pointer; color: var(--text-muted);" id="btn-clear-history">Clear</span>
-          </div>
-          <div class="gen-history-list">
-            ${passwordHistory.slice(0, 4).map((h) => `
-              <div class="gen-history-item">
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">${h.password}</span>
-                <button class="kloak-mini-btn btn-copy-hist" data-pwd="${h.password}" title="Copy">\u{1F4CB}</button>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      ` : ""}
+      <!-- Password History Card Placeholder -->
+      <div id="gen-history-card-wrap"></div>
     </div>
   `;
     bindGeneratorEvents(container);
+    updateHistoryUI(container);
+  }
+  function updateGeneratorDisplay(container) {
+    const liveText = container.querySelector("#gen-live-text");
+    if (liveText) {
+      liveText.innerHTML = formatPasswordHtml(currentGenPassword, genMode);
+    }
+    const entropy = calculateEntropy(currentGenPassword);
+    const labelText = container.querySelector("#gen-strength-label-text");
+    if (labelText) {
+      labelText.textContent = entropy.label;
+      labelText.style.color = entropy.color;
+    }
+    const entropyText = container.querySelector("#gen-strength-entropy-text");
+    if (entropyText) {
+      entropyText.textContent = `${entropy.bits} bits of entropy`;
+    }
+    for (let i = 1; i <= 4; i++) {
+      const seg = container.querySelector(`#gen-str-seg-${i}`);
+      if (seg) {
+        seg.style.background = entropy.score >= i ? entropy.color : "rgba(255,255,255,0.08)";
+      }
+    }
+    const lenNum = container.querySelector("#gen-view-len-num");
+    if (lenNum) lenNum.textContent = String(genLength);
+    const wordsNum = container.querySelector("#gen-view-words-num");
+    if (wordsNum) wordsNum.textContent = String(genPassphraseWords);
+    container.querySelectorAll("#gen-pwd-presets .gen-preset-chip").forEach((chip) => {
+      const len = chip.dataset.len;
+      chip.classList.toggle("active", len === String(genLength));
+    });
+    container.querySelectorAll("#gen-phrase-presets .gen-preset-chip").forEach((chip) => {
+      const words = chip.dataset.words;
+      chip.classList.toggle("active", words === String(genPassphraseWords));
+    });
+  }
+  function updateHistoryUI(container) {
+    const wrap = container.querySelector("#gen-history-card-wrap");
+    if (!wrap) return;
+    if (passwordHistory.length === 0) {
+      wrap.innerHTML = "";
+      return;
+    }
+    wrap.innerHTML = `
+    <div class="gen-history-card">
+      <div class="gen-history-head">
+        <span>Recent Passwords</span>
+        <span style="font-size: 9px; cursor: pointer; color: var(--text-muted);" id="btn-clear-history">Clear</span>
+      </div>
+      <div class="gen-history-list">
+        ${passwordHistory.slice(0, 4).map((h) => `
+          <div class="gen-history-item">
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">${h.password}</span>
+            <button class="kloak-mini-btn btn-copy-hist" data-pwd="${h.password}" title="Copy">\u{1F4CB}</button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+    wrap.querySelector("#btn-clear-history")?.addEventListener("click", () => {
+      passwordHistory = [];
+      updateHistoryUI(container);
+    });
+    wrap.querySelectorAll(".btn-copy-hist").forEach((b) => {
+      b.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const pwd = b.dataset.pwd;
+        if (pwd) {
+          await copyToClipboardText(pwd);
+          b.textContent = "\u2713";
+          setTimeout(() => {
+            b.textContent = "\u{1F4CB}";
+          }, 1200);
+        }
+      });
+    });
   }
   function bindGeneratorEvents(container) {
     const regenBtn = container.querySelector("#btn-view-regen");
@@ -1251,7 +1318,8 @@ ${notes}`;
         regenBtn.classList.add("spinning");
         setTimeout(() => regenBtn.classList.remove("spinning"), 400);
       }
-      renderGeneratorUI(container);
+      updateGeneratorDisplay(container);
+      updateHistoryUI(container);
     };
     regenBtn?.addEventListener("click", doRegenerate);
     const doCopy = async (btn) => {
@@ -1296,59 +1364,81 @@ ${notes}`;
         url: activeTabUrl
       });
     });
-    container.querySelector("#mode-btn-pwd")?.addEventListener("click", () => {
+    const modePwdBtn = container.querySelector("#mode-btn-pwd");
+    const modePhraseBtn = container.querySelector("#mode-btn-phrase");
+    const pwdControls = container.querySelector("#gen-controls-pwd");
+    const phraseControls = container.querySelector("#gen-controls-phrase");
+    modePwdBtn?.addEventListener("click", () => {
       if (genMode !== "password") {
         genMode = "password";
+        modePwdBtn.classList.add("active");
+        modePhraseBtn?.classList.remove("active");
+        if (pwdControls) pwdControls.style.display = "flex";
+        if (phraseControls) phraseControls.style.display = "none";
         currentGenPassword = generateSecurePassword();
-        renderGeneratorUI(container);
+        updateGeneratorDisplay(container);
       }
     });
-    container.querySelector("#mode-btn-phrase")?.addEventListener("click", () => {
+    modePhraseBtn?.addEventListener("click", () => {
       if (genMode !== "passphrase") {
         genMode = "passphrase";
+        modePhraseBtn.classList.add("active");
+        modePwdBtn?.classList.remove("active");
+        if (pwdControls) pwdControls.style.display = "none";
+        if (phraseControls) phraseControls.style.display = "flex";
         currentGenPassword = generateSecurePassword();
-        renderGeneratorUI(container);
+        updateGeneratorDisplay(container);
       }
     });
     const slider = container.querySelector("#gen-view-slider");
     slider?.addEventListener("input", () => {
       genLength = parseInt(slider.value, 10);
-      const numDisplay = container.querySelector("#gen-view-len-num");
-      if (numDisplay) numDisplay.textContent = String(genLength);
       currentGenPassword = generateSecurePassword();
-      renderGeneratorUI(container);
+      updateGeneratorDisplay(container);
     });
     const wordsSlider = container.querySelector("#gen-view-words-slider");
     wordsSlider?.addEventListener("input", () => {
       genPassphraseWords = parseInt(wordsSlider.value, 10);
-      const numDisplay = container.querySelector("#gen-view-words-num");
-      if (numDisplay) numDisplay.textContent = String(genPassphraseWords);
       currentGenPassword = generateSecurePassword();
-      renderGeneratorUI(container);
+      updateGeneratorDisplay(container);
     });
-    container.querySelectorAll(".gen-preset-chip").forEach((chip) => {
+    container.querySelectorAll("#gen-pwd-presets .gen-preset-chip").forEach((chip) => {
       chip.addEventListener("click", () => {
         const len = chip.dataset.len;
-        const words = chip.dataset.words;
         if (len) {
           genLength = parseInt(len, 10);
+          if (slider) slider.value = String(genLength);
           currentGenPassword = generateSecurePassword();
-          renderGeneratorUI(container);
-        } else if (words) {
+          updateGeneratorDisplay(container);
+        }
+      });
+    });
+    container.querySelectorAll("#gen-phrase-presets .gen-preset-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const words = chip.dataset.words;
+        if (words) {
           genPassphraseWords = parseInt(words, 10);
+          if (wordsSlider) wordsSlider.value = String(genPassphraseWords);
           currentGenPassword = generateSecurePassword();
-          renderGeneratorUI(container);
+          updateGeneratorDisplay(container);
         }
       });
     });
     const bindCheck = (id, propSetter) => {
       const chk = container.querySelector(`#${id}`);
-      chk?.parentElement?.addEventListener("click", (e) => {
-        if (e.target !== chk) chk.checked = !chk.checked;
+      chk?.addEventListener("change", () => {
         chk.parentElement?.classList.toggle("active", chk.checked);
         propSetter(chk.checked);
+        if (!genUseUpper && !genUseLower && !genUseDigits && !genUseSymbols) {
+          genUseLower = true;
+          const lowerChk = container.querySelector("#chk-v-lower");
+          if (lowerChk) {
+            lowerChk.checked = true;
+            lowerChk.parentElement?.classList.add("active");
+          }
+        }
         currentGenPassword = generateSecurePassword();
-        renderGeneratorUI(container);
+        updateGeneratorDisplay(container);
       });
     };
     bindCheck("chk-v-upper", (v) => genUseUpper = v);
@@ -1356,21 +1446,6 @@ ${notes}`;
     bindCheck("chk-v-digits", (v) => genUseDigits = v);
     bindCheck("chk-v-symbols", (v) => genUseSymbols = v);
     bindCheck("chk-v-ambig", (v) => genAvoidAmbiguous = v);
-    container.querySelectorAll(".btn-copy-hist").forEach((b) => {
-      b.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        const pwd = b.dataset.pwd;
-        if (pwd) {
-          await copyToClipboardText(pwd);
-          b.textContent = "\u2713";
-          setTimeout(() => b.textContent = "\u{1F4CB}", 1200);
-        }
-      });
-    });
-    container.querySelector("#btn-clear-history")?.addEventListener("click", () => {
-      passwordHistory = [];
-      renderGeneratorUI(container);
-    });
   }
   async function copyToClipboardText(text) {
     try {
