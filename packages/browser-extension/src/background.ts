@@ -5,8 +5,8 @@ const NATIVE_HOST = 'app.kloak.native';
 let cachedItems: any[] = [];
 let isVaultUnlocked: boolean = false;
 let connectedAccount: { provider: string; email: string; customForwardingEmail?: string } = {
-  provider: 'google',
-  email: 'naetik.arvind@gmail.com'
+  provider: 'none',
+  email: ''
 };
 
 const aiSecurityCache = new Map<string, AIThreatEvaluation>();
@@ -14,33 +14,8 @@ const aiSecurityCache = new Map<string, AIThreatEvaluation>();
 let lastActiveTabId: number | null = null;
 let lastActiveUrl: string | null = null;
 
-// Fallback demo vault items
-const FALLBACK_ITEMS = [
-  {
-    id: 'demo-1',
-    title: 'GitHub',
-    username: 'alex.dev@github.com',
-    password: 'ghp_KloakSecurePassword982!',
-    urls: ['https://github.com', 'https://gist.github.com'],
-    totpSecret: 'JBSWY3DPEHPK3PXP'
-  },
-  {
-    id: 'demo-2',
-    title: 'Google Account',
-    username: 'alex.engineer@gmail.com',
-    password: 'KloakGoogleEncryptedKey#99',
-    urls: ['https://accounts.google.com', 'https://google.com'],
-    totpSecret: 'HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ'
-  },
-  {
-    id: 'demo-3',
-    title: 'ProtonMail',
-    username: 'security@proton.me',
-    password: 'Kloak-Proton-Encrypted#42',
-    urls: ['https://mail.proton.me', 'https://account.proton.me'],
-    totpSecret: 'JBSWY3DPEHPK3PXP'
-  }
-];
+// Empty fallback items for clean zero-knowledge environment
+const FALLBACK_ITEMS: any[] = [];
 
 let rpcIdCounter = 1;
 
