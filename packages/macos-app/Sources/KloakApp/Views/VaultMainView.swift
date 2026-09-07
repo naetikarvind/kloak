@@ -170,6 +170,7 @@ public struct VaultMainView: View {
                             if let selId = selectedItemId, let itemBinding = binding(for: selId) {
                                 ItemDetailView(
                                     item: itemBinding,
+                                    currentSection: selection,
                                     onSave: { updated in
                                         if let idx = items.firstIndex(where: { $0.id == updated.id }) {
                                             items[idx] = updated

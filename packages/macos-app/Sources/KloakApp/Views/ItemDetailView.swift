@@ -2,8 +2,18 @@ import SwiftUI
 
 public struct ItemDetailView: View {
     @Binding var item: VaultItem
+    var currentSection: NavigationSection = .allItems
     var onSave: (VaultItem) -> Void
     var onDelete: (String) -> Void
+
+    private var shouldShowTypeBadge: Bool {
+        if case .category(let selectedCategory) = currentSection {
+            if selectedCategory == item.type && selectedCategory != .authenticator {
+                return false
+            }
+        }
+        return true
+    }
 
     @State private var revealPassword: Bool = false
     @State private var revealCvv: Bool = false
@@ -93,15 +103,17 @@ public struct ItemDetailView: View {
                         }
 
                         HStack(spacing: 6) {
-                            Text(item.type.displayName)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                                .fixedSize()
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Color.white.opacity(0.08))
-                                .foregroundColor(.secondary)
-                                .clipShape(Capsule())
+                            if shouldShowTypeBadge {
+                                Text(item.type.displayName)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                    .fixedSize()
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(Color.white.opacity(0.08))
+                                    .foregroundColor(.secondary)
+                                    .clipShape(Capsule())
+                            }
 
                             if let tag = item.tags.first(where: { $0.lowercased() != "imported" }) {
                                 Text(tag)
