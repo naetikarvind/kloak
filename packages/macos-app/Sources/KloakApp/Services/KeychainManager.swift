@@ -206,6 +206,49 @@ public final class KeychainManager: @unchecked Sendable {
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
+    /// Scans the macOS Keychain and returns a summary of accessible passwords without modifying anything.
+    public func scanKeychainSummary() -> KeychainScanPreview {
+        var internetCount = 0
+        var genericCount = 0
+
+        // 1. Internet passwords count
+        let internetQuery: [String: Any] = [
+            kSecClass as String: kSecClassInternetPassword,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var internetResult: CFTypeRef?
+        let internetStatus = SecItemCopyMatching(internetQuery as CFDictionary, &internetResult)
+        if internetStatus == errSecSuccess, let items = internetResult as? [[String: Any]] {
+            internetCount = items.count
+        }
+
+        // 2. Generic passwords count
+        let genericQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll
+        ]
+        var genericResult: CFTypeRef?
+        let genericStatus = SecItemCopyMatching(genericQuery as CFDictionary, &genericResult)
+        if genericStatus == errSecSuccess, let items = genericResult as? [[String: Any]] {
+            genericCount = items.filter { ($0[kSecAttrService as String] as? String) != self.service }.count
+        }
+
+        let isAuth = internetStatus == errSecSuccess || genericStatus == errSecSuccess
+        var errDesc: String? = nil
+        if !isAuth && internetStatus != errSecItemNotFound && genericStatus != errSecItemNotFound {
+            errDesc = "Keychain authorization required."
+        }
+
+        return KeychainScanPreview(
+            internetPasswordsCount: internetCount,
+            genericPasswordsCount: genericCount,
+            isAuthorized: isAuth || (internetCount + genericCount > 0),
+            error: errDesc
+        )
+    }
+
     /// Bulk mirrors all non-trashed logins to the macOS Keychain.
     public func mirrorAllLoginsToKeychain(_ items: [VaultItem]) -> Int {
         var syncedCount = 0

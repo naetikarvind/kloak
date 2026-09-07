@@ -54,8 +54,8 @@ public final class WindowSizeManager {
             targetSize = CGSize(width: 460, height: 580)
             minSize = CGSize(width: 420, height: 520)
         case .setup:
-            targetSize = CGSize(width: 580, height: 640)
-            minSize = CGSize(width: 500, height: 580)
+            targetSize = CGSize(width: 620, height: 680)
+            minSize = CGSize(width: 540, height: 600)
         case .vaultItems:
             targetSize = CGSize(width: 1060, height: 720)
             minSize = CGSize(width: 860, height: 560)

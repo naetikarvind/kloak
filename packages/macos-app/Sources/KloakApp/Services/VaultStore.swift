@@ -47,7 +47,10 @@ public final class VaultStore: ObservableObject {
     public func createVault(
         masterPassword: String,
         enableBiometrics: Bool = true,
-        seedSampleData: Bool = true
+        seedSampleData: Bool = true,
+        importedItems: [VaultItem] = [],
+        connectedAccounts: [OnboardingAccountConnection] = [],
+        keychainSyncEnabled: Bool = false
     ) async throws {
         guard !masterPassword.isEmpty else {
             throw NSError(domain: "KloakVault", code: 1, userInfo: [NSLocalizedDescriptionKey: "Master password cannot be empty."])
@@ -78,21 +81,38 @@ public final class VaultStore: ObservableObject {
             createdAt: ISO8601DateFormatter().string(from: Date())
         )
 
-        // 6. Construct initial Payload
+        // 6. Construct initial Settings and Accounts
         var initialSettings = VaultSettings.default
         initialSettings.biometricsEnabled = enableBiometrics
+        initialSettings.keychainSyncEnabled = keychainSyncEnabled
+
+        if let firstConnected = connectedAccounts.first(where: { $0.isConnected }) {
+            initialSettings.connectedAccountProvider = firstConnected.provider.rawValue
+            initialSettings.connectedAccountEmail = firstConnected.email
+            initialSettings.isAccountConnected = true
+            initialSettings.connectedAccountToken = firstConnected.token
+        }
 
         let initialFolders: [VaultFolder] = [
             VaultFolder(id: "f_dev", name: "Development"),
             VaultFolder(id: "f_fin", name: "Finance"),
-            VaultFolder(id: "f_rec", name: "Recovery")
+            VaultFolder(id: "f_rec", name: "Recovery"),
+            VaultFolder(id: "f_import", name: "Imported")
         ]
 
-        let initialItems: [VaultItem] = seedSampleData ? Self.defaultSeedItems : []
+        var finalItems: [VaultItem] = []
+        if seedSampleData {
+            finalItems.append(contentsOf: Self.defaultSeedItems)
+        }
+        for imported in importedItems {
+            if !finalItems.contains(where: { $0.title == imported.title && $0.username == imported.username }) {
+                finalItems.append(imported)
+            }
+        }
 
         let payload = VaultPayload(
             version: 1,
-            items: initialItems,
+            items: finalItems,
             folders: initialFolders,
             settings: initialSettings,
             updatedAt: ISO8601DateFormatter().string(from: Date())
@@ -117,7 +137,7 @@ public final class VaultStore: ObservableObject {
         // 10. Update in-memory state
         self.vaultKey = newVaultKey
         self.cachedHeader = header
-        self.items = initialItems
+        self.items = finalItems
         self.folders = initialFolders
         self.settings = initialSettings
         self.hasVault = true

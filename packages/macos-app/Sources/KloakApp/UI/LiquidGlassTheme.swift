@@ -6,6 +6,8 @@ public struct LiquidGlassTheme {
     public static let roseAccent = Color(red: 1.0, green: 0.30, blue: 0.40)
     public static let amberAccent = Color(red: 1.0, green: 0.72, blue: 0.15)
     public static let purpleAccent = Color(red: 0.65, green: 0.35, blue: 1.0)
+    public static let tealAccent = Color(red: 0.00, green: 0.82, blue: 0.70)
+    public static let cyanAccent = Color(red: 0.00, green: 0.65, blue: 0.92)
 
     public static let glassBackground = Color.black.opacity(0.35)
     public static let cardBackground = Color.white.opacity(0.04)
