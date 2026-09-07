@@ -45,7 +45,7 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
 
 // MARK: - Cloud Account Provider Enum
 
-public enum CloudProvider: String, CaseIterable, Identifiable, Sendable {
+public enum CloudProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     case google = "google"
     case proton = "proton"
     case microsoft = "microsoft"
@@ -99,14 +99,37 @@ public enum CloudProvider: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+// MARK: - Authentication Method Enum
+
+public enum AuthMethod: String, Codable, CaseIterable, Sendable {
+    case oauth = "oauth"
+    case appPassword = "app_password"
+    case manualToken = "manual_token"
+
+    public var displayName: String {
+        switch self {
+        case .oauth: return "OAuth 2.0 Web Sign-In"
+        case .appPassword: return "App Password"
+        case .manualToken: return "API Token / Key"
+        }
+    }
+}
+
 // MARK: - Onboarding Account Connection State
 
-public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable {
+public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable, Codable {
     public var id: String { provider.rawValue }
     public var provider: CloudProvider
     public var isConnected: Bool
     public var email: String
     public var token: String?
+    public var userName: String?
+    public var avatarUrl: String?
+    public var accessToken: String?
+    public var refreshToken: String?
+    public var idToken: String?
+    public var tokenExpirationDate: Date?
+    public var authMethod: AuthMethod
     public var syncLogins: Bool
     public var syncAliases: Bool
     public var enableThreatShield: Bool
@@ -116,6 +139,13 @@ public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable {
         isConnected: Bool = false,
         email: String = "",
         token: String? = nil,
+        userName: String? = nil,
+        avatarUrl: String? = nil,
+        accessToken: String? = nil,
+        refreshToken: String? = nil,
+        idToken: String? = nil,
+        tokenExpirationDate: Date? = nil,
+        authMethod: AuthMethod = .oauth,
         syncLogins: Bool = true,
         syncAliases: Bool = true,
         enableThreatShield: Bool = true
@@ -124,6 +154,13 @@ public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable {
         self.isConnected = isConnected
         self.email = email
         self.token = token
+        self.userName = userName
+        self.avatarUrl = avatarUrl
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.idToken = idToken
+        self.tokenExpirationDate = tokenExpirationDate
+        self.authMethod = authMethod
         self.syncLogins = syncLogins
         self.syncAliases = syncAliases
         self.enableThreatShield = enableThreatShield

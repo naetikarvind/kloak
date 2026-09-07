@@ -9,10 +9,12 @@ public struct OnboardingAccountConnectSheet: View {
     @State private var email: String = ""
     @State private var tokenOrPass: String = ""
     @State private var showSecret: Bool = false
+    @State private var showManualForm: Bool = false
     @State private var syncLogins: Bool = true
     @State private var syncAliases: Bool = true
     @State private var enableThreatShield: Bool = true
     @State private var isAuthenticating: Bool = false
+    @State private var isOAuthAuthenticating: Bool = false
     @State private var errorMessage: String? = nil
     @State private var successPulse: Bool = false
 
@@ -68,7 +70,53 @@ public struct OnboardingAccountConnectSheet: View {
 
                 Divider().opacity(0.15)
 
-                // Form Inputs
+                // Primary Action: OAuth 2.0 Sign In Button
+                VStack(spacing: 12) {
+                    Button(action: { Task { await handleOAuthSignIn() } }) {
+                        HStack(spacing: 10) {
+                            if isOAuthAuthenticating {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: provider.iconName)
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+
+                            Text(isOAuthAuthenticating ? "Authenticating with \(provider.displayName)..." : "Sign in with \(provider.displayName)")
+                                .font(.system(size: 13, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [provider.accentColor, provider.accentColor.opacity(0.8)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isOAuthAuthenticating || isAuthenticating)
+
+                    HStack {
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+                        Text("OR MANUAL CONFIGURATION")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                // Form Inputs (Expandable or Quick Edit)
                 VStack(alignment: .leading, spacing: 14) {
                     // Email input
                     VStack(alignment: .leading, spacing: 6) {
@@ -197,7 +245,7 @@ public struct OnboardingAccountConnectSheet: View {
                     Button("Cancel", action: onCancel)
                         .buttonStyle(GlassCapsuleButton(isPrimary: false))
 
-                    Button(action: handleConnect) {
+                    Button(action: handleManualConnect) {
                         if isAuthenticating {
                             ProgressView()
                                 .controlSize(.small)
@@ -205,13 +253,13 @@ public struct OnboardingAccountConnectSheet: View {
                         } else {
                             HStack(spacing: 6) {
                                 Image(systemName: "link.badge.plus")
-                                Text("Connect \(provider.displayName)")
+                                Text("Save Connection")
                             }
-                            .frame(width: 160)
+                            .frame(width: 150)
                         }
                     }
                     .buttonStyle(GlassCapsuleButton(isPrimary: true))
-                    .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isAuthenticating)
+                    .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isAuthenticating || isOAuthAuthenticating)
                 }
                 .padding(.top, 8)
             }
@@ -227,7 +275,29 @@ public struct OnboardingAccountConnectSheet: View {
         }
     }
 
-    private func handleConnect() {
+    private func handleOAuthSignIn() async {
+        isOAuthAuthenticating = true
+        errorMessage = nil
+
+        do {
+            let authResult = try await OAuthManager.shared.authenticate(provider: provider)
+            await MainActor.run {
+                isOAuthAuthenticating = false
+                var updated = authResult
+                updated.syncLogins = syncLogins
+                updated.syncAliases = syncAliases
+                updated.enableThreatShield = enableThreatShield
+                onSave(updated)
+            }
+        } catch {
+            await MainActor.run {
+                isOAuthAuthenticating = false
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func handleManualConnect() {
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
         guard !trimmedEmail.isEmpty else {
             errorMessage = "Please enter an email address."
@@ -242,13 +312,13 @@ public struct OnboardingAccountConnectSheet: View {
         isAuthenticating = true
         errorMessage = nil
 
-        // Simulate fast secure verification
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             isAuthenticating = false
             var updated = connection
             updated.isConnected = true
             updated.email = trimmedEmail
             updated.token = tokenOrPass.isEmpty ? nil : tokenOrPass
+            updated.authMethod = tokenOrPass.isEmpty ? .manualToken : .appPassword
             updated.syncLogins = syncLogins
             updated.syncAliases = syncAliases
             updated.enableThreatShield = enableThreatShield

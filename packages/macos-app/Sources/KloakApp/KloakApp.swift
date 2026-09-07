@@ -102,6 +102,9 @@ public struct KloakApp: App {
                     WindowSizeManager.shared.resize(to: .vaultItems)
                 }
             }
+            .onOpenURL { url in
+                OAuthManager.shared.handleIncomingURL(url)
+            }
             .frame(minWidth: 420, minHeight: 480)
             .background(.ultraThinMaterial)
         }
