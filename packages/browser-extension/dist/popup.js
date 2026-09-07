@@ -1159,8 +1159,8 @@ ${notes}`;
       <!-- Main Action Buttons -->
       <div class="gen-actions-row">
         <button class="btn-gen-primary" id="btn-view-fill">
-          <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
-          \u26A1 Fill on Active Page ${activeDomain ? `(${activeDomain})` : ""}
+          <svg viewBox="0 0 24 24" style="width: 15px; height: 15px; fill: currentColor;"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>
+          Fill on Active Page
         </button>
         <div class="gen-sub-actions">
           <button class="btn-gen-sub" id="btn-view-copy-full">
