@@ -4,7 +4,7 @@
   "title": "Kloak Password Manager",
   "description": "Zero-knowledge, local-first password manager with instant search, auto-clear clipboard, and generator.",
   "icon": "icon.png",
-  "author": "kloak",
+  "author": "naetik_arvind",
   "categories": [
     "Security",
     "Productivity"
