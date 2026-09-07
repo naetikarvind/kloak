@@ -164,7 +164,7 @@ async function main() {
                     return;
                 }
             }
-            console.log('🌟 Setting up a new zero-knowledge Kloak vault.\n');
+            console.log('🌟 Setting up a new Kloak vault.\n');
             const pass1 = await promptPassword('Enter Master Password: ');
             if (pass1.length < 8) {
                 console.log('❌ Password must be at least 8 characters long.');

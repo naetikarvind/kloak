@@ -2,7 +2,7 @@
   "name": "kloak-monorepo",
   "version": "1.0.0",
   "private": true,
-  "description": "Kloak — Local-first, zero-knowledge password manager ecosystem",
+  "description": "Kloak — Local-first password manager ecosystem",
   "workspaces": [
     "packages/*"
   ],
@@ -19,7 +19,6 @@
   },
   "keywords": [
     "password-manager",
-    "zero-knowledge",
     "local-first",
     "raycast",
     "browser-extension",

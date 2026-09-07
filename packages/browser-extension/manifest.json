@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kloak Password Manager",
   "version": "1.0.0",
-  "description": "Zero-knowledge, local-first password manager with instant autofill, TOTP authenticator, and phishing defense.",
+  "description": "Local-first password manager with instant autofill, TOTP authenticator, and phishing defense.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

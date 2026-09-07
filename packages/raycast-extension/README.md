@@ -4,7 +4,7 @@
   <img src="assets/icon.png" width="128" height="128" alt="Kloak Logo" />
 </p>
 
-A fast, zero-knowledge, local-first Raycast extension for **Kloak Password Manager**. Access, generate, and autofill credentials instantly from your keyboard with native macOS performance.
+A fast, local-first Raycast extension for **Kloak Password Manager**. Access, generate, and autofill credentials instantly from your keyboard with native macOS performance.
 
 ## Features
 

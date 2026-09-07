@@ -1,7 +1,7 @@
 {
   "name": "@kloak/core",
   "version": "1.0.0",
-  "description": "Kloak Core — Zero-knowledge crypto engine, vault storage, TOTP & parsers",
+  "description": "Kloak Core — Crypto engine, vault storage, TOTP & parsers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

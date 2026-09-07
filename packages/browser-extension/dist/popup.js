@@ -1123,7 +1123,7 @@ ${notes}`;
           </div>
           <div>
             <div class="detail-title" style="font-size: 16px;">Password Generator</div>
-            <div style="font-size: 11px; color: var(--text-muted);">Zero-knowledge random key generator</div>
+            <div style="font-size: 11px; color: var(--text-muted);">High-entropy random key generator</div>
           </div>
         </div>
       </div>

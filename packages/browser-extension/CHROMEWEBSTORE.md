@@ -3,14 +3,14 @@
 ## Extension Details
 - **Name**: Kloak Password Manager
 - **Version**: 1.0.0
-- **Short Description**: Zero-knowledge, local-first password manager with instant autofill, TOTP authenticator, and phishing defense.
+- **Short Description**: Local-first password manager with instant autofill, TOTP authenticator, and phishing defense.
 - **Category**: Productivity / Security
 
 ## Detailed Description
-Kloak is a modern, zero-knowledge, local-first password manager designed with unmatched security and native speed.
+Kloak is a modern, local-first password manager designed with unmatched security and native speed.
 
 ### Key Features:
-- **Zero-Knowledge Security**: Your master password and derived keys never leave your machine.
+- **Local-First Security**: Your master password and derived keys never leave your machine.
 - **Intelligent Autofill**: Auto-detects login forms, injects credentials safely, and defends against lookalike/phishing domains.
 - **Built-in TOTP Authenticator**: Generates RFC 6238 two-factor authentication codes directly in your browser with real-time countdowns.
 - **High-Entropy Password Generator**: Create ultra-strong random passwords and EFF passphrases with instant clipboard copy.

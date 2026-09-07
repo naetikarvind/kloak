@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "kloak",
   "title": "Kloak Password Manager",
-  "description": "Zero-knowledge, local-first password manager with instant search, auto-clear clipboard, and generator.",
+  "description": "Local-first password manager with instant search, auto-clear clipboard, and generator.",
   "icon": "icon.png",
   "author": "naetik_arvind",
   "categories": [

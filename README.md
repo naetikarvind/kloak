@@ -45,7 +45,7 @@ graph TD
 ```
 kloak/
 ├── packages/
-│   ├── core/                  # Zero-knowledge crypto, vault model, TOTP & parsers
+│   ├── core/                  # Encrypted crypto engine, vault model, TOTP & parsers
 │   │   ├── src/crypto/        # AES-256-GCM, PBKDF2, TOTP, EFF Passphrase generator
 │   │   ├── src/models/        # Normalized vault schema
 │   │   ├── src/parsers/       # 10+ password manager importers & export engine
@@ -80,7 +80,7 @@ kloak/
 
 | Layer | Implementation | Security Benefit |
 |---|---|---|
-| **Architecture** | Zero-Knowledge, Local-First | Master password never leaves device; no cloud breach surface |
+| **Architecture** | Encrypted, Local-First | Master password never leaves device; no cloud breach surface |
 | **Key Derivation** | PBKDF2-SHA256 (600,000 iterations) / Argon2id | GPU-crack resistant and memory-hard |
 | **Vault Encryption** | AES-256-GCM (96-bit IV, 128-bit tag) | Authenticated encryption (confidentiality + tamper detection) |
 | **Key Envelope** | Two-Key Hierarchy | Master key wraps random Vault Key; password changes re-wrap envelope only |

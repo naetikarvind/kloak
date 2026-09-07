@@ -503,7 +503,7 @@ public final class VaultStore: ObservableObject {
             username: "security@proton.me",
             password: "Kloak-Proton-Encrypted#42",
             urls: ["https://mail.proton.me"],
-            notes: "Primary zero-knowledge mailbox",
+            notes: "Primary secure mailbox",
             totpSecret: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ",
             tags: ["Email"],
             favorite: true

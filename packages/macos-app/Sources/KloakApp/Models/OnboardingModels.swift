@@ -26,7 +26,7 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
         switch self {
         case .cloudAccounts: return "Connect Google, Proton, or Microsoft"
         case .appleKeychain: return "Link Apple Keychain & Safari credentials"
-        case .vaultPassword: return "Initialize zero-knowledge encryption"
+        case .vaultPassword: return "Initialize local vault encryption"
         case .ecosystem: return "Browser & Raycast native bridges"
         case .complete: return "Your vault is ready"
         }
@@ -92,7 +92,7 @@ public enum CloudProvider: String, CaseIterable, Identifiable, Sendable, Codable
         case .google:
             return ["Chrome Logins", "Google Passkeys", "Threat Shield"]
         case .proton:
-            return ["Proton Pass", "SimpleLogin Aliases", "Zero-Knowledge"]
+            return ["Proton Pass", "SimpleLogin Aliases", "Encrypted Vault"]
         case .microsoft:
             return ["Edge Passwords", "MS Authenticator", "OneDrive Backup"]
         }

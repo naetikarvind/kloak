@@ -1,6 +1,6 @@
 # Kloak Chrome Extension — Architecture & Roadmap Plan
 
-> **Zero-Knowledge • Local-First Password Management**  
+> **Local-First Password Management**  
 > *Proton Pass Aesthetic + iCloud Passwords Interaction Model*
 
 ---

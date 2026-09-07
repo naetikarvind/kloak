@@ -1,6 +1,6 @@
 /**
  * Kloak Core — Vault Data Models
- * Zero-knowledge, local-first password manager schema.
+ * Local-first password manager schema.
  */
 export type ItemType = 'login' | 'secure_note' | 'card' | 'identity' | 'oauth';
 export interface CustomField {

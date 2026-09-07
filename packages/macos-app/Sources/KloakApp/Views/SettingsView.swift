@@ -437,9 +437,9 @@ public struct SettingsView: View {
                 .padding(14)
                 .glassEffect(cornerRadius: 16)
 
-                // Section 3: Zero-Knowledge Standalone Mode & Apple Keychain
+                // Section 3: Standalone Offline Mode & Apple Keychain
                 VStack(alignment: .leading, spacing: 16) {
-                    Label("Zero-Knowledge Standalone Mode", systemImage: "shield.checkered")
+                    Label("Standalone Offline Mode", systemImage: "shield.checkered")
                         .font(.system(size: 14, weight: .bold))
 
                     VStack(alignment: .leading, spacing: 12) {

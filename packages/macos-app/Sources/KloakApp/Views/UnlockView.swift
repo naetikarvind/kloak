@@ -43,7 +43,7 @@ public struct UnlockView: View {
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundColor(.primary)
 
-                    Text("Zero-Knowledge • Local-First")
+                    Text("Encrypted • Local-First")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.secondary)
                 }
