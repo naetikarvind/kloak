@@ -1,6 +1,6 @@
-# Kloak — Zero-Knowledge, Local-First Password Manager
+# Kloak — Local-First Password Manager
 
-> **A local-first, zero-knowledge password manager with a Raycast extension, a native macOS app (Liquid Glass), a cross-browser extension (Manifest V3), and a companion website.**
+> **A local-first password manager with a Raycast extension, a native macOS app (Liquid Glass), a cross-browser extension (Manifest V3), and a companion website.**
 
 ---
 
