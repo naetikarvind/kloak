@@ -47,7 +47,7 @@ public final class VaultStore: ObservableObject {
     public func createVault(
         masterPassword: String,
         enableBiometrics: Bool = true,
-        seedSampleData: Bool = true,
+        seedSampleData: Bool = false,
         importedItems: [VaultItem] = [],
         connectedAccounts: [OnboardingAccountConnection] = [],
         keychainSyncEnabled: Bool = false
