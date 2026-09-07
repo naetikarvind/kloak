@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct ItemListView: View {
     var items: [VaultItem]
+    var currentSection: NavigationSection = .allItems
     @Binding var selectedItemId: String?
     @Binding var searchText: String
     var onToggleFavorite: (String) -> Void
@@ -74,11 +75,15 @@ public struct ItemListView: View {
             } else {
                 List(selection: $selectedItemId) {
                     ForEach(items) { item in
-                        ItemRowView(item: item, onToggleFavorite: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                                onToggleFavorite(item.id)
+                        ItemRowView(
+                            item: item,
+                            currentSection: currentSection,
+                            onToggleFavorite: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                    onToggleFavorite(item.id)
+                                }
                             }
-                        })
+                        )
                         .tag(item.id)
                     }
                 }
@@ -91,6 +96,7 @@ public struct ItemListView: View {
 
 public struct ItemRowView: View {
     let item: VaultItem
+    var currentSection: NavigationSection = .allItems
     var onToggleFavorite: () -> Void
 
     private var isWeakPassword: Bool {
@@ -146,6 +152,16 @@ public struct ItemRowView: View {
         return item.type.displayName
     }
 
+    private var shouldShowTypeBadge: Bool {
+        guard item.type != .login else { return false }
+        if case .category(let selectedCategory) = currentSection {
+            if selectedCategory == item.type && selectedCategory != .authenticator {
+                return false
+            }
+        }
+        return true
+    }
+
     public var body: some View {
         HStack(spacing: 10) {
             // High-resolution logo or fallback icon
@@ -185,7 +201,7 @@ public struct ItemRowView: View {
                         .background(LiquidGlassTheme.roseAccent.opacity(0.15))
                         .foregroundColor(LiquidGlassTheme.roseAccent)
                         .clipShape(Capsule())
-                } else if item.type != .login {
+                } else if shouldShowTypeBadge {
                     Text(item.type.displayName.lowercased())
                         .font(.system(size: 8, weight: .bold))
                         .lineLimit(1)

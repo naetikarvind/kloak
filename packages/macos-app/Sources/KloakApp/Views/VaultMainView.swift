@@ -148,6 +148,7 @@ public struct VaultMainView: View {
                     HStack(spacing: 0) {
                         ItemListView(
                             items: filteredItems,
+                            currentSection: selection,
                             selectedItemId: $selectedItemId,
                             searchText: $searchText,
                             onToggleFavorite: { id in
