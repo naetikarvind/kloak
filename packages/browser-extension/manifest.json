@@ -1,6 +1,5 @@
 {
   "manifest_version": 3,
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgZMwXNd6PqRpmTnYBsLY4pPs6bPI83N+UsE3qwN3bw3slaSWtkx2obyxbFiTG7gjaA+hvvcqP1T8KS8LlcTE3XeWxIFpXV+1DJeL6y9oxpnzWDVHBuWzYgSc9lTsVj1z716QZ7iI/3kSyrjx4e5SbNfrkHzzvDZwPAoYd3AnN+Wq25VHn/BqGWsxk1H5OcxqXQnLjv6w8FW1nBebNFuvq9nVX0Cshcwym2Y4A7JICDLJYC7STOp2o4qjZEn5fahZ+2JNss2OJYP+fXNGtJORVssLcrXHTPimF1n5xfnkHpeqcuWBsvoc/TsyFsWELNpY5oTpi2OqzUNw6Sd8LKupmQIDAQAB",
   "name": "Kloak Password Manager",
   "version": "1.0.0",
   "description": "Zero-knowledge, local-first password manager with instant autofill, TOTP authenticator, and phishing defense.",
