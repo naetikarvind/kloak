@@ -14,7 +14,8 @@
     "cli": "node packages/daemon/dist/cli/index.js",
     "website:dev": "npm run dev --workspace=packages/website",
     "website:build": "npm run build --workspace=packages/website",
-    "pack:extension": "node scripts/pack-extension.mjs"
+    "pack:extension": "node scripts/pack-extension.mjs",
+    "publish:raycast": "npm run publish --workspace=packages/raycast-extension"
   },
   "keywords": [
     "password-manager",
