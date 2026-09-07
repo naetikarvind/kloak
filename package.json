@@ -13,7 +13,8 @@
     "daemon": "npm run start --workspace=packages/daemon",
     "cli": "node packages/daemon/dist/cli/index.js",
     "website:dev": "npm run dev --workspace=packages/website",
-    "website:build": "npm run build --workspace=packages/website"
+    "website:build": "npm run build --workspace=packages/website",
+    "pack:extension": "node scripts/pack-extension.mjs"
   },
   "keywords": [
     "password-manager",
