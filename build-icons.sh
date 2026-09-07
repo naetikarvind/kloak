@@ -57,10 +57,22 @@ if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
         sips -z 1024 1024 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_512x512@2x.png" >/dev/null 2>&1 || true
     fi
 
-    [ -f "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" "$REPO_ROOT/packages/browser-extension/icons/icon-16.png"
-    sips -z 48 48 "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" --out "$REPO_ROOT/packages/browser-extension/icons/icon-48.png" >/dev/null 2>&1 || true
-    [ -f "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" "$REPO_ROOT/packages/browser-extension/icons/icon-128.png"
-    echo "✓ Browser extension PNG icons (16, 48, 128) synced"
+    # Generate tight-cropped, full-bleed icons for Browser Extension toolbar and web store
+    MASTER_PNG="$REPO_ROOT/AppIcon.iconset/icon_512x512@2x.png"
+    if [ ! -f "$MASTER_PNG" ]; then
+        MASTER_PNG="$REPO_ROOT/AppIcon.iconset/icon_512x512.png"
+    fi
+    
+    TMP_CROPPED="/tmp/kloak_ext_icon_tight.png"
+    sips -c 890 890 "$MASTER_PNG" --out "$TMP_CROPPED" >/dev/null 2>&1 || cp "$MASTER_PNG" "$TMP_CROPPED"
+    
+    sips -z 16 16 "$TMP_CROPPED" --out "$REPO_ROOT/packages/browser-extension/icons/icon-16.png" >/dev/null 2>&1 || true
+    sips -z 32 32 "$TMP_CROPPED" --out "$REPO_ROOT/packages/browser-extension/icons/icon-32.png" >/dev/null 2>&1 || true
+    sips -z 48 48 "$TMP_CROPPED" --out "$REPO_ROOT/packages/browser-extension/icons/icon-48.png" >/dev/null 2>&1 || true
+    sips -z 128 128 "$TMP_CROPPED" --out "$REPO_ROOT/packages/browser-extension/icons/icon-128.png" >/dev/null 2>&1 || true
+    rm -f "$TMP_CROPPED"
+    
+    echo "✓ Browser extension PNG icons (16, 32, 48, 128) cropped and synced (maximized toolbar size)"
 fi
 
 # 4. Sync Raycast extension icons
@@ -82,10 +94,10 @@ if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
     # Mirror directly to local raycast dev config if installed
     RAYCAST_DEV_DIR="$HOME/.config/raycast/extensions/kloak"
     if [ -d "$RAYCAST_DEV_DIR" ]; then
-        mkdir -p "$RAYCAST_DEV_DIR/assets"
-        cp "$SRC_512" "$RAYCAST_DEV_DIR/icon.png"
-        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon.png"
-        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon@dark.png"
+        mkdir -p "$RAYCAST_DEV_DIR/assets" 2>/dev/null || true
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/icon.png" 2>/dev/null || true
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon.png" 2>/dev/null || true
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon@dark.png" 2>/dev/null || true
         [ -e "$REPO_ROOT/AppIcon.icon" ] && cp -R "$REPO_ROOT/AppIcon.icon" "$RAYCAST_DEV_DIR/assets/icon.icon" 2>/dev/null || true
         cp "$REPO_ROOT/packages/raycast-extension/package.json" "$RAYCAST_DEV_DIR/package.json" 2>/dev/null || true
     fi
