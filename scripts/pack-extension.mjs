@@ -50,7 +50,18 @@ for (const item of filesToCopy) {
   }
 }
 
-// 5. Remove any unwanted OS files (.DS_Store)
+// 5. Sanitize manifest for Chrome Web Store compliance (strip 'key' field if present)
+const stagedManifestPath = path.join(STAGING_DIR, 'manifest.json');
+if (fs.existsSync(stagedManifestPath)) {
+  const stagedManifest = JSON.parse(fs.readFileSync(stagedManifestPath, 'utf8'));
+  if (stagedManifest.key) {
+    delete stagedManifest.key;
+    fs.writeFileSync(stagedManifestPath, JSON.stringify(stagedManifest, null, 2));
+    console.log('  ✓ Stripped development "key" field from production manifest');
+  }
+}
+
+// 6. Remove any unwanted OS files (.DS_Store)
 execSync(`find "${STAGING_DIR}" -name ".DS_Store" -delete 2>/dev/null || true`);
 
 // 6. Create production ZIP archives
