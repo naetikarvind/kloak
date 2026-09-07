@@ -44,13 +44,31 @@ if [ -f "$REPO_ROOT/scripts/build-ico.mjs" ]; then
     node "$REPO_ROOT/scripts/build-ico.mjs" 2>/dev/null || true
 fi
 
-# 3. Verify extension icons
+# 3. Generate all standard iconset sizes & Sync Browser Extension
 mkdir -p "$REPO_ROOT/packages/browser-extension/icons"
 if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
+    BASE_256="$REPO_ROOT/AppIcon.iconset/icon_128x128@2x.png"
+    if [ -f "$BASE_256" ]; then
+        sips -z 32 32 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_32x32.png" >/dev/null 2>&1 || true
+        sips -z 64 64 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" >/dev/null 2>&1 || true
+        sips -z 256 256 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_256x256.png" >/dev/null 2>&1 || true
+        sips -z 512 512 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_256x256@2x.png" >/dev/null 2>&1 || true
+        sips -z 512 512 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_512x512.png" >/dev/null 2>&1 || true
+        sips -z 1024 1024 "$BASE_256" --out "$REPO_ROOT/AppIcon.iconset/icon_512x512@2x.png" >/dev/null 2>&1 || true
+    fi
+
     [ -f "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" "$REPO_ROOT/packages/browser-extension/icons/icon-16.png"
-    [ -f "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" "$REPO_ROOT/packages/browser-extension/icons/icon-48.png"
+    sips -z 48 48 "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" --out "$REPO_ROOT/packages/browser-extension/icons/icon-48.png" >/dev/null 2>&1 || true
     [ -f "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" "$REPO_ROOT/packages/browser-extension/icons/icon-128.png"
-    echo "✓ Browser extension PNG icons synced from compiled asset"
+    echo "✓ Browser extension PNG icons (16, 48, 128) synced"
+fi
+
+# 4. Sync Raycast extension icons
+mkdir -p "$REPO_ROOT/packages/raycast-extension/assets"
+if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
+    sips -z 512 512 "$REPO_ROOT/AppIcon.iconset/icon_128x128@2x.png" --out "$REPO_ROOT/packages/raycast-extension/icon.png" >/dev/null 2>&1 || true
+    cp "$REPO_ROOT/packages/raycast-extension/icon.png" "$REPO_ROOT/packages/raycast-extension/assets/icon.png" 2>/dev/null || true
+    echo "✓ Raycast extension icons (512x512) synced"
 fi
 
 echo ""
@@ -59,3 +77,4 @@ echo "🎉 All icon formats built successfully:"
 [ -f "$REPO_ROOT/AppIcon.icns" ] && ls -lh "$REPO_ROOT/AppIcon.icns"
 [ -f "$REPO_ROOT/AppIcon.ico" ] && ls -lh "$REPO_ROOT/AppIcon.ico"
 [ -f "$REPO_ROOT/packages/browser-extension/icons/favicon.ico" ] && ls -lh "$REPO_ROOT/packages/browser-extension/icons/favicon.ico"
+[ -f "$REPO_ROOT/packages/raycast-extension/icon.png" ] && ls -lh "$REPO_ROOT/packages/raycast-extension/icon.png"
