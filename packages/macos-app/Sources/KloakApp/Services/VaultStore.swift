@@ -610,4 +610,23 @@ public final class VaultStore: ObservableObject {
             tags: ["Media"]
         )
     ]
+
+    // MARK: - Vault Reset / Delete
+
+    public func resetVault() {
+        stopAutoLockTimer()
+        self.isUnlocked = false
+        self.hasVault = false
+        self.items = []
+        self.folders = []
+        self.settings = .default
+        self.vaultKey = nil
+        self.sessionVaultKey = nil
+        self.cachedHeader = nil
+
+        try? FileManager.default.removeItem(at: Self.vaultFileURL)
+        try? FileManager.default.removeItem(at: Self.vaultDirectoryURL)
+        KeychainManager.shared.clearKey()
+        checkVaultExistence()
+    }
 }

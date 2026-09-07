@@ -4,7 +4,7 @@ public struct SetupView: View {
     @ObservedObject var vaultStore: VaultStore = .shared
 
     // Navigation & Stage
-    @State private var currentStep: OnboardingStep = .vaultPassword
+    @State private var currentStep: OnboardingStep = .cloudAccounts
     @State private var pulseGlow: Bool = false
 
     // Step 1: Password State
@@ -309,19 +309,27 @@ public struct SetupView: View {
 
             Spacer()
 
-            // Next button
+            // Navigation buttons
             HStack {
-                Spacer()
-                Button(action: {
+                Button("Back") {
                     withAnimation(.easeInOut(duration: 0.28)) {
                         currentStep = .appleKeychain
                     }
+                }
+                .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                Spacer()
+
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.28)) {
+                        currentStep = .ecosystem
+                    }
                 }) {
                     HStack(spacing: 8) {
-                        Text("Continue to Keychain Setup")
+                        Text("Continue to Integrations")
                         Image(systemName: "arrow.right")
                     }
-                    .frame(minWidth: 200)
+                    .frame(minWidth: 190)
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: true))
                 .disabled(!canProceedFromPassword)
@@ -472,7 +480,7 @@ public struct SetupView: View {
             HStack {
                 Button("Back") {
                     withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .vaultPassword
+                        currentStep = .cloudAccounts
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
@@ -481,14 +489,14 @@ public struct SetupView: View {
 
                 Button("Skip") {
                     withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .cloudAccounts
+                        currentStep = .vaultPassword
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
 
                 Button("Continue") {
                     withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .cloudAccounts
+                        currentStep = .vaultPassword
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: true))
@@ -527,25 +535,18 @@ public struct SetupView: View {
 
             // Navigation buttons
             HStack {
-                Button("Back") {
+                Spacer()
+
+                Button("Skip Accounts") {
                     withAnimation(.easeInOut(duration: 0.28)) {
                         currentStep = .appleKeychain
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
 
-                Spacer()
-
-                Button("Skip Accounts") {
+                Button("Continue to Keychain") {
                     withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .ecosystem
-                    }
-                }
-                .buttonStyle(GlassCapsuleButton(isPrimary: false))
-
-                Button("Continue") {
-                    withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .ecosystem
+                        currentStep = .appleKeychain
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: true))
@@ -729,7 +730,7 @@ public struct SetupView: View {
             HStack {
                 Button("Back") {
                     withAnimation(.easeInOut(duration: 0.28)) {
-                        currentStep = .cloudAccounts
+                        currentStep = .vaultPassword
                     }
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
@@ -826,22 +827,33 @@ public struct SetupView: View {
             Spacer()
 
             // Launch Action
-            Button(action: handleCreateVault) {
-                if isProcessing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                        Text("Launch Kloak Password Manager")
+            HStack(spacing: 12) {
+                Button("Back") {
+                    withAnimation(.easeInOut(duration: 0.28)) {
+                        currentStep = .ecosystem
                     }
-                    .font(.system(size: 14, weight: .bold))
-                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                Spacer()
+
+                Button(action: handleCreateVault) {
+                    if isProcessing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                            Text("Launch Kloak")
+                        }
+                        .font(.system(size: 14, weight: .bold))
+                        .frame(minWidth: 160)
+                    }
+                }
+                .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                .disabled(isProcessing)
             }
-            .buttonStyle(GlassCapsuleButton(isPrimary: true))
-            .disabled(isProcessing)
         }
     }
 

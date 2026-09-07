@@ -4,9 +4,9 @@ import Foundation
 // MARK: - Onboarding Step Enum
 
 public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
-    case vaultPassword = 0
+    case cloudAccounts = 0
     case appleKeychain = 1
-    case cloudAccounts = 2
+    case vaultPassword = 2
     case ecosystem = 3
     case complete = 4
 
@@ -14,9 +14,9 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
-        case .vaultPassword: return "Master Password"
-        case .appleKeychain: return "Apple Keychain"
         case .cloudAccounts: return "Cloud Accounts"
+        case .appleKeychain: return "Apple Keychain"
+        case .vaultPassword: return "Master Password"
         case .ecosystem: return "Integrations"
         case .complete: return "Ready"
         }
@@ -24,9 +24,9 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
 
     public var subtitle: String {
         switch self {
-        case .vaultPassword: return "Initialize zero-knowledge encryption"
-        case .appleKeychain: return "Import Safari & macOS passwords"
         case .cloudAccounts: return "Connect Google, Proton, or Microsoft"
+        case .appleKeychain: return "Link Apple Keychain & Safari credentials"
+        case .vaultPassword: return "Initialize zero-knowledge encryption"
         case .ecosystem: return "Browser & Raycast native bridges"
         case .complete: return "Your vault is ready"
         }
@@ -34,9 +34,9 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
 
     public var icon: String {
         switch self {
-        case .vaultPassword: return "lock.shield.fill"
-        case .appleKeychain: return "key.horizontal.fill"
         case .cloudAccounts: return "cloud.fill"
+        case .appleKeychain: return "key.horizontal.fill"
+        case .vaultPassword: return "lock.shield.fill"
         case .ecosystem: return "puzzlepiece.extension.fill"
         case .complete: return "checkmark.seal.fill"
         }

@@ -12,6 +12,7 @@ public struct UnlockView: View {
 
     @FocusState private var isPasswordFocused: Bool
     @State private var showPassword: Bool = false
+    @State private var showResetConfirmation: Bool = false
 
     public init(
         isUnlocked: Binding<Bool>,
@@ -122,6 +123,26 @@ public struct UnlockView: View {
                 }
                 .padding(24)
                 .glassEffect(cornerRadius: 20)
+
+                Button(action: { showResetConfirmation = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                        Text("Start Fresh Onboarding / Reset Vault")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(LiquidGlassTheme.primaryAccent.opacity(0.85))
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 2)
+                .alert("Reset Vault & Start Onboarding?", isPresented: $showResetConfirmation) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Reset & Start Setup", role: .destructive) {
+                        VaultStore.shared.resetVault()
+                    }
+                } message: {
+                    Text("This will clear the current local vault and launch the clean first-time onboarding wizard.")
+                }
             }
             .padding(40)
         }
