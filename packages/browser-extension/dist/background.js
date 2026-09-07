@@ -889,13 +889,38 @@
   var cachedItems = [];
   var isVaultUnlocked = false;
   var connectedAccount = {
-    provider: "none",
-    email: ""
+    provider: "google",
+    email: "naetik.arvind@gmail.com"
   };
   var aiSecurityCache = /* @__PURE__ */ new Map();
   var lastActiveTabId = null;
   var lastActiveUrl = null;
-  var FALLBACK_ITEMS = [];
+  var FALLBACK_ITEMS = [
+    {
+      id: "demo-1",
+      title: "GitHub",
+      username: "alex.dev@github.com",
+      password: "ghp_KloakSecurePassword982!",
+      urls: ["https://github.com", "https://gist.github.com"],
+      totpSecret: "JBSWY3DPEHPK3PXP"
+    },
+    {
+      id: "demo-2",
+      title: "Google Account",
+      username: "alex.engineer@gmail.com",
+      password: "KloakGoogleEncryptedKey#99",
+      urls: ["https://accounts.google.com", "https://google.com"],
+      totpSecret: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ"
+    },
+    {
+      id: "demo-3",
+      title: "ProtonMail",
+      username: "security@proton.me",
+      password: "Kloak-Proton-Encrypted#42",
+      urls: ["https://mail.proton.me", "https://account.proton.me"],
+      totpSecret: "JBSWY3DPEHPK3PXP"
+    }
+  ];
   var rpcIdCounter = 1;
   function getRegistrableDomain(urlStr) {
     try {

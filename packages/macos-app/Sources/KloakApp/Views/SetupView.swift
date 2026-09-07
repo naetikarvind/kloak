@@ -21,7 +21,7 @@ public struct SetupView: View {
     @State private var importedKeychainItems: [VaultItem] = []
     @State private var keychainPasswordInput: String = ""
     @State private var showKeychainPasswordInput: Bool = false
-    @State private var importKeychainLogins: Bool = false
+    @State private var importKeychainLogins: Bool = true
     @State private var enableKeychainSync: Bool = false
     @State private var keychainFeedback: String? = nil
 
@@ -32,7 +32,7 @@ public struct SetupView: View {
     @State private var selectedProviderForSheet: CloudProvider? = nil
 
     // Step 4: Integrations & Completion
-    @State private var seedSampleData: Bool = false
+    @State private var seedSampleData: Bool = true
     @State private var isProcessing: Bool = false
     @State private var errorMessage: String? = nil
 
