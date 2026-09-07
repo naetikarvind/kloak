@@ -38,15 +38,9 @@ public struct UnlockView: View {
                         }
                     }
 
-                VStack(spacing: 8) {
-                    Text("Kloak")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(.primary)
-
-                    Text("Encrypted • Local-First")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
+                Text("Kloak")
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
 
                 // Password Entry Glass Panel
                 VStack(spacing: 16) {
