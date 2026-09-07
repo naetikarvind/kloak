@@ -6,37 +6,51 @@ echo "============================="
 echo "  Kloak Icon Format Builder"
 echo "============================="
 
-# 1. Handle Apple Icon Composer .icon bundle/file directly
+# 1. Compile Apple Icon Composer .icon directly via actool
 if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
-    echo "→ Syncing Apple Icon Composer AppIcon.icon..."
+    echo "→ Compiling Apple Icon Composer AppIcon.icon via actool..."
     mkdir -p "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources"
+    mkdir -p "$REPO_ROOT/dist"
+    
+    # Copy .icon to macOS app resources
     rm -rf "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
     cp -R "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icon"
-    echo "✓ AppIcon.icon synced directly to macOS app resources"
+    
+    # Compile AppIcon.icns and Assets.car with full Liquid Glass effects
+    xcrun actool "$REPO_ROOT/AppIcon.icon" \
+        --compile "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources" \
+        --platform macosx \
+        --minimum-deployment-target 14.0 \
+        --app-icon AppIcon \
+        --output-partial-info-plist /tmp/kloak_icon_partial.plist \
+        --output-format xml1
+    
+    # Mirror compiled AppIcon.icns and Assets.car to repo root and packages/macos-app
+    cp "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icns" "$REPO_ROOT/AppIcon.icns"
+    cp "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icns" "$REPO_ROOT/packages/macos-app/AppIcon.icns" 2>/dev/null || true
+    cp "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/Assets.car" "$REPO_ROOT/packages/macos-app/Assets.car" 2>/dev/null || true
+    
+    echo "✓ AppIcon.icns & Assets.car compiled with Liquid Glass from AppIcon.icon"
+
+    # Extract iconset for web/extension PNG targets
+    rm -rf "$REPO_ROOT/AppIcon.iconset"
+    iconutil -c iconset "$REPO_ROOT/AppIcon.icns" -o "$REPO_ROOT/AppIcon.iconset"
+    echo "✓ AppIcon.iconset extracted from compiled Liquid Glass ICNS"
 fi
 
-# 3. Compile Apple ICNS format
-if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
-    echo "→ Compiling Apple ICNS format (AppIcon.icns)..."
-    iconutil -c icns "$REPO_ROOT/AppIcon.iconset" -o "$REPO_ROOT/AppIcon.icns"
-    mkdir -p "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources"
-    cp "$REPO_ROOT/AppIcon.icns" "$REPO_ROOT/packages/macos-app/Sources/KloakApp/Resources/AppIcon.icns"
-    echo "✓ AppIcon.icns built & synced to macOS app resources"
-fi
-
-# 4. Compile Windows/Web ICO format
+# 2. Compile Windows/Web ICO format
 if [ -f "$REPO_ROOT/scripts/build-ico.mjs" ]; then
     echo "→ Compiling ICO format (AppIcon.ico & favicon.ico)..."
-    node "$REPO_ROOT/scripts/build-ico.mjs"
+    node "$REPO_ROOT/scripts/build-ico.mjs" 2>/dev/null || true
 fi
 
-# 5. Verify extension icons
+# 3. Verify extension icons
 mkdir -p "$REPO_ROOT/packages/browser-extension/icons"
-if [ -f "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" ]; then
-    cp "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" "$REPO_ROOT/packages/browser-extension/icons/icon-16.png"
-    cp "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" "$REPO_ROOT/packages/browser-extension/icons/icon-48.png" 2>/dev/null || true
-    cp "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" "$REPO_ROOT/packages/browser-extension/icons/icon-128.png"
-    echo "✓ Browser extension PNG icons synced"
+if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
+    [ -f "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_16x16.png" "$REPO_ROOT/packages/browser-extension/icons/icon-16.png"
+    [ -f "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_32x32@2x.png" "$REPO_ROOT/packages/browser-extension/icons/icon-48.png"
+    [ -f "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" ] && cp "$REPO_ROOT/AppIcon.iconset/icon_128x128.png" "$REPO_ROOT/packages/browser-extension/icons/icon-128.png"
+    echo "✓ Browser extension PNG icons synced from compiled asset"
 fi
 
 echo ""

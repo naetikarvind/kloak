@@ -5,7 +5,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        // macOS automatically resolves and renders AppIcon.icon from Info.plist & bundle resources
+
+        // Set application icon for Dock and App Switcher from compiled AppIcon
+        if let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let iconImg = NSImage(contentsOf: iconUrl) {
+            NSApp.applicationIconImage = iconImg
+        }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if let window = NSApp.windows.first {
