@@ -66,9 +66,30 @@ fi
 # 4. Sync Raycast extension icons
 mkdir -p "$REPO_ROOT/packages/raycast-extension/assets"
 if [ -d "$REPO_ROOT/AppIcon.iconset" ]; then
-    sips -z 512 512 "$REPO_ROOT/AppIcon.iconset/icon_128x128@2x.png" --out "$REPO_ROOT/packages/raycast-extension/icon.png" >/dev/null 2>&1 || true
-    cp "$REPO_ROOT/packages/raycast-extension/icon.png" "$REPO_ROOT/packages/raycast-extension/assets/icon.png" 2>/dev/null || true
-    echo "✓ Raycast extension icons (512x512) synced"
+    SRC_512="$REPO_ROOT/AppIcon.iconset/icon_512x512.png"
+    if [ ! -f "$SRC_512" ]; then
+        SRC_512="$REPO_ROOT/AppIcon.iconset/icon_256x256@2x.png"
+    fi
+    cp "$SRC_512" "$REPO_ROOT/packages/raycast-extension/icon.png"
+    cp "$SRC_512" "$REPO_ROOT/packages/raycast-extension/assets/icon.png"
+    cp "$SRC_512" "$REPO_ROOT/packages/raycast-extension/assets/icon@dark.png"
+    
+    if [ -e "$REPO_ROOT/AppIcon.icon" ]; then
+        rm -rf "$REPO_ROOT/packages/raycast-extension/assets/icon.icon"
+        cp -R "$REPO_ROOT/AppIcon.icon" "$REPO_ROOT/packages/raycast-extension/assets/icon.icon"
+    fi
+    
+    # Mirror directly to local raycast dev config if installed
+    RAYCAST_DEV_DIR="$HOME/.config/raycast/extensions/kloak"
+    if [ -d "$RAYCAST_DEV_DIR" ]; then
+        mkdir -p "$RAYCAST_DEV_DIR/assets"
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/icon.png"
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon.png"
+        cp "$SRC_512" "$RAYCAST_DEV_DIR/assets/icon@dark.png"
+        [ -e "$REPO_ROOT/AppIcon.icon" ] && cp -R "$REPO_ROOT/AppIcon.icon" "$RAYCAST_DEV_DIR/assets/icon.icon" 2>/dev/null || true
+        cp "$REPO_ROOT/packages/raycast-extension/package.json" "$RAYCAST_DEV_DIR/package.json" 2>/dev/null || true
+    fi
+    echo "✓ Raycast extension icons (512x512, dark mode, icon.icon) synced"
 fi
 
 echo ""
