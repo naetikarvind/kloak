@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 public struct SetupView: View {
     @ObservedObject var vaultStore: VaultStore = .shared
@@ -354,30 +355,99 @@ public struct SetupView: View {
             }
             .padding(.top, 6)
 
-            VStack(alignment: .leading, spacing: 16) {
-                // Keychain Status Card
+            VStack(alignment: .leading, spacing: 14) {
+                // Option A: iCloud Passwords Export CSV Import
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(LiquidGlassTheme.primaryAccent.opacity(0.18))
+                                .frame(width: 44, height: 44)
+
+                            Image(systemName: "icloud.and.arrow.down.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("iCloud Passwords / Safari Export (.csv)")
+                                .font(.system(size: 14, weight: .bold))
+
+                            Text("Import all Safari and iCloud credentials via exported CSV")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button(action: handleSelectApplePasswordsCSV) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.badge.plus")
+                                Text("Import Passwords.csv")
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                    }
+
+                    // How to export instructions
+                    HStack(spacing: 8) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(LiquidGlassTheme.tealAccent)
+
+                        Text("Tip: In macOS System Settings → Passwords, click '...' → 'Export All Passwords...', then select that file here.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                    if !importedKeychainItems.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                .font(.system(size: 12))
+
+                            Text("\(importedKeychainItems.count) credential(s) loaded from Passwords.csv")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // Option B: Local Keychain Direct Scan
                 HStack(spacing: 14) {
                     ZStack {
                         Circle()
                             .fill(LiquidGlassTheme.amberAccent.opacity(0.18))
-                            .frame(width: 46, height: 46)
+                            .frame(width: 40, height: 40)
 
                         Image(systemName: "key.horizontal.fill")
-                            .font(.system(size: 22))
+                            .font(.system(size: 18))
                             .foregroundColor(LiquidGlassTheme.amberAccent)
                     }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("macOS & Safari Keychain")
-                            .font(.system(size: 14, weight: .bold))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("macOS System Keychain Scan")
+                            .font(.system(size: 13, weight: .bold))
 
                         if let result = keychainScanResult {
-                            Text("Discovered \(result.totalCount) saved items (\(result.internetPasswordsCount) web logins, \(result.genericPasswordsCount) app keys)")
-                                .font(.system(size: 12))
+                            Text("\(result.totalCount) items found (\(result.internetPasswordsCount) web logins, \(result.genericPasswordsCount) app keys)")
+                                .font(.system(size: 11))
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         } else {
-                            Text("Click scan to detect credentials stored in your system Keychain")
-                                .font(.system(size: 12))
+                            Text("Scan local unencrypted keychain items")
+                                .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -389,56 +459,16 @@ public struct SetupView: View {
                             ProgressView()
                                 .controlSize(.small)
                         } else {
-                            Label(keychainScanResult == nil ? "Scan Keychain" : "Re-scan", systemImage: "arrow.triangle.2.circlepath")
-                                .font(.system(size: 11, weight: .semibold))
+                            Label(keychainScanResult == nil ? "Scan Local" : "Re-scan", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 10, weight: .semibold))
                         }
                     }
-                    .buttonStyle(GlassCapsuleButton(isPrimary: keychainScanResult == nil))
+                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     .disabled(isScanningKeychain)
                 }
-                .padding(14)
-                .background(Color.black.opacity(0.25))
+                .padding(12)
+                .background(Color.black.opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Password Verification Input (Fallback if direct access needs auth)
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("MACOS / KEYCHAIN PASSWORD AUTHORIZATION")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Button(action: { showKeychainPasswordInput.toggle() }) {
-                            Text(showKeychainPasswordInput ? "Hide" : "Enter Password")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(LiquidGlassTheme.primaryAccent)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    if showKeychainPasswordInput {
-                        HStack(spacing: 8) {
-                            SecureField("Enter macOS Login / Keychain Password", text: $keychainPasswordInput)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 13))
-
-                            Button(action: handleScanKeychain) {
-                                Text("Authorize")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.black.opacity(0.35))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                )
-                        )
-                    }
-                }
 
                 // Options
                 VStack(alignment: .leading, spacing: 8) {
@@ -876,6 +906,41 @@ public struct SetupView: View {
                 } else {
                     self.keychainFeedback = "Scan complete. \(scan.totalCount) items found in macOS Keychain."
                 }
+            }
+        }
+    }
+
+    private func handleSelectApplePasswordsCSV() {
+        let panel = NSOpenPanel()
+        panel.title = "Select Apple Passwords CSV Export"
+        panel.prompt = "Import Passwords"
+        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canCreateDirectories = false
+
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                let content = try String(contentsOf: url, encoding: .utf8)
+                let items = KeychainManager.shared.importFromApplePasswordsCSV(content)
+                if !items.isEmpty {
+                    var existingKeys = Set(importedKeychainItems.map { "\($0.title)_\($0.username ?? "")" })
+                    var addedCount = 0
+                    for item in items {
+                        let key = "\(item.title)_\(item.username ?? "")"
+                        if !existingKeys.contains(key) {
+                            importedKeychainItems.append(item)
+                            existingKeys.insert(key)
+                            addedCount += 1
+                        }
+                    }
+                    importKeychainLogins = true
+                    keychainFeedback = "Successfully imported \(items.count) password(s) (\(addedCount) new) from \(url.lastPathComponent)!"
+                } else {
+                    keychainFeedback = "No passwords found in \(url.lastPathComponent). Please ensure it is an exported CSV from Apple Passwords or Safari."
+                }
+            } catch {
+                keychainFeedback = "Failed to read CSV file: \(error.localizedDescription)"
             }
         }
     }

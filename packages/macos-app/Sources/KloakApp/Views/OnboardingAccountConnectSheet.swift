@@ -252,7 +252,7 @@ public struct OnboardingAccountConnectSheet: View {
                         }
                     }
                     .buttonStyle(GlassCapsuleButton(isPrimary: false))
-                    .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isAuthenticating || isOAuthAuthenticating)
+                    .disabled(isAuthenticating || isOAuthAuthenticating)
                 }
                 .padding(.top, 4)
             }
@@ -269,19 +269,17 @@ public struct OnboardingAccountConnectSheet: View {
     }
 
     private func handleOAuthSignIn() async {
-        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-        guard !trimmedEmail.isEmpty else {
+        var trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedEmail.isEmpty {
+            trimmedEmail = "user" + defaultDomain
             await MainActor.run {
-                errorMessage = "Please enter your \(provider.displayName) email above to connect."
+                self.email = trimmedEmail
             }
-            return
-        }
-
-        guard trimmedEmail.contains("@") else {
+        } else if !trimmedEmail.contains("@") {
+            trimmedEmail = trimmedEmail + defaultDomain
             await MainActor.run {
-                errorMessage = "Please enter a valid email address."
+                self.email = trimmedEmail
             }
-            return
         }
 
         await MainActor.run {
@@ -309,15 +307,11 @@ public struct OnboardingAccountConnectSheet: View {
     }
 
     private func handleManualConnect() {
-        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
-        guard !trimmedEmail.isEmpty else {
-            errorMessage = "Please enter an email address."
-            return
-        }
-
-        if !trimmedEmail.contains("@") {
-            errorMessage = "Please enter a valid email address."
-            return
+        var trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedEmail.isEmpty {
+            trimmedEmail = "user" + defaultDomain
+        } else if !trimmedEmail.contains("@") {
+            trimmedEmail = trimmedEmail + defaultDomain
         }
 
         isAuthenticating = true

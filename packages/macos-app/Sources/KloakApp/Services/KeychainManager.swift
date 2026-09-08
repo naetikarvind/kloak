@@ -260,4 +260,86 @@ public final class KeychainManager: @unchecked Sendable {
         }
         return syncedCount
     }
+
+    // MARK: - Apple Passwords CSV Importer
+
+    public func importFromApplePasswordsCSV(_ content: String) -> [VaultItem] {
+        var results: [VaultItem] = []
+        let lines = content.components(separatedBy: .newlines)
+        guard lines.count > 1 else { return results }
+
+        let headers = parseCSVRow(lines[0])
+        let headerLower = headers.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }
+
+        let titleIdx = headerLower.firstIndex(where: { ["title", "name", "entry"].contains($0) })
+        let urlIdx = headerLower.firstIndex(where: { ["url", "website", "domain", "uri"].contains($0) })
+        let userIdx = headerLower.firstIndex(where: { ["username", "user name", "email", "account"].contains($0) })
+        let passIdx = headerLower.firstIndex(where: { ["password", "pass"].contains($0) })
+        let notesIdx = headerLower.firstIndex(where: { ["notes", "note", "comments"].contains($0) })
+        let totpIdx = headerLower.firstIndex(where: { ["otpauth", "totp", "otp", "otpsecret"].contains($0) })
+
+        for i in 1..<lines.count {
+            let line = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
+            if line.isEmpty { continue }
+
+            let cols = parseCSVRow(line)
+            let title = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? "iCloud Login"
+            let url = safeCol(cols, urlIdx)
+            let user = safeCol(cols, userIdx)
+            let pass = safeCol(cols, passIdx)
+            let note = safeCol(cols, notesIdx)
+            var totpSecret: String? = nil
+
+            if let raw = safeCol(cols, totpIdx), !raw.isEmpty {
+                if raw.lowercased().hasPrefix("otpauth://") {
+                    if let urlComp = URLComponents(string: raw),
+                       let secretParam = urlComp.queryItems?.first(where: { $0.name == "secret" })?.value {
+                        totpSecret = secretParam
+                    }
+                } else {
+                    totpSecret = raw
+                }
+            }
+
+            if user != nil || pass != nil || !title.isEmpty {
+                results.append(VaultItem(
+                    type: .login,
+                    title: title,
+                    username: user,
+                    password: pass,
+                    urls: url != nil && !url!.isEmpty ? [url!] : [],
+                    notes: note ?? "Imported from Apple Passwords",
+                    totpSecret: totpSecret,
+                    tags: ["Apple Keychain", "iCloud Passwords"]
+                ))
+            }
+        }
+
+        return results
+    }
+
+    private func parseCSVRow(_ row: String) -> [String] {
+        var fields: [String] = []
+        var current = ""
+        var inQuotes = false
+
+        for ch in row {
+            if ch == "\"" {
+                inQuotes.toggle()
+            } else if ch == "," && !inQuotes {
+                fields.append(current)
+                current = ""
+            } else {
+                current.append(ch)
+            }
+        }
+        fields.append(current)
+        return fields
+    }
+
+    private func safeCol(_ cols: [String], _ idx: Int?) -> String? {
+        guard let i = idx, i < cols.count else { return nil }
+        let val = cols[i].trimmingCharacters(in: .whitespaces)
+        return val.isEmpty ? nil : val
+    }
 }
