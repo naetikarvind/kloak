@@ -74,7 +74,20 @@ public struct VaultMainView: View {
                 base = items.filter { $0.type == type && !$0.trashed }
             }
         case .folder(let folderId):
-            base = items.filter { $0.tags.contains(folderId) && !$0.trashed }
+            let targetFolder = folders.first(where: { $0.id == folderId })
+            let folderName = targetFolder?.name.lowercased() ?? ""
+            base = items.filter { item in
+                guard !item.trashed else { return false }
+                if item.tags.contains(folderId) { return true }
+                if !folderName.isEmpty && item.tags.contains(where: { $0.lowercased() == folderName }) { return true }
+                if folderName == "imported" && item.tags.contains(where: {
+                    let lower = $0.lowercased()
+                    return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
+                }) {
+                    return true
+                }
+                return false
+            }
         case .trash:
             base = items.filter { $0.trashed }
         case .generator, .importExport, .settings:

@@ -60,9 +60,23 @@ public struct SidebarView: View {
                 if !folders.isEmpty {
                     Section("Folders") {
                         ForEach(folders) { folder in
+                            let count = items.filter { item in
+                                guard !item.trashed else { return false }
+                                if item.tags.contains(folder.id) { return true }
+                                if item.tags.contains(where: { $0.lowercased() == folder.name.lowercased() }) { return true }
+                                if folder.name.lowercased() == "imported" && item.tags.contains(where: {
+                                    let lower = $0.lowercased()
+                                    return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
+                                }) {
+                                    return true
+                                }
+                                return false
+                            }.count
+
                             NavigationLink(value: NavigationSection.folder(folder.id)) {
                                 Label(folder.name, systemImage: "folder.fill")
                             }
+                            .badge(count)
                         }
                     }
                 }
