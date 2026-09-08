@@ -56,7 +56,153 @@ public final class KeychainManager: @unchecked Sendable {
 
     // MARK: - Apple Keychain Two-Way Sync (Logins & Passwords)
 
-    /// Imports all internet and generic passwords directly from the macOS Keychain.
+    /// Determines whether a keychain entry or vault item is an internal macOS system token,
+    /// daemon credential, Apple developer registration/certificate, or hardware/network key,
+    /// rather than a genuine user password/login.
+    public static func isSystemOrDeveloperItem(server: String, service: String, account: String, label: String) -> Bool {
+        let lowerServer = server.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerService = service.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerAccount = account.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowerLabel = label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let combined = "\(lowerServer) \(lowerService) \(lowerAccount) \(lowerLabel)"
+
+        // 1. Developer certificates, provisioning profiles, code signing, and developer registrations
+        let devPatterns = [
+            "apple development",
+            "apple distribution",
+            "developer id",
+            "mac developer",
+            "iphone developer",
+            "ios developer",
+            "iphone distribution",
+            "apple worldwide developer",
+            "software signing",
+            "codesign",
+            "code signing",
+            "provisioning",
+            "com.apple.developer",
+            "developer registration",
+            "apple certification",
+            "xcode",
+            "wwdr",
+            "notarization",
+            "development identity",
+            "distribution identity",
+            "altool",
+            "csr",
+            "identity:"
+        ]
+        for p in devPatterns {
+            if combined.contains(p) { return true }
+        }
+
+        // 2. macOS System daemons, services, internal subsystems, and network/hardware credentials
+        let systemPatterns = [
+            "com.apple.",
+            "apple-",
+            "bluetooth",
+            "airport",
+            "airdrop",
+            "handoff",
+            "continuity",
+            "sidecar",
+            "session-key",
+            "protectedcloudstorage",
+            "identity root",
+            "encryption root",
+            "nonce root",
+            "public key root",
+            "private key root",
+            "master key root",
+            "cloudkit",
+            "cloudd",
+            "trustd",
+            "securityd",
+            "syncdefaultsd",
+            "scopedbookmarkagent",
+            "containermanager",
+            "launchservices",
+            "nsurlcredentialstorage",
+            "securityagent",
+            "loginwindow",
+            "filevault",
+            "wifianalytics",
+            "wifi",
+            "802.1x",
+            "vtpm",
+            "parallels",
+            "vmware",
+            "virtualbox",
+            "xauth",
+            "vpn",
+            "wireguard",
+            "ipsec",
+            "ikev2",
+            "configurationprofiles",
+            "device enrollment",
+            "mdm",
+            "kerberos",
+            "token",
+            "certificate",
+            "idmsa.apple.com",
+            "identity.apple.com",
+            "gsa.apple.com",
+            "setup.icloud.com",
+            "albert.apple.com",
+            "smoot.apple.com",
+            "appleid.apple.com"
+        ]
+        for p in systemPatterns {
+            if combined.contains(p) { return true }
+        }
+
+        // 3. Reverse DNS bundle identifier format check (e.g. "ch.protonvpn.mac", "org.videolan.vlc")
+        // Internal app state storage, not user logins
+        if lowerService.contains(".") && !lowerService.contains(" ") && (
+            lowerService.hasPrefix("com.") || lowerService.hasPrefix("ch.") ||
+            lowerService.hasPrefix("org.") || lowerService.hasPrefix("net.") ||
+            lowerService.hasPrefix("io.") || lowerService.hasPrefix("de.") ||
+            lowerService.hasPrefix("fr.") || lowerService.hasPrefix("uk.")
+        ) {
+            return true
+        }
+
+        // 4. Hex strings, UUIDs, and curly-brace GUIDs in account or service
+        let uuidPattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+        if lowerAccount.range(of: uuidPattern, options: .regularExpression) != nil ||
+           lowerService.range(of: uuidPattern, options: .regularExpression) != nil {
+            return true
+        }
+        if (lowerAccount.contains("{") && lowerAccount.contains("}")) ||
+           (lowerService.contains("{") && lowerService.contains("}")) {
+            return true
+        }
+
+        // 5. MAC address pattern (e.g., AA:BB:CC:DD:EE:FF)
+        let macPattern = "([0-9a-f]{2}:){5}[0-9a-f]{2}"
+        if lowerAccount.range(of: macPattern, options: .regularExpression) != nil ||
+           lowerService.range(of: macPattern, options: .regularExpression) != nil {
+            return true
+        }
+
+        // 6. High entropy / raw crypto tokens without spaces (30+ characters without email @ or space)
+        if lowerAccount.count >= 30 && !lowerAccount.contains(" ") && !lowerAccount.contains("@") {
+            return true
+        }
+        if lowerService.count >= 30 && !lowerService.contains(" ") && !lowerService.contains("@") {
+            return true
+        }
+
+        // 7. Missing both account and server
+        if lowerAccount.isEmpty && lowerServer.isEmpty {
+            return true
+        }
+
+        return false
+    }
+
+    /// Imports all internet and genuine user logins directly from the macOS Keychain,
+    /// strictly filtering out developer registrations and system internal tokens.
     public func importFromKeychain() -> [VaultItem] {
         var importedItems: [VaultItem] = []
 
@@ -79,6 +225,11 @@ public final class KeychainManager: @unchecked Sendable {
                 let port = item[kSecAttrPort as String] as? Int ?? 0
                 let path = item[kSecAttrPath as String] as? String ?? ""
 
+                // Filter out developer registrations and system internal tokens
+                if Self.isSystemOrDeveloperItem(server: server, service: "", account: account, label: label) {
+                    continue
+                }
+
                 var urlStr = ""
                 if !server.isEmpty {
                     urlStr = "\(protocolType)://\(server)"
@@ -98,14 +249,14 @@ public final class KeychainManager: @unchecked Sendable {
                         password: nil,
                         urls: urlStr.isEmpty ? [] : [urlStr],
                         notes: "Discovered from macOS Keychain. Import via Passwords.csv for full plaintext password.",
-                        tags: ["Apple Keychain"]
+                        tags: ["Apple Keychain", "Imported"]
                     )
                     importedItems.append(vaultItem)
                 }
             }
         }
 
-        // 2. Query Generic Passwords (App logins, tokens)
+        // 2. Query Generic Passwords (User app logins)
         let genericQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
@@ -124,6 +275,11 @@ public final class KeychainManager: @unchecked Sendable {
                 let account = item[kSecAttrAccount as String] as? String ?? ""
                 let label = item[kSecAttrLabel as String] as? String ?? serviceName
 
+                // Filter out developer registrations and system internal tokens
+                if Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label) {
+                    continue
+                }
+
                 if !account.isEmpty || !serviceName.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
@@ -132,7 +288,7 @@ public final class KeychainManager: @unchecked Sendable {
                         password: nil,
                         urls: [],
                         notes: "Discovered from macOS Keychain Service: \(serviceName). Import via Passwords.csv for full plaintext password.",
-                        tags: ["Apple Keychain", "App Login"]
+                        tags: ["Apple Keychain", "App Login", "Imported"]
                     )
                     importedItems.append(vaultItem)
                 }
@@ -198,7 +354,8 @@ public final class KeychainManager: @unchecked Sendable {
         return status == errSecSuccess || status == errSecItemNotFound
     }
 
-    /// Scans the macOS Keychain and returns a summary of accessible passwords without modifying anything.
+    /// Scans the macOS Keychain and returns a summary of accessible passwords without modifying anything,
+    /// filtering out developer registrations and system internal tokens.
     public func scanKeychainSummary() -> KeychainScanPreview {
         var internetCount = 0
         var genericCount = 0
@@ -212,7 +369,12 @@ public final class KeychainManager: @unchecked Sendable {
         var internetResult: CFTypeRef?
         let internetStatus = SecItemCopyMatching(internetQuery as CFDictionary, &internetResult)
         if internetStatus == errSecSuccess, let items = internetResult as? [[String: Any]] {
-            internetCount = items.count
+            internetCount = items.filter { item in
+                let server = item[kSecAttrServer as String] as? String ?? ""
+                let account = item[kSecAttrAccount as String] as? String ?? ""
+                let label = item[kSecAttrLabel as String] as? String ?? server
+                return !Self.isSystemOrDeveloperItem(server: server, service: "", account: account, label: label)
+            }.count
         }
 
         // 2. Generic passwords count
@@ -224,7 +386,13 @@ public final class KeychainManager: @unchecked Sendable {
         var genericResult: CFTypeRef?
         let genericStatus = SecItemCopyMatching(genericQuery as CFDictionary, &genericResult)
         if genericStatus == errSecSuccess, let items = genericResult as? [[String: Any]] {
-            genericCount = items.filter { ($0[kSecAttrService as String] as? String) != self.service }.count
+            genericCount = items.filter { item in
+                let serviceName = item[kSecAttrService as String] as? String ?? ""
+                if serviceName == self.service { return false }
+                let account = item[kSecAttrAccount as String] as? String ?? ""
+                let label = item[kSecAttrLabel as String] as? String ?? serviceName
+                return !Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label)
+            }.count
         }
 
         let isAuth = internetStatus == errSecSuccess || genericStatus == errSecSuccess

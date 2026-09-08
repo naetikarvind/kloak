@@ -104,7 +104,19 @@ public final class VaultStore: ObservableObject {
         if seedSampleData {
             finalItems.append(contentsOf: Self.defaultSeedItems)
         }
-        for imported in importedItems {
+        for var imported in importedItems {
+            // Strictly exclude any developer registration or system internal item
+            if KeychainManager.isSystemOrDeveloperItem(
+                server: imported.urls.first ?? "",
+                service: imported.title,
+                account: imported.username ?? "",
+                label: imported.title
+            ) {
+                continue
+            }
+            if !imported.tags.contains("Imported") {
+                imported.tags.append("Imported")
+            }
             if !finalItems.contains(where: { $0.title == imported.title && $0.username == imported.username }) {
                 finalItems.append(imported)
             }
@@ -189,15 +201,28 @@ public final class VaultStore: ObservableObject {
                 return false
             }
 
-            // Success
+            // Success - sanitize items to purge any previously imported developer registrations or system items
+            let sanitizedItems = payload.items.filter { item in
+                !KeychainManager.isSystemOrDeveloperItem(
+                    server: item.urls.first ?? "",
+                    service: item.title,
+                    account: item.username ?? "",
+                    label: item.title
+                )
+            }
+
             self.vaultKey = unwrappedVaultKey
             self.sessionVaultKey = unwrappedVaultKey
             self.cachedHeader = header
-            self.items = payload.items
+            self.items = sanitizedItems
             self.folders = payload.folders
             self.settings = payload.settings
             self.isUnlocked = true
             self.lastError = nil
+
+            if sanitizedItems.count != payload.items.count {
+                self.saveVault()
+            }
 
             // Store in Keychain for biometric unlock across sessions
             let keyData = CryptoEngine.shared.keyToData(unwrappedVaultKey)
@@ -256,14 +281,27 @@ public final class VaultStore: ObservableObject {
 
                         let payload = try JSONDecoder().decode(VaultPayload.self, from: decryptedPayloadData)
 
+                        let sanitizedItems = payload.items.filter { item in
+                            !KeychainManager.isSystemOrDeveloperItem(
+                                server: item.urls.first ?? "",
+                                service: item.title,
+                                account: item.username ?? "",
+                                label: item.title
+                            )
+                        }
+
                         self.vaultKey = validKey
                         self.sessionVaultKey = validKey
                         self.cachedHeader = vaultFile.header
-                        self.items = payload.items
+                        self.items = sanitizedItems
                         self.folders = payload.folders
                         self.settings = payload.settings
                         self.isUnlocked = true
                         self.lastError = nil
+
+                        if sanitizedItems.count != payload.items.count {
+                            self.saveVault()
+                        }
 
                         self.startAutoLockTimer()
                         continuation.resume(returning: true)

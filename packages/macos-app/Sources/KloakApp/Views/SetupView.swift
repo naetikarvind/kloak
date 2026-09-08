@@ -924,7 +924,10 @@ public struct SetupView: View {
                 self.keychainScanResult = scan
                 if self.importKeychainLogins {
                     var existingKeys = Set(self.importedKeychainItems.map { "\($0.title)_\($0.username ?? "")" })
-                    for item in items {
+                    for var item in items {
+                        if !item.tags.contains("Imported") {
+                            item.tags.append("Imported")
+                        }
                         let key = "\(item.title)_\(item.username ?? "")"
                         if !existingKeys.contains(key) {
                             self.importedKeychainItems.append(item)
@@ -936,7 +939,9 @@ public struct SetupView: View {
                 if self.importedKeychainItems.count > 0 {
                     self.keychainFeedback = "Successfully staged \(self.importedKeychainItems.count) credential(s) ready for vault creation."
                 } else if scan.totalCount > 0 {
-                    self.keychainFeedback = "Scan complete. \(scan.totalCount) items found in macOS Keychain."
+                    self.keychainFeedback = "Scan complete. \(scan.totalCount) password(s) found in macOS Keychain."
+                } else {
+                    self.keychainFeedback = "No website logins found in local Keychain (system & developer tokens excluded)."
                 }
             }
         }

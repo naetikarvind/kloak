@@ -163,9 +163,12 @@ public struct ImportExportView: View {
     private func importDirectFromKeychain() {
         let keychainItems = KeychainManager.shared.importFromKeychain()
         if keychainItems.isEmpty {
-            keychainStatusText = "No credentials found in Keychain."
+            keychainStatusText = "No website or app logins found in Keychain (system & developer tokens excluded)."
         } else {
-            for item in keychainItems {
+            for var item in keychainItems {
+                if !item.tags.contains("Imported") {
+                    item.tags.append("Imported")
+                }
                 items.append(item)
                 onSaveItem?(item)
             }
