@@ -79,25 +79,6 @@ public final class KeychainManager: @unchecked Sendable {
                 let port = item[kSecAttrPort as String] as? Int ?? 0
                 let path = item[kSecAttrPath as String] as? String ?? ""
 
-                var password = ""
-                // Attempt to retrieve secret payload for this specific item without blocking UI
-                var singleQuery: [String: Any] = [
-                    kSecClass as String: kSecClassInternetPassword,
-                    kSecReturnData as String: true,
-                    kSecMatchLimit as String: kSecMatchLimitOne,
-                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
-                ]
-                if !server.isEmpty { singleQuery[kSecAttrServer as String] = server }
-                if !account.isEmpty { singleQuery[kSecAttrAccount as String] = account }
-                if port > 0 { singleQuery[kSecAttrPort as String] = port }
-                if !path.isEmpty { singleQuery[kSecAttrPath as String] = path }
-
-                var dataRef: CFTypeRef?
-                if SecItemCopyMatching(singleQuery as CFDictionary, &dataRef) == errSecSuccess,
-                   let pwdData = dataRef as? Data {
-                    password = String(data: pwdData, encoding: .utf8) ?? ""
-                }
-
                 var urlStr = ""
                 if !server.isEmpty {
                     urlStr = "\(protocolType)://\(server)"
@@ -109,14 +90,14 @@ public final class KeychainManager: @unchecked Sendable {
                     }
                 }
 
-                if !account.isEmpty || !password.isEmpty || !server.isEmpty {
+                if !account.isEmpty || !server.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
                         title: label.isEmpty ? (server.isEmpty ? "Keychain Login" : server) : label,
                         username: account.isEmpty ? nil : account,
-                        password: password.isEmpty ? nil : password,
+                        password: nil,
                         urls: urlStr.isEmpty ? [] : [urlStr],
-                        notes: password.isEmpty ? "Imported from macOS Apple Keychain" : "Imported directly from macOS Apple Keychain (Password Decrypted)",
+                        notes: "Discovered from macOS Keychain. Import via Passwords.csv for full plaintext password.",
                         tags: ["Apple Keychain"]
                     )
                     importedItems.append(vaultItem)
@@ -143,30 +124,14 @@ public final class KeychainManager: @unchecked Sendable {
                 let account = item[kSecAttrAccount as String] as? String ?? ""
                 let label = item[kSecAttrLabel as String] as? String ?? serviceName
 
-                var password = ""
-                var singleQuery: [String: Any] = [
-                    kSecClass as String: kSecClassGenericPassword,
-                    kSecAttrService as String: serviceName,
-                    kSecReturnData as String: true,
-                    kSecMatchLimit as String: kSecMatchLimitOne,
-                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
-                ]
-                if !account.isEmpty { singleQuery[kSecAttrAccount as String] = account }
-
-                var dataRef: CFTypeRef?
-                if SecItemCopyMatching(singleQuery as CFDictionary, &dataRef) == errSecSuccess,
-                   let pwdData = dataRef as? Data {
-                    password = String(data: pwdData, encoding: .utf8) ?? ""
-                }
-
-                if !account.isEmpty || !password.isEmpty || !serviceName.isEmpty {
+                if !account.isEmpty || !serviceName.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
                         title: label.isEmpty ? serviceName : label,
                         username: account.isEmpty ? nil : account,
-                        password: password.isEmpty ? nil : password,
+                        password: nil,
                         urls: [],
-                        notes: password.isEmpty ? "Imported from macOS Keychain Service: \(serviceName)" : "Imported from macOS Keychain Service: \(serviceName) (Password Decrypted)",
+                        notes: "Discovered from macOS Keychain Service: \(serviceName). Import via Passwords.csv for full plaintext password.",
                         tags: ["Apple Keychain", "App Login"]
                     )
                     importedItems.append(vaultItem)
