@@ -20,6 +20,7 @@ public struct SetupView: View {
     @State private var isScanningKeychain: Bool = false
     @State private var keychainScanResult: KeychainScanPreview? = nil
     @State private var importedKeychainItems: [VaultItem] = []
+    @State private var csvImportCount: Int = 0
     @State private var keychainPasswordInput: String = ""
     @State private var showKeychainPasswordInput: Bool = false
     @State private var importKeychainLogins: Bool = true
@@ -419,13 +420,13 @@ public struct SetupView: View {
                     .background(Color.white.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                    if !importedKeychainItems.isEmpty {
+                    if csvImportCount > 0 {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
                                 .font(.system(size: 12))
 
-                            Text("\(importedKeychainItems.count) credential(s) loaded from Passwords.csv")
+                            Text("\(csvImportCount) credential(s) loaded from Passwords.csv")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         }
@@ -496,6 +497,11 @@ public struct SetupView: View {
                         }
                     }
                     .toggleStyle(.checkbox)
+                    .onChange(of: importKeychainLogins) { isEnabled in
+                        if isEnabled && importedKeychainItems.isEmpty {
+                            handleScanKeychain()
+                        }
+                    }
 
                     Toggle(isOn: $enableKeychainSync) {
                         HStack(spacing: 6) {
@@ -517,6 +523,11 @@ public struct SetupView: View {
             }
             .padding(20)
             .glassEffect(cornerRadius: 16)
+            .onAppear {
+                if keychainScanResult == nil {
+                    handleScanKeychain()
+                }
+            }
 
             Spacer()
 
@@ -539,6 +550,10 @@ public struct SetupView: View {
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
 
                 Button("Continue") {
+                    if importKeychainLogins && importedKeychainItems.isEmpty {
+                        let items = KeychainManager.shared.importFromKeychain()
+                        importedKeychainItems = items
+                    }
                     withAnimation(.easeInOut(duration: 0.28)) {
                         currentStep = .vaultPassword
                     }
@@ -836,8 +851,9 @@ public struct SetupView: View {
                 HStack {
                     Label("Apple Keychain", systemImage: "key.horizontal.fill")
                     Spacer()
-                    Text("\(importedKeychainItems.count) items ready to import")
-                        .foregroundColor(importedKeychainItems.isEmpty ? .secondary : LiquidGlassTheme.emeraldAccent)
+                    let count = importKeychainLogins ? importedKeychainItems.count : 0
+                    Text("\(count) items ready to import")
+                        .foregroundColor(count > 0 ? LiquidGlassTheme.emeraldAccent : .secondary)
                 }
                 .font(.system(size: 12))
 
@@ -906,11 +922,20 @@ public struct SetupView: View {
 
             await MainActor.run {
                 self.keychainScanResult = scan
-                self.importedKeychainItems = items
+                if self.importKeychainLogins {
+                    var existingKeys = Set(self.importedKeychainItems.map { "\($0.title)_\($0.username ?? "")" })
+                    for item in items {
+                        let key = "\(item.title)_\(item.username ?? "")"
+                        if !existingKeys.contains(key) {
+                            self.importedKeychainItems.append(item)
+                            existingKeys.insert(key)
+                        }
+                    }
+                }
                 self.isScanningKeychain = false
-                if items.count > 0 {
-                    self.keychainFeedback = "Successfully authorized and ready to import \(items.count) keychain items."
-                } else {
+                if self.importedKeychainItems.count > 0 {
+                    self.keychainFeedback = "Successfully staged \(self.importedKeychainItems.count) credential(s) ready for vault creation."
+                } else if scan.totalCount > 0 {
                     self.keychainFeedback = "Scan complete. \(scan.totalCount) items found in macOS Keychain."
                 }
             }
@@ -939,10 +964,22 @@ public struct SetupView: View {
                             importedKeychainItems.append(item)
                             existingKeys.insert(key)
                             addedCount += 1
+                        } else if let idx = importedKeychainItems.firstIndex(where: { "\($0.title)_\($0.username ?? "")" == key }) {
+                            if let newPass = item.password, !newPass.isEmpty {
+                                importedKeychainItems[idx].password = newPass
+                            }
+                            if let newTotp = item.totpSecret, !newTotp.isEmpty {
+                                importedKeychainItems[idx].totpSecret = newTotp
+                            }
+                            if !item.urls.isEmpty {
+                                importedKeychainItems[idx].urls = item.urls
+                            }
+                            addedCount += 1
                         }
                     }
+                    csvImportCount = items.count
                     importKeychainLogins = true
-                    keychainFeedback = "Successfully imported \(items.count) password(s) (\(addedCount) new) from \(url.lastPathComponent)!"
+                    keychainFeedback = "Successfully imported \(items.count) password(s) from \(url.lastPathComponent) (Total staged: \(importedKeychainItems.count))!"
                 } else {
                     keychainFeedback = "No passwords found in \(url.lastPathComponent). Please ensure it is an exported CSV from Apple Passwords or Safari."
                 }
@@ -978,7 +1015,11 @@ public struct SetupView: View {
         errorMessage = nil
 
         let activeConnections = [googleConnection, protonConnection, microsoftConnection].filter { $0.isConnected }
-        let itemsToImport = importKeychainLogins ? importedKeychainItems : []
+        var itemsToImport = importKeychainLogins ? importedKeychainItems : []
+        if importKeychainLogins && itemsToImport.isEmpty {
+            itemsToImport = KeychainManager.shared.importFromKeychain()
+            importedKeychainItems = itemsToImport
+        }
 
         Task {
             do {

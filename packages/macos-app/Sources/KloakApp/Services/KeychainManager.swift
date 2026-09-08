@@ -64,7 +64,6 @@ public final class KeychainManager: @unchecked Sendable {
         let internetQuery: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecReturnAttributes as String: true,
-            kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitAll
         ]
 
@@ -78,9 +77,24 @@ public final class KeychainManager: @unchecked Sendable {
                 let label = item[kSecAttrLabel as String] as? String ?? server
                 let protocolType = item[kSecAttrProtocol as String] as? String ?? "https"
                 let port = item[kSecAttrPort as String] as? Int ?? 0
+                let path = item[kSecAttrPath as String] as? String ?? ""
 
                 var password = ""
-                if let pwdData = item[kSecValueData as String] as? Data {
+                // Attempt to retrieve secret payload for this specific item without blocking UI
+                var singleQuery: [String: Any] = [
+                    kSecClass as String: kSecClassInternetPassword,
+                    kSecReturnData as String: true,
+                    kSecMatchLimit as String: kSecMatchLimitOne,
+                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
+                ]
+                if !server.isEmpty { singleQuery[kSecAttrServer as String] = server }
+                if !account.isEmpty { singleQuery[kSecAttrAccount as String] = account }
+                if port > 0 { singleQuery[kSecAttrPort as String] = port }
+                if !path.isEmpty { singleQuery[kSecAttrPath as String] = path }
+
+                var dataRef: CFTypeRef?
+                if SecItemCopyMatching(singleQuery as CFDictionary, &dataRef) == errSecSuccess,
+                   let pwdData = dataRef as? Data {
                     password = String(data: pwdData, encoding: .utf8) ?? ""
                 }
 
@@ -90,16 +104,19 @@ public final class KeychainManager: @unchecked Sendable {
                     if port > 0 && port != 80 && port != 443 {
                         urlStr += ":\(port)"
                     }
+                    if !path.isEmpty && path != "/" {
+                        urlStr += path.hasPrefix("/") ? path : "/\(path)"
+                    }
                 }
 
                 if !account.isEmpty || !password.isEmpty || !server.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
-                        title: label.isEmpty ? (server.isEmpty ? "Keychain Item" : server) : label,
+                        title: label.isEmpty ? (server.isEmpty ? "Keychain Login" : server) : label,
                         username: account.isEmpty ? nil : account,
                         password: password.isEmpty ? nil : password,
                         urls: urlStr.isEmpty ? [] : [urlStr],
-                        notes: "Imported directly from macOS Apple Keychain",
+                        notes: password.isEmpty ? "Imported from macOS Apple Keychain" : "Imported directly from macOS Apple Keychain (Password Decrypted)",
                         tags: ["Apple Keychain"]
                     )
                     importedItems.append(vaultItem)
@@ -111,7 +128,6 @@ public final class KeychainManager: @unchecked Sendable {
         let genericQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
-            kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitAll
         ]
 
@@ -128,7 +144,18 @@ public final class KeychainManager: @unchecked Sendable {
                 let label = item[kSecAttrLabel as String] as? String ?? serviceName
 
                 var password = ""
-                if let pwdData = item[kSecValueData as String] as? Data {
+                var singleQuery: [String: Any] = [
+                    kSecClass as String: kSecClassGenericPassword,
+                    kSecAttrService as String: serviceName,
+                    kSecReturnData as String: true,
+                    kSecMatchLimit as String: kSecMatchLimitOne,
+                    kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail
+                ]
+                if !account.isEmpty { singleQuery[kSecAttrAccount as String] = account }
+
+                var dataRef: CFTypeRef?
+                if SecItemCopyMatching(singleQuery as CFDictionary, &dataRef) == errSecSuccess,
+                   let pwdData = dataRef as? Data {
                     password = String(data: pwdData, encoding: .utf8) ?? ""
                 }
 
@@ -139,7 +166,7 @@ public final class KeychainManager: @unchecked Sendable {
                         username: account.isEmpty ? nil : account,
                         password: password.isEmpty ? nil : password,
                         urls: [],
-                        notes: "Imported from macOS Keychain Service: \(serviceName)",
+                        notes: password.isEmpty ? "Imported from macOS Keychain Service: \(serviceName)" : "Imported from macOS Keychain Service: \(serviceName) (Password Decrypted)",
                         tags: ["Apple Keychain", "App Login"]
                     )
                     importedItems.append(vaultItem)
@@ -403,15 +430,29 @@ public final class KeychainManager: @unchecked Sendable {
         var fields: [String] = []
         var current = ""
         var inQuotes = false
+        let chars = Array(row)
+        var idx = 0
 
-        for ch in row {
+        while idx < chars.count {
+            let ch = chars[idx]
             if ch == "\"" {
-                inQuotes.toggle()
+                if inQuotes && idx + 1 < chars.count && chars[idx + 1] == "\"" {
+                    current.append("\"")
+                    idx += 2
+                    continue
+                } else {
+                    inQuotes.toggle()
+                    idx += 1
+                    continue
+                }
             } else if ch == "," && !inQuotes {
                 fields.append(current)
                 current = ""
+                idx += 1
+                continue
             } else {
                 current.append(ch)
+                idx += 1
             }
         }
         fields.append(current)
