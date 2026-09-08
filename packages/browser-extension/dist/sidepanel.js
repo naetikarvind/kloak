@@ -3,16 +3,19 @@
   // src/sidepanel.ts
   document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.getElementById("side-search");
-    searchInput?.addEventListener("input", async () => {
-      const query = searchInput.value;
+    const container = document.getElementById("side-items");
+    const loadItems = async (query = "") => {
+      if (!container) return;
       const res = await chrome.runtime.sendMessage({
         type: "SEARCH_VAULT",
         query
       });
-      const container = document.getElementById("side-items");
-      if (!container) return;
       const items = res?.items || [];
       container.innerHTML = "";
+      if (items.length === 0) {
+        container.innerHTML = '<div style="color: #64748b; font-size: 13px; text-align: center; padding: 24px 0;">No passwords found</div>';
+        return;
+      }
       items.forEach((item) => {
         const card = document.createElement("div");
         card.className = "item-card";
@@ -22,6 +25,10 @@
       `;
         container.appendChild(card);
       });
+    };
+    loadItems("");
+    searchInput?.addEventListener("input", () => {
+      loadItems(searchInput.value);
     });
   });
 })();

@@ -33,7 +33,7 @@ public struct SetupView: View {
     @State private var selectedProviderForSheet: CloudProvider? = nil
 
     // Step 4: Integrations & Completion
-    @State private var seedSampleData: Bool = true
+    @State private var seedSampleData: Bool = false
     @State private var isProcessing: Bool = false
     @State private var errorMessage: String? = nil
 
@@ -757,26 +757,6 @@ public struct SetupView: View {
                 .padding(12)
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                // Starter Data Toggle
-                Toggle(isOn: $seedSampleData) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14))
-                            .foregroundColor(LiquidGlassTheme.amberAccent)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Include sample curated items & logos")
-                                .font(.system(size: 12, weight: .medium))
-                            Text("Adds starter templates for logins, payment cards, and secure notes")
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .toggleStyle(.checkbox)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
             }
             .padding(18)
             .glassEffect(cornerRadius: 16)

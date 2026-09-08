@@ -5,8 +5,8 @@ const NATIVE_HOST = 'app.kloak.native';
 let cachedItems: any[] = [];
 let isVaultUnlocked: boolean = false;
 let connectedAccount: { provider: string; email: string; customForwardingEmail?: string } = {
-  provider: 'google',
-  email: 'naetik.arvind@gmail.com'
+  provider: '',
+  email: ''
 };
 
 const aiSecurityCache = new Map<string, AIThreatEvaluation>();
@@ -14,33 +14,8 @@ const aiSecurityCache = new Map<string, AIThreatEvaluation>();
 let lastActiveTabId: number | null = null;
 let lastActiveUrl: string | null = null;
 
-// Fallback demo vault items
-const FALLBACK_ITEMS = [
-  {
-    id: 'demo-1',
-    title: 'GitHub',
-    username: 'alex.dev@github.com',
-    password: 'ghp_KloakSecurePassword982!',
-    urls: ['https://github.com', 'https://gist.github.com'],
-    totpSecret: 'JBSWY3DPEHPK3PXP'
-  },
-  {
-    id: 'demo-2',
-    title: 'Google Account',
-    username: 'alex.engineer@gmail.com',
-    password: 'KloakGoogleEncryptedKey#99',
-    urls: ['https://accounts.google.com', 'https://google.com'],
-    totpSecret: 'HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ'
-  },
-  {
-    id: 'demo-3',
-    title: 'ProtonMail',
-    username: 'security@proton.me',
-    password: 'Kloak-Proton-Encrypted#42',
-    urls: ['https://mail.proton.me', 'https://account.proton.me'],
-    totpSecret: 'JBSWY3DPEHPK3PXP'
-  }
-];
+// Fallback vault items (deactivated test passwords)
+const FALLBACK_ITEMS: any[] = [];
 
 let rpcIdCounter = 1;
 
@@ -250,9 +225,8 @@ async function updateBadgeForTab(tabId: number, urlStr: string) {
       matches = strictMatch(nativeMatches, urlStr);
     } 
     if (matches.length === 0) {
-      // 2. Query in-memory cached/fallback items
-      const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-      matches = strictMatch(pool, urlStr);
+      // 2. Query in-memory cached items
+      matches = strictMatch(cachedItems, urlStr);
     }
 
     if (matches.length > 0) {
@@ -304,8 +278,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         targetDomain = targetDomain || 'untrusted-site';
 
         const aliasEmail = generateMaskedAlias(targetDomain);
-        const forwardTo = connectedAccount.customForwardingEmail || connectedAccount.email || 'naetik.arvind@gmail.com';
-        const provider = (connectedAccount.provider || 'google').toUpperCase();
+        const forwardTo = connectedAccount.customForwardingEmail || connectedAccount.email || 'shield@kloak.app';
+        const provider = (connectedAccount.provider || 'Kloak').toUpperCase();
 
         const newItem = {
           id: `alias-${Date.now()}`,
@@ -329,8 +303,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           await sendNativeRequest('vault.addItem', { item: newItem });
         }
 
-        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-        pool.push(newItem);
+        cachedItems.push(newItem);
 
         sendResponse({
           success: true,
@@ -400,8 +373,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           
           if (matches.length === 0) {
-            const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-            matches = strictMatch(pool, urlStr);
+            matches = strictMatch(cachedItems, urlStr);
           }
 
           sendResponse({ success: true, isUnlocked: isVaultUnlocked, items: matches });
@@ -484,8 +456,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         // 2. Fallback search
-        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-        const results = pool.filter(item =>
+        const results = cachedItems.filter(item =>
           item.title.toLowerCase().includes(q) ||
           (item.username && item.username.toLowerCase().includes(q)) ||
           item.urls.some((u: string) => u.toLowerCase().includes(q))
@@ -499,7 +470,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           success: true,
           isUnlocked: isVaultUnlocked,
-          itemCount: cachedItems.length > 0 ? cachedItems.length : FALLBACK_ITEMS.length
+          itemCount: cachedItems.length
         });
         break;
       }
@@ -519,10 +490,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       case 'UPDATE_ITEM': {
         const { item } = message;
         await sendNativeRequest('vault.updateItem', { item });
-        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-        const index = pool.findIndex(i => i.id === item.id);
+        const index = cachedItems.findIndex(i => i.id === item.id);
         if (index !== -1) {
-          pool[index] = { ...pool[index], ...item };
+          cachedItems[index] = { ...cachedItems[index], ...item };
         }
         sendResponse({ success: true });
         break;
@@ -532,8 +502,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const { item } = message;
         item.id = `new-${Date.now()}`;
         await sendNativeRequest('vault.addItem', { item });
-        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-        pool.push(item);
+        cachedItems.push(item);
         sendResponse({ success: true, item });
         break;
       }
@@ -549,9 +518,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const domain = url.hostname.toLowerCase().replace('www.', '');
 
           await refreshVaultState();
-          const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-
-          const matched = strictMatch(pool, urlStr);
+          const matched = strictMatch(cachedItems, urlStr);
 
           if (matched.length === 0) {
             sendResponse({ action: 'save_new', domain, username, password });

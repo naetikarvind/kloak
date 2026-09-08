@@ -889,38 +889,12 @@
   var cachedItems = [];
   var isVaultUnlocked = false;
   var connectedAccount = {
-    provider: "google",
-    email: "naetik.arvind@gmail.com"
+    provider: "",
+    email: ""
   };
   var aiSecurityCache = /* @__PURE__ */ new Map();
   var lastActiveTabId = null;
   var lastActiveUrl = null;
-  var FALLBACK_ITEMS = [
-    {
-      id: "demo-1",
-      title: "GitHub",
-      username: "alex.dev@github.com",
-      password: "ghp_KloakSecurePassword982!",
-      urls: ["https://github.com", "https://gist.github.com"],
-      totpSecret: "JBSWY3DPEHPK3PXP"
-    },
-    {
-      id: "demo-2",
-      title: "Google Account",
-      username: "alex.engineer@gmail.com",
-      password: "KloakGoogleEncryptedKey#99",
-      urls: ["https://accounts.google.com", "https://google.com"],
-      totpSecret: "HXDMVJECJJWSRB3HWIZR4IFUGFTMXBOZ"
-    },
-    {
-      id: "demo-3",
-      title: "ProtonMail",
-      username: "security@proton.me",
-      password: "Kloak-Proton-Encrypted#42",
-      urls: ["https://mail.proton.me", "https://account.proton.me"],
-      totpSecret: "JBSWY3DPEHPK3PXP"
-    }
-  ];
   var rpcIdCounter = 1;
   function getRegistrableDomain(urlStr) {
     try {
@@ -1090,8 +1064,7 @@
         matches = strictMatch(nativeMatches, urlStr);
       }
       if (matches.length === 0) {
-        const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-        matches = strictMatch(pool, urlStr);
+        matches = strictMatch(cachedItems, urlStr);
       }
       if (matches.length > 0) {
         await chrome.action.setBadgeText({ tabId, text: String(matches.length) });
@@ -1138,8 +1111,8 @@
           }
           targetDomain = targetDomain || "untrusted-site";
           const aliasEmail = generateMaskedAlias(targetDomain);
-          const forwardTo = connectedAccount.customForwardingEmail || connectedAccount.email || "naetik.arvind@gmail.com";
-          const provider = (connectedAccount.provider || "google").toUpperCase();
+          const forwardTo = connectedAccount.customForwardingEmail || connectedAccount.email || "shield@kloak.app";
+          const provider = (connectedAccount.provider || "Kloak").toUpperCase();
           const newItem = {
             id: `alias-${Date.now()}`,
             type: "email_alias",
@@ -1159,8 +1132,7 @@
           } catch {
             await sendNativeRequest("vault.addItem", { item: newItem });
           }
-          const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-          pool.push(newItem);
+          cachedItems.push(newItem);
           sendResponse({
             success: true,
             aliasEmail,
@@ -1225,8 +1197,7 @@
               }
             }
             if (matches.length === 0) {
-              const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-              matches = strictMatch(pool, urlStr);
+              matches = strictMatch(cachedItems, urlStr);
             }
             sendResponse({ success: true, isUnlocked: isVaultUnlocked, items: matches });
           } catch {
@@ -1294,8 +1265,7 @@
             sendResponse({ success: true, isUnlocked: true, items: filtered });
             return;
           }
-          const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-          const results = pool.filter(
+          const results = cachedItems.filter(
             (item) => item.title.toLowerCase().includes(q) || item.username && item.username.toLowerCase().includes(q) || item.urls.some((u) => u.toLowerCase().includes(q))
           );
           sendResponse({ success: true, isUnlocked: true, items: results });
@@ -1306,7 +1276,7 @@
           sendResponse({
             success: true,
             isUnlocked: isVaultUnlocked,
-            itemCount: cachedItems.length > 0 ? cachedItems.length : FALLBACK_ITEMS.length
+            itemCount: cachedItems.length
           });
           break;
         }
@@ -1324,10 +1294,9 @@
         case "UPDATE_ITEM": {
           const { item } = message;
           await sendNativeRequest("vault.updateItem", { item });
-          const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-          const index = pool.findIndex((i) => i.id === item.id);
+          const index = cachedItems.findIndex((i) => i.id === item.id);
           if (index !== -1) {
-            pool[index] = { ...pool[index], ...item };
+            cachedItems[index] = { ...cachedItems[index], ...item };
           }
           sendResponse({ success: true });
           break;
@@ -1336,8 +1305,7 @@
           const { item } = message;
           item.id = `new-${Date.now()}`;
           await sendNativeRequest("vault.addItem", { item });
-          const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-          pool.push(item);
+          cachedItems.push(item);
           sendResponse({ success: true, item });
           break;
         }
@@ -1351,8 +1319,7 @@
             const url = new URL(urlStr);
             const domain = url.hostname.toLowerCase().replace("www.", "");
             await refreshVaultState();
-            const pool = cachedItems.length > 0 ? cachedItems : FALLBACK_ITEMS;
-            const matched = strictMatch(pool, urlStr);
+            const matched = strictMatch(cachedItems, urlStr);
             if (matched.length === 0) {
               sendResponse({ action: "save_new", domain, username, password });
             } else {
