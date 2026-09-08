@@ -261,29 +261,110 @@ public final class KeychainManager: @unchecked Sendable {
         return syncedCount
     }
 
-    // MARK: - Apple Passwords CSV Importer
+    // MARK: - Cross-Platform Passwords & Vault Importers (Apple, Google, Microsoft, Proton)
 
     public func importFromApplePasswordsCSV(_ content: String) -> [VaultItem] {
+        return importFromProviderContent(content, provider: nil)
+    }
+
+    public func importFromProviderContent(_ content: String, provider: CloudProvider?) -> [VaultItem] {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return [] }
+
+        // 1. Try JSON formats (Proton Pass JSON, Bitwarden JSON, Kloak JSON)
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            if let data = trimmed.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // Check for Bitwarden / Kloak items array
+                if let jsonItems = (json["items"] as? [[String: Any]]) ?? (json["vaults"] as? [[String: Any]]) {
+                    var results: [VaultItem] = []
+                    for entry in jsonItems {
+                        let name = (entry["name"] as? String) ?? (entry["title"] as? String) ?? ""
+                        var username = entry["username"] as? String ?? ""
+                        var password = entry["password"] as? String ?? ""
+                        var urls: [String] = []
+                        var totp: String? = entry["totp"] as? String ?? entry["totpSecret"] as? String
+                        let notes = (entry["notes"] as? String) ?? (entry["description"] as? String)
+
+                        if let login = entry["login"] as? [String: Any] {
+                            username = login["username"] as? String ?? username
+                            password = login["password"] as? String ?? password
+                            totp = login["totp"] as? String ?? totp
+                            if let uriList = login["uris"] as? [[String: Any]] {
+                                urls = uriList.compactMap { $0["uri"] as? String }
+                            }
+                        }
+                        if let singleUrl = entry["url"] as? String, !singleUrl.isEmpty {
+                            urls.append(singleUrl)
+                        }
+
+                        let itemType: ItemType
+                        if let typeStr = entry["type"] as? String {
+                            itemType = typeStr == "note" || typeStr == "secureNote" ? .secureNote :
+                                       typeStr == "card" ? .card :
+                                       typeStr == "alias" ? .emailAlias : .login
+                        } else if let typeNum = entry["type"] as? Int {
+                            itemType = typeNum == 2 ? .secureNote : typeNum == 3 ? .card : .login
+                        } else {
+                            itemType = .login
+                        }
+
+                        let tagList: [String]
+                        if let p = provider {
+                            tagList = [p.displayName, "\(p.displayName) Passwords"]
+                        } else {
+                            tagList = ["Apple Keychain", "iCloud Passwords"]
+                        }
+
+                        results.append(VaultItem(
+                            type: itemType,
+                            title: name.isEmpty ? "Imported Credential" : name,
+                            username: username.isEmpty ? nil : username,
+                            password: password.isEmpty ? nil : password,
+                            urls: urls,
+                            notes: notes,
+                            totpSecret: totp,
+                            tags: tagList
+                        ))
+                    }
+                    if !results.isEmpty { return results }
+                }
+            }
+        }
+
+        // 2. CSV parsing for Apple Passwords, Google Passwords, Microsoft Edge, Proton Pass
         var results: [VaultItem] = []
-        let lines = content.components(separatedBy: .newlines)
+        let lines = trimmed.components(separatedBy: .newlines)
         guard lines.count > 1 else { return results }
 
         let headers = parseCSVRow(lines[0])
         let headerLower = headers.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }
 
-        let titleIdx = headerLower.firstIndex(where: { ["title", "name", "entry"].contains($0) })
-        let urlIdx = headerLower.firstIndex(where: { ["url", "website", "domain", "uri"].contains($0) })
-        let userIdx = headerLower.firstIndex(where: { ["username", "user name", "email", "account"].contains($0) })
-        let passIdx = headerLower.firstIndex(where: { ["password", "pass"].contains($0) })
-        let notesIdx = headerLower.firstIndex(where: { ["notes", "note", "comments"].contains($0) })
-        let totpIdx = headerLower.firstIndex(where: { ["otpauth", "totp", "otp", "otpsecret"].contains($0) })
+        let titleIdx = headerLower.firstIndex(where: { ["title", "name", "entry", "item_name"].contains($0) })
+        let urlIdx = headerLower.firstIndex(where: { ["url", "website", "domain", "uri", "login_uri", "website_url"].contains($0) })
+        let userIdx = headerLower.firstIndex(where: { ["username", "user name", "email", "account", "login_username"].contains($0) })
+        let passIdx = headerLower.firstIndex(where: { ["password", "pass", "login_password"].contains($0) })
+        let notesIdx = headerLower.firstIndex(where: { ["notes", "note", "comments", "description", "extra"].contains($0) })
+        let totpIdx = headerLower.firstIndex(where: { ["otpauth", "totp", "otp", "otpsecret", "login_totp"].contains($0) })
+
+        let defaultTags: [String] = {
+            if let p = provider {
+                switch p {
+                case .google: return ["Google", "Chrome Passwords"]
+                case .microsoft: return ["Microsoft", "Edge Passwords"]
+                case .proton: return ["Proton", "Proton Pass"]
+                }
+            }
+            return ["Apple Keychain", "iCloud Passwords"]
+        }()
 
         for i in 1..<lines.count {
             let line = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
             if line.isEmpty { continue }
 
             let cols = parseCSVRow(line)
-            let title = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? "iCloud Login"
+            let fallbackName = provider != nil ? "\(provider!.displayName) Login" : "iCloud Login"
+            let title = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? fallbackName
             let url = safeCol(cols, urlIdx)
             let user = safeCol(cols, userIdx)
             let pass = safeCol(cols, passIdx)
@@ -308,9 +389,9 @@ public final class KeychainManager: @unchecked Sendable {
                     username: user,
                     password: pass,
                     urls: url != nil && !url!.isEmpty ? [url!] : [],
-                    notes: note ?? "Imported from Apple Passwords",
+                    notes: note ?? (provider != nil ? "Imported from \(provider!.displayName)" : "Imported from Apple Passwords"),
                     totpSecret: totpSecret,
-                    tags: ["Apple Keychain", "iCloud Passwords"]
+                    tags: defaultTags
                 ))
             }
         }

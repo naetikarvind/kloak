@@ -84,8 +84,22 @@ public struct SetupView: View {
                 OnboardingAccountConnectSheet(
                     provider: provider,
                     connection: binding(for: provider),
-                    onSave: { updated in
-                        updateConnection(provider: provider, with: updated)
+                    onSave: { updatedConn, newItems in
+                        updateConnection(provider: provider, with: updatedConn)
+                        if !newItems.isEmpty {
+                            var existingKeys = Set(importedKeychainItems.map { "\($0.title)_\($0.username ?? "")" })
+                            var addedCount = 0
+                            for item in newItems {
+                                let key = "\(item.title)_\(item.username ?? "")"
+                                if !existingKeys.contains(key) {
+                                    importedKeychainItems.append(item)
+                                    existingKeys.insert(key)
+                                    addedCount += 1
+                                }
+                            }
+                            importKeychainLogins = true
+                            keychainFeedback = "Successfully staged \(importedKeychainItems.count) credential(s) (\(addedCount) from \(provider.displayName)) for vault creation."
+                        }
                         selectedProviderForSheet = nil
                     },
                     onCancel: {
@@ -624,6 +638,19 @@ public struct SetupView: View {
 
                 // Feature pills
                 HStack(spacing: 4) {
+                    if conn.importedCount > 0 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "checkmark")
+                            Text("\(conn.importedCount) Logins")
+                        }
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                        .clipShape(Capsule())
+                    }
+
                     ForEach(provider.featureBadges, id: \.self) { badge in
                         Text(badge)
                             .font(.system(size: 9, weight: .medium))

@@ -133,6 +133,7 @@ public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable, Cod
     public var syncLogins: Bool
     public var syncAliases: Bool
     public var enableThreatShield: Bool
+    public var importedCount: Int
 
     public init(
         provider: CloudProvider,
@@ -148,7 +149,8 @@ public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable, Cod
         authMethod: AuthMethod = .oauth,
         syncLogins: Bool = true,
         syncAliases: Bool = true,
-        enableThreatShield: Bool = true
+        enableThreatShield: Bool = true,
+        importedCount: Int = 0
     ) {
         self.provider = provider
         self.isConnected = isConnected
@@ -164,6 +166,7 @@ public struct OnboardingAccountConnection: Identifiable, Hashable, Sendable, Cod
         self.syncLogins = syncLogins
         self.syncAliases = syncAliases
         self.enableThreatShield = enableThreatShield
+        self.importedCount = importedCount
     }
 }
 
