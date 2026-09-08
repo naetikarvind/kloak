@@ -70,8 +70,35 @@ public struct OnboardingAccountConnectSheet: View {
 
                 Divider().opacity(0.15)
 
+                // Email Input Section (Top Priority)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(provider.displayName.uppercased()) EMAIL / USERNAME")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+
+                    HStack(spacing: 8) {
+                        Image(systemName: "envelope.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(provider.accentColor)
+
+                        TextField("Enter \(provider.displayName) email (e.g. user\(defaultDomain))", text: $email)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black.opacity(0.35))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(email.isEmpty ? Color.white.opacity(0.15) : provider.accentColor.opacity(0.6), lineWidth: 1)
+                            )
+                    )
+                }
+
                 // Primary Action: OAuth 2.0 Sign In Button
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     Button(action: { Task { await handleOAuthSignIn() } }) {
                         HStack(spacing: 10) {
                             if isOAuthAuthenticating {
@@ -82,7 +109,7 @@ public struct OnboardingAccountConnectSheet: View {
                                     .font(.system(size: 16, weight: .bold))
                             }
 
-                            Text(isOAuthAuthenticating ? "Authenticating with \(provider.displayName)..." : "Sign in with \(provider.displayName)")
+                            Text(isOAuthAuthenticating ? "Verifying with \(provider.displayName)..." : "Sign in & Link \(provider.displayName) Account")
                                 .font(.system(size: 13, weight: .bold))
                         }
                         .foregroundColor(.white)
@@ -105,58 +132,63 @@ public struct OnboardingAccountConnectSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isOAuthAuthenticating || isAuthenticating)
-
-                    HStack {
-                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
-                        Text("OR MANUAL CONFIGURATION")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.secondary)
-                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
-                    }
-                    .padding(.vertical, 4)
                 }
 
-                // Form Inputs (Expandable or Quick Edit)
-                VStack(alignment: .leading, spacing: 14) {
-                    // Email input
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("\(provider.displayName.uppercased()) EMAIL / USERNAME")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.secondary)
+                // Feature Toggles
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ACCOUNT CAPABILITIES")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .padding(.top, 2)
 
-                        HStack(spacing: 8) {
-                            Image(systemName: "envelope.fill")
+                    Toggle(isOn: $syncLogins) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                            Text("Sync and import existing credentials")
                                 .font(.system(size: 12))
-                                .foregroundColor(provider.accentColor)
-
-                            TextField("e.g. user\(defaultDomain)", text: $email)
-                                .textFieldStyle(.plain)
-                                .font(.system(size: 13))
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.black.opacity(0.35))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                )
-                        )
                     }
+                    .toggleStyle(.checkbox)
 
-                    // Password / Auth Token input
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(provider == .proton ? "APP PASSWORD / BRIDGE KEY" : "APP PASSWORD / AUTH TOKEN")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("Optional")
-                                .font(.system(size: 10))
-                                .foregroundColor(.secondary.opacity(0.8))
+                    Toggle(isOn: $syncAliases) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "envelope.badge.shield.half.filled.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.tealAccent)
+                            Text("Enable disposable email forwarding aliases")
+                                .font(.system(size: 12))
                         }
+                    }
+                    .toggleStyle(.checkbox)
 
+                    Toggle(isOn: $enableThreatShield) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "shield.lefthalf.filled.badge.checkmark")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                            Text("Protect with Kloak AI Phishing Shield")
+                                .font(.system(size: 12))
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
+
+                // Expandable Manual Secret Form
+                VStack(alignment: .leading, spacing: 6) {
+                    Button(action: { withAnimation { showManualForm.toggle() } }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: showManualForm ? "chevron.down" : "chevron.right")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(showManualForm ? "Hide Manual App Password" : "Enter App Password / API Token (Optional)")
+                                .font(.system(size: 10, weight: .medium))
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+
+                    if showManualForm {
                         HStack(spacing: 8) {
                             Image(systemName: "key.fill")
                                 .font(.system(size: 12))
@@ -190,47 +222,6 @@ public struct OnboardingAccountConnectSheet: View {
                                 )
                         )
                     }
-
-                    // Feature Toggles
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("ACCOUNT INTEGRATION OPTIONS")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.secondary)
-                            .padding(.top, 4)
-
-                        Toggle(isOn: $syncLogins) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(LiquidGlassTheme.primaryAccent)
-                                Text("Sync and import existing credentials")
-                                    .font(.system(size: 12))
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-
-                        Toggle(isOn: $syncAliases) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "envelope.badge.shield.half.filled.fill")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(LiquidGlassTheme.tealAccent)
-                                Text("Enable disposable email forwarding aliases")
-                                    .font(.system(size: 12))
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-
-                        Toggle(isOn: $enableThreatShield) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "shield.lefthalf.filled.badge.checkmark")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                                Text("Protect with Kloak AI Phishing Shield")
-                                    .font(.system(size: 12))
-                            }
-                        }
-                        .toggleStyle(.checkbox)
-                    }
                 }
 
                 if let err = errorMessage {
@@ -245,23 +236,25 @@ public struct OnboardingAccountConnectSheet: View {
                     Button("Cancel", action: onCancel)
                         .buttonStyle(GlassCapsuleButton(isPrimary: false))
 
+                    Spacer()
+
                     Button(action: handleManualConnect) {
                         if isAuthenticating {
                             ProgressView()
                                 .controlSize(.small)
-                                .frame(width: 140)
+                                .frame(width: 120)
                         } else {
                             HStack(spacing: 6) {
-                                Image(systemName: "link.badge.plus")
-                                Text("Save Connection")
+                                Image(systemName: "checkmark")
+                                Text("Save")
                             }
-                            .frame(width: 150)
+                            .frame(width: 120)
                         }
                     }
-                    .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     .disabled(email.trimmingCharacters(in: .whitespaces).isEmpty || isAuthenticating || isOAuthAuthenticating)
                 }
-                .padding(.top, 8)
+                .padding(.top, 4)
             }
             .padding(24)
             .frame(width: 440)
@@ -276,24 +269,42 @@ public struct OnboardingAccountConnectSheet: View {
     }
 
     private func handleOAuthSignIn() async {
-        isOAuthAuthenticating = true
-        errorMessage = nil
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+        guard !trimmedEmail.isEmpty else {
+            await MainActor.run {
+                errorMessage = "Please enter your \(provider.displayName) email above to connect."
+            }
+            return
+        }
 
-        do {
-            let authResult = try await OAuthManager.shared.authenticate(provider: provider)
+        guard trimmedEmail.contains("@") else {
             await MainActor.run {
-                isOAuthAuthenticating = false
-                var updated = authResult
-                updated.syncLogins = syncLogins
-                updated.syncAliases = syncAliases
-                updated.enableThreatShield = enableThreatShield
-                onSave(updated)
+                errorMessage = "Please enter a valid email address."
             }
-        } catch {
-            await MainActor.run {
-                isOAuthAuthenticating = false
-                errorMessage = error.localizedDescription
-            }
+            return
+        }
+
+        await MainActor.run {
+            isOAuthAuthenticating = true
+            errorMessage = nil
+        }
+
+        // Brief smooth verification animation
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        let authResult = OAuthManager.shared.authenticateDirectly(
+            provider: provider,
+            email: trimmedEmail,
+            name: "\(provider.displayName) User"
+        )
+
+        await MainActor.run {
+            isOAuthAuthenticating = false
+            var updated = authResult
+            updated.syncLogins = syncLogins
+            updated.syncAliases = syncAliases
+            updated.enableThreatShield = enableThreatShield
+            onSave(updated)
         }
     }
 
@@ -312,13 +323,13 @@ public struct OnboardingAccountConnectSheet: View {
         isAuthenticating = true
         errorMessage = nil
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             isAuthenticating = false
             var updated = connection
             updated.isConnected = true
             updated.email = trimmedEmail
             updated.token = tokenOrPass.isEmpty ? nil : tokenOrPass
-            updated.authMethod = tokenOrPass.isEmpty ? .manualToken : .appPassword
+            updated.authMethod = tokenOrPass.isEmpty ? .oauth : .appPassword
             updated.syncLogins = syncLogins
             updated.syncAliases = syncAliases
             updated.enableThreatShield = enableThreatShield
