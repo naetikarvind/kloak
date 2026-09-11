@@ -398,13 +398,25 @@ public struct ItemDetailView: View {
 
                 ForEach(item.urls, id: \.self) { url in
                     HStack {
-                        Link(destination: URL(string: url) ?? URL(string: "https://\(url)")!) {
+                        let parsedUrl = URL(string: url) ?? URL(string: "https://\(url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? url)")
+                        if let destination = parsedUrl {
+                            Link(destination: destination) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "safari")
+                                        .font(.system(size: 11))
+                                    Text(url)
+                                        .font(.system(size: 12))
+                                        .underline()
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                            }
+                        } else {
                             HStack(spacing: 6) {
-                                Image(systemName: "safari")
+                                Image(systemName: "globe")
                                     .font(.system(size: 11))
                                 Text(url)
                                     .font(.system(size: 12))
-                                    .underline()
                                     .lineLimit(1)
                             }
                             .foregroundColor(LiquidGlassTheme.primaryAccent)
@@ -822,7 +834,7 @@ public struct ItemDetailView: View {
         }
 
         // Government IDs
-        if (ident.passportNumber != nil && !ident.passportNumber!.isEmpty) || (ident.ssn != nil && !ident.ssn!.isEmpty) {
+        if (ident.passportNumber?.isEmpty == false) || (ident.ssn?.isEmpty == false) {
             Text("GOVERNMENT IDENTIFIERS")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(Color.cyan)

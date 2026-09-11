@@ -352,8 +352,8 @@ public struct MenuBarView: View {
                                                     .font(.system(size: 10, weight: .bold))
                                                     .foregroundColor(LiquidGlassTheme.emeraldAccent)
                                                     .textCase(.uppercase)
-                                            } else if ctx.isBrowser && ctx.activeDomain != nil {
-                                                Text("Suggested for \(ctx.activeDomain!)")
+                                            } else if ctx.isBrowser, let activeDomain = ctx.activeDomain {
+                                                Text("Suggested for \(activeDomain)")
                                                     .font(.system(size: 10, weight: .bold))
                                                     .foregroundColor(.secondary)
                                                     .textCase(.uppercase)

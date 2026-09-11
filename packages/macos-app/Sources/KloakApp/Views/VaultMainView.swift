@@ -11,7 +11,7 @@ public struct VaultMainView: View {
     var onSaveSettings: (VaultSettings) -> Void
     var onImport: (String, String) -> (Int, [String])
     var onExport: (String, String?) -> String
-    var onChangeMasterPassword: (String, String) -> Bool
+    var onChangeMasterPassword: (String, String) async -> Bool
 
     @State private var selection: NavigationSection = .allItems
     @State private var selectedItemId: String? = nil
@@ -30,7 +30,7 @@ public struct VaultMainView: View {
         onSaveSettings: @escaping (VaultSettings) -> Void,
         onImport: @escaping (String, String) -> (Int, [String]),
         onExport: @escaping (String, String?) -> String,
-        onChangeMasterPassword: @escaping (String, String) -> Bool
+        onChangeMasterPassword: @escaping (String, String) async -> Bool
     ) {
         self._isUnlocked = isUnlocked
         self._items = items

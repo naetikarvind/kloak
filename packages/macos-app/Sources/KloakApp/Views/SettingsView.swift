@@ -3,7 +3,7 @@ import SwiftUI
 public struct SettingsView: View {
     @Binding var settings: VaultSettings
     var onSaveSettings: (VaultSettings) -> Void
-    var onChangeMasterPassword: (String, String) -> Bool
+    var onChangeMasterPassword: (String, String) async -> Bool
 
     @State private var oldPass: String = ""
     @State private var newPass1: String = ""
@@ -669,16 +669,18 @@ public struct SettingsView: View {
             return
         }
 
-        let success = onChangeMasterPassword(oldPass, newPass1)
-        if success {
-            passChangeMessage = "Master password successfully changed!"
-            isSuccess = true
-            oldPass = ""
-            newPass1 = ""
-            newPass2 = ""
-        } else {
-            passChangeMessage = "Current password was incorrect."
-            isSuccess = false
+        Task {
+            let success = await onChangeMasterPassword(oldPass, newPass1)
+            if success {
+                passChangeMessage = "Master password successfully changed!"
+                isSuccess = true
+                oldPass = ""
+                newPass1 = ""
+                newPass2 = ""
+            } else {
+                passChangeMessage = "Current password was incorrect."
+                isSuccess = false
+            }
         }
     }
 }

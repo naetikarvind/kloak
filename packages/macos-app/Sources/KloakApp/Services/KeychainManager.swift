@@ -128,6 +128,8 @@ public final class KeychainManager: @unchecked Sendable {
             "filevault",
             "wifianalytics",
             "wifi",
+            "wi-fi",
+            "wireless",
             "802.1x",
             "vtpm",
             "parallels",
@@ -150,10 +152,30 @@ public final class KeychainManager: @unchecked Sendable {
             "setup.icloud.com",
             "albert.apple.com",
             "smoot.apple.com",
-            "appleid.apple.com"
+            "appleid.apple.com",
+            // Mobile Hotspots & Wireless Network SSIDs
+            "hotspot",
+            "personal hotspot",
+            "mobile hotspot",
+            "instant hotspot",
+            "portable hotspot",
+            "tether",
+            "tethering",
+            "androidap",
+            "iphone hotspot",
+            "phone hotspot",
+            "mobile network",
+            "cellular hotspot",
+            "wlan",
+            "ssid"
         ]
         for p in systemPatterns {
             if combined.contains(p) { return true }
+        }
+
+        // 3. AirPort, Wi-Fi or Wireless network services (blocks all mobile hotspots, SSIDs like 'Pixel_6164', 'Naetik_5G', 'Moto_sindhu\'s phone', 'Redmi 12C')
+        if lowerService.contains("airport") || lowerService.contains("wifi") || lowerService.contains("wi-fi") || lowerService.contains("wireless") {
+            return true
         }
 
         // 3. Reverse DNS bundle identifier format check (e.g. "ch.protonvpn.mac", "org.videolan.vlc")

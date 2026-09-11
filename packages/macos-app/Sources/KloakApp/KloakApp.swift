@@ -67,14 +67,7 @@ public struct KloakApp: App {
                             return vaultStore.exportVault(format: format, password: password)
                         },
                         onChangeMasterPassword: { oldP, newP in
-                            var success = false
-                            let semaphore = DispatchSemaphore(value: 0)
-                            Task {
-                                success = await vaultStore.changeMasterPassword(oldPassword: oldP, newPassword: newP)
-                                semaphore.signal()
-                            }
-                            _ = semaphore.wait(timeout: .now() + 5.0)
-                            return success
+                            await vaultStore.changeMasterPassword(oldPassword: oldP, newPassword: newP)
                         }
                     )
                     .onAppear {
