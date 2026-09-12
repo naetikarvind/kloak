@@ -86,12 +86,24 @@ public final class KeychainManager: @unchecked Sendable {
         let lowerLabel = label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let combined = "\(lowerServer) \(lowerService) \(lowerAccount) \(lowerLabel)"
 
+        // 0. Developer API endpoints and API keys (e.g. api.github.com, Gemini/OpenAI API keys)
+        if lowerServer.hasPrefix("api.") || lowerServer.contains(".api.") || lowerLabel.contains("api.github.com") || lowerServer == "api.github.com" {
+            return true
+        }
+        if lowerLabel.contains("api key") || lowerLabel.contains("apikey") || lowerLabel.contains("api_key") ||
+           lowerService.contains("api key") || lowerService.contains("apikey") || lowerService.contains("api_key") ||
+           lowerAccount.contains("apikey") || lowerAccount.contains("api_key") || lowerAccount.contains("api key") {
+            return true
+        }
+
         // 1. Safe Storage, App Encryption Keys & Internal Secret/Token Storage
         let storagePatterns = [
             "safe storage",
             "safestorage",
             "safe meeting",
             "safemeeting",
+            "safe_storage",
+            "storage_key",
             "secret storage",
             "credential store",
             "tokenstore",
@@ -114,13 +126,38 @@ public final class KeychainManager: @unchecked Sendable {
             "raycast",
             "logioptionsplus",
             "logioptions",
-            "logitech"
+            "logitech",
+            "persistent state",
+            "bitmap encryption",
+            "window bitmap",
+            "drivefs",
+            "shottr"
         ]
         for p in storagePatterns {
             if combined.contains(p) { return true }
         }
 
-        // 2. Developer & Local Databases, Dev Servers (e.g. Mysql@127.0.0.1:3306, postgres@localhost)
+        // 2. Reverse DNS application bundle identifier format (e.g. "app.glaze.macos.main", "jacklandrin.OnlySwitch")
+        let commonTLDs: Set<String> = [
+            "com", "org", "net", "edu", "gov", "mil", "int",
+            "io", "co", "ai", "me", "app", "dev", "is", "tv", "cc",
+            "in", "uk", "de", "ca", "fr", "jp", "au", "us", "eu", "ch", "nl", "se", "no", "es", "it", "br", "nz", "za", "ru", "cn", "mx", "sg", "kr", "hk",
+            "info", "biz", "xyz", "online", "site", "tech", "store", "live", "club", "space", "vip", "pro", "cloud", "agency", "digital"
+        ]
+        let parts = lowerService.split(separator: ".")
+        if parts.count >= 2 && !lowerService.contains(" ") {
+            if (lowerService.hasPrefix("com.") || lowerService.hasPrefix("org.") || lowerService.hasPrefix("net.")) && parts.count >= 3 {
+                return true
+            }
+            if let lastPart = parts.last {
+                let lastStr = String(lastPart)
+                if !commonTLDs.contains(lastStr) {
+                    return true
+                }
+            }
+        }
+
+        // 3. Developer & Local Databases, Dev Servers (e.g. Mysql@127.0.0.1:3306, postgres@localhost)
         let devServerPatterns = [
             "mysql@",
             "mysql:",
@@ -145,24 +182,29 @@ public final class KeychainManager: @unchecked Sendable {
             return true
         }
 
-        // 3. Accounts ending in "Key" or "key" that are internal app tokens rather than email addresses
+        // 4. Non-email accounts containing "key", "token", "vault", "encryption"
         if !lowerAccount.contains("@") && (
-            lowerAccount.hasSuffix(" key") ||
-            lowerAccount.hasSuffix("key") ||
-            lowerAccount.contains("key_") ||
-            lowerAccount.contains("_key")
+            lowerAccount.contains("key") ||
+            lowerAccount.contains("token") ||
+            lowerAccount.contains("vault") ||
+            lowerAccount.contains("encryption")
         ) {
-            let appKeyIndicators = ["code", "notion", "logi", "zoom", "fmfd", "chrome", "opera", "store", "token", "cache", "secret"]
-            for ind in appKeyIndicators {
-                if combined.contains(ind) { return true }
-            }
+            return true
         }
 
-        // 4. Generic Password account identical to service or label (internal cache/settings/token)
+        // 5. Generic Password account identical to service or label (internal cache/settings/token)
         if (lowerAccount == lowerService || lowerAccount == lowerLabel) && !lowerAccount.contains("@") {
-            if combined.contains("cache") || combined.contains("setting") || combined.contains("identity") || combined.contains("token") || combined.contains("store") {
-                return true
-            }
+            return true
+        }
+
+        // 6. CLI / Local agent tokens
+        if lowerService == "gemini" && lowerAccount == "antigravity" {
+            return true
+        }
+
+        // 7. Long numeric Gaia / DSID accounts (10+ digits without @)
+        if !lowerAccount.contains("@") && lowerAccount.count >= 10 && lowerAccount.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil {
+            return true
         }
 
         // 5. Deactivated test accounts from setup/onboarding
@@ -412,51 +454,6 @@ public final class KeychainManager: @unchecked Sendable {
             }
         }
 
-        // 2. Query Generic Passwords (User app logins)
-        let genericQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
-        ]
-
-        var genericResult: CFTypeRef?
-        let genericStatus = SecItemCopyMatching(genericQuery as CFDictionary, &genericResult)
-
-        if genericStatus == errSecSuccess, let items = genericResult as? [[String: Any]] {
-            for item in items {
-                let serviceName = item[kSecAttrService as String] as? String ?? ""
-                // Skip Kloak's own master key envelope
-                if serviceName == service { continue }
-
-                let account = item[kSecAttrAccount as String] as? String ?? ""
-                let label = item[kSecAttrLabel as String] as? String ?? serviceName
-
-                // Skip entries with no account (these are system cryptographic tokens or state)
-                if account.isEmpty { continue }
-
-                // Filter out developer registrations and system internal tokens
-                if Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label) {
-                    continue
-                }
-
-                let rawTitle = label.isEmpty ? serviceName : label
-                let title = Self.cleanTitle(rawTitle)
-
-                if !account.isEmpty || !serviceName.isEmpty {
-                    let vaultItem = VaultItem(
-                        type: .login,
-                        title: title,
-                        username: account.isEmpty ? nil : account,
-                        password: nil,
-                        urls: [],
-                        notes: "Discovered from macOS Keychain Service: \(serviceName). Import via Passwords.csv for full plaintext password.",
-                        tags: ["Apple Keychain", "App Login", "Imported"]
-                    )
-                    importedItems.append(vaultItem)
-                }
-            }
-        }
-
         return importedItems
     }
 
@@ -520,9 +517,8 @@ public final class KeychainManager: @unchecked Sendable {
     /// filtering out developer registrations and system internal tokens.
     public func scanKeychainSummary() -> KeychainScanPreview {
         var internetCount = 0
-        var genericCount = 0
 
-        // 1. Internet passwords count
+        // 1. Internet passwords count (Web and app logins)
         let internetQuery: [String: Any] = [
             kSecClass as String: kSecClassInternetPassword,
             kSecReturnAttributes as String: true,
@@ -539,35 +535,16 @@ public final class KeychainManager: @unchecked Sendable {
             }.count
         }
 
-        // 2. Generic passwords count
-        let genericQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecReturnAttributes as String: true,
-            kSecMatchLimit as String: kSecMatchLimitAll
-        ]
-        var genericResult: CFTypeRef?
-        let genericStatus = SecItemCopyMatching(genericQuery as CFDictionary, &genericResult)
-        if genericStatus == errSecSuccess, let items = genericResult as? [[String: Any]] {
-            genericCount = items.filter { item in
-                let serviceName = item[kSecAttrService as String] as? String ?? ""
-                if serviceName == self.service { return false }
-                let account = item[kSecAttrAccount as String] as? String ?? ""
-                if account.isEmpty { return false }
-                let label = item[kSecAttrLabel as String] as? String ?? serviceName
-                return !Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label)
-            }.count
-        }
-
-        let isAuth = internetStatus == errSecSuccess || genericStatus == errSecSuccess
+        let isAuth = internetStatus == errSecSuccess
         var errDesc: String? = nil
-        if !isAuth && internetStatus != errSecItemNotFound && genericStatus != errSecItemNotFound {
+        if !isAuth && internetStatus != errSecItemNotFound {
             errDesc = "Keychain authorization required."
         }
 
         return KeychainScanPreview(
             internetPasswordsCount: internetCount,
-            genericPasswordsCount: genericCount,
-            isAuthorized: isAuth || (internetCount + genericCount > 0),
+            genericPasswordsCount: 0,
+            isAuthorized: isAuth || internetCount > 0,
             error: errDesc
         )
     }
