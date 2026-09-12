@@ -266,7 +266,10 @@ public struct ItemDetailView: View {
                         }
 
                         // Notes in view mode
-                        if let notes = item.notes, !notes.isEmpty {
+                        if let notes = item.notes, !notes.isEmpty,
+                           !notes.contains("Discovered from macOS Keychain"),
+                           !notes.contains("Import via Passwords.csv"),
+                           notes != "Imported from Apple Passwords" {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("NOTES")
                                     .font(.system(size: 10, weight: .bold))
@@ -1148,7 +1151,14 @@ public struct ItemDetailView: View {
         editPassword = item.password ?? ""
         editUrls = item.urls.isEmpty ? [""] : item.urls
         editTotpSecret = item.totpSecret ?? ""
-        editNotes = item.notes ?? ""
+        if let rawNotes = item.notes,
+           !rawNotes.contains("Discovered from macOS Keychain"),
+           !rawNotes.contains("Import via Passwords.csv"),
+           rawNotes != "Imported from Apple Passwords" {
+            editNotes = rawNotes
+        } else {
+            editNotes = ""
+        }
         showEditPassword = false
 
         // Card

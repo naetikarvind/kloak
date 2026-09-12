@@ -115,6 +115,13 @@ public final class VaultStore: ObservableObject {
                 continue
             }
             imported.title = KeychainManager.cleanTitle(imported.title)
+            if let noteText = imported.notes, (
+                noteText.contains("Discovered from macOS Keychain") ||
+                noteText.contains("Import via Passwords.csv") ||
+                noteText == "Imported from Apple Passwords"
+            ) {
+                imported.notes = nil
+            }
             if !imported.tags.contains("Imported") {
                 imported.tags.append("Imported")
             }
@@ -222,6 +229,16 @@ public final class VaultStore: ObservableObject {
                     item.title = cleanedTitle
                     didModify = true
                 }
+
+                if let noteText = item.notes, (
+                    noteText.contains("Discovered from macOS Keychain") ||
+                    noteText.contains("Import via Passwords.csv") ||
+                    noteText == "Imported from Apple Passwords"
+                ) {
+                    item.notes = nil
+                    didModify = true
+                }
+
                 sanitizedItems.append(item)
             }
 
@@ -314,6 +331,16 @@ public final class VaultStore: ObservableObject {
                                 item.title = cleanedTitle
                                 didModify = true
                             }
+
+                            if let noteText = item.notes, (
+                                noteText.contains("Discovered from macOS Keychain") ||
+                                noteText.contains("Import via Passwords.csv") ||
+                                noteText == "Imported from Apple Passwords"
+                            ) {
+                                item.notes = nil
+                                didModify = true
+                            }
+
                             sanitizedItems.append(item)
                         }
 
@@ -432,6 +459,13 @@ public final class VaultStore: ObservableObject {
                 continue
             }
             item.title = KeychainManager.cleanTitle(item.title)
+            if let noteText = item.notes, (
+                noteText.contains("Discovered from macOS Keychain") ||
+                noteText.contains("Import via Passwords.csv") ||
+                noteText == "Imported from Apple Passwords"
+            ) {
+                item.notes = nil
+            }
             if !items.contains(where: { $0.title == item.title && $0.username == item.username }) {
                 items.append(item)
                 addedCount += 1

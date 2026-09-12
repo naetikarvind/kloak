@@ -446,7 +446,7 @@ public final class KeychainManager: @unchecked Sendable {
                         username: account.isEmpty ? nil : account,
                         password: nil,
                         urls: urlStr.isEmpty ? [] : [urlStr],
-                        notes: "Discovered from macOS Keychain. Import via Passwords.csv for full plaintext password.",
+                        notes: nil,
                         tags: ["Apple Keychain", "Imported"]
                     )
                     importedItems.append(vaultItem)
@@ -690,7 +690,7 @@ public final class KeychainManager: @unchecked Sendable {
                     username: user,
                     password: pass,
                     urls: url != nil && !url!.isEmpty ? [url!] : [],
-                    notes: note ?? (provider != nil ? "Imported from \(provider!.displayName)" : "Imported from Apple Passwords"),
+                    notes: (note != nil && !note!.isEmpty) ? note : nil,
                     totpSecret: totpSecret,
                     tags: defaultTags
                 ))
