@@ -165,6 +165,39 @@ public final class KeychainManager: @unchecked Sendable {
             }
         }
 
+        // 5. Deactivated test accounts from setup/onboarding
+        let testAccounts = [
+            "alex.music@spotify.com",
+            "alex@acme.slack.com",
+            "alex.watch@gmail.com",
+            "alex.dev@github.com"
+        ]
+        if testAccounts.contains(lowerAccount) {
+            return true
+        }
+        if lowerLabel.contains("personal chatgpt api") && lowerAccount == "personal" {
+            return true
+        }
+
+        // 6. Hardware devices & computer sharing credentials (e.g. "Naetik's MacBook Pro", iMac, Mac mini)
+        let devicePatterns = [
+            "macbook",
+            "imac",
+            "mac mini",
+            "mac studio",
+            "mac pro",
+            "macintosh"
+        ]
+        for p in devicePatterns {
+            if combined.contains(p) { return true }
+        }
+
+        // 7. Apple iCloud internal sync tokens (e.g. Service: "iCloud", Account: numeric DSID like "18410015217")
+        if (lowerService == "icloud" || lowerService.hasPrefix("icloud.") || lowerService.hasSuffix(".icloud") || lowerLabel.contains("icloud.com")) &&
+           (!lowerAccount.contains("@") || lowerAccount.rangeOfCharacter(from: CharacterSet.decimalDigits.inverted) == nil) {
+            return true
+        }
+
         // 5. Developer certificates, provisioning profiles, code signing, and developer registrations
         let devPatterns = [
             "apple development",
