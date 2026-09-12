@@ -56,9 +56,29 @@ public final class KeychainManager: @unchecked Sendable {
 
     // MARK: - Apple Keychain Two-Way Sync (Logins & Passwords)
 
+    /// Strips any "Kloak — ", "Kloak - - ", "Kloak - ", "Kloak-", or "kloak — " prefixes from a title.
+    public static func cleanTitle(_ raw: String) -> String {
+        var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separators = CharacterSet(charactersIn: "-—–: \t\r\n")
+
+        while true {
+            let lower = title.lowercased()
+            if lower.hasPrefix("kloakapp") {
+                title = String(title.dropFirst(8)).trimmingCharacters(in: separators)
+                continue
+            } else if lower.hasPrefix("kloak") {
+                title = String(title.dropFirst(5)).trimmingCharacters(in: separators)
+                continue
+            }
+            break
+        }
+
+        return title.isEmpty ? raw : title
+    }
+
     /// Determines whether a keychain entry or vault item is an internal macOS system token,
-    /// daemon credential, Apple developer registration/certificate, or hardware/network key,
-    /// rather than a genuine user password/login.
+    /// daemon credential, Apple developer registration/certificate, app safe storage encryption key,
+    /// local development server/database key, or hardware/network key, rather than a genuine user password/login.
     public static func isSystemOrDeveloperItem(server: String, service: String, account: String, label: String) -> Bool {
         let lowerServer = server.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let lowerService = service.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -66,7 +86,86 @@ public final class KeychainManager: @unchecked Sendable {
         let lowerLabel = label.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let combined = "\(lowerServer) \(lowerService) \(lowerAccount) \(lowerLabel)"
 
-        // 1. Developer certificates, provisioning profiles, code signing, and developer registrations
+        // 1. Safe Storage, App Encryption Keys & Internal Secret/Token Storage
+        let storagePatterns = [
+            "safe storage",
+            "safestorage",
+            "safe meeting",
+            "safemeeting",
+            "secret storage",
+            "credential store",
+            "tokenstore",
+            "token store",
+            "keystore",
+            "database_key",
+            "urlcache_key",
+            "db_key",
+            "sqlite_key",
+            "realm_key",
+            "storecontroller",
+            "store controller",
+            "fmfd",
+            "identities cache",
+            "identities settings",
+            "identity cache",
+            "identity setting",
+            "identity settings",
+            "microsoft office identities",
+            "raycast",
+            "logioptionsplus",
+            "logioptions",
+            "logitech"
+        ]
+        for p in storagePatterns {
+            if combined.contains(p) { return true }
+        }
+
+        // 2. Developer & Local Databases, Dev Servers (e.g. Mysql@127.0.0.1:3306, postgres@localhost)
+        let devServerPatterns = [
+            "mysql@",
+            "mysql:",
+            "postgres@",
+            "postgresql@",
+            "redis@",
+            "mongodb@",
+            "127.0.0.1",
+            "localhost:",
+            "localhost@",
+            ":3306",
+            ":5432",
+            ":6379",
+            ":27017",
+            ":8080"
+        ]
+        for p in devServerPatterns {
+            if combined.contains(p) { return true }
+        }
+        if (lowerService.contains("mysql") || lowerServer.contains("mysql") || lowerLabel.contains("mysql")) &&
+           (lowerAccount == "root" || lowerAccount.contains("admin") || combined.contains("localhost") || combined.contains("127.0.0.1")) {
+            return true
+        }
+
+        // 3. Accounts ending in "Key" or "key" that are internal app tokens rather than email addresses
+        if !lowerAccount.contains("@") && (
+            lowerAccount.hasSuffix(" key") ||
+            lowerAccount.hasSuffix("key") ||
+            lowerAccount.contains("key_") ||
+            lowerAccount.contains("_key")
+        ) {
+            let appKeyIndicators = ["code", "notion", "logi", "zoom", "fmfd", "chrome", "opera", "store", "token", "cache", "secret"]
+            for ind in appKeyIndicators {
+                if combined.contains(ind) { return true }
+            }
+        }
+
+        // 4. Generic Password account identical to service or label (internal cache/settings/token)
+        if (lowerAccount == lowerService || lowerAccount == lowerLabel) && !lowerAccount.contains("@") {
+            if combined.contains("cache") || combined.contains("setting") || combined.contains("identity") || combined.contains("token") || combined.contains("store") {
+                return true
+            }
+        }
+
+        // 5. Developer certificates, provisioning profiles, code signing, and developer registrations
         let devPatterns = [
             "apple development",
             "apple distribution",
@@ -96,7 +195,7 @@ public final class KeychainManager: @unchecked Sendable {
             if combined.contains(p) { return true }
         }
 
-        // 2. macOS System daemons, services, internal subsystems, and network/hardware credentials
+        // 6. macOS System daemons, services, internal subsystems, and network/hardware credentials
         let systemPatterns = [
             "com.apple.",
             "apple-",
@@ -173,13 +272,12 @@ public final class KeychainManager: @unchecked Sendable {
             if combined.contains(p) { return true }
         }
 
-        // 3. AirPort, Wi-Fi or Wireless network services (blocks all mobile hotspots, SSIDs like 'Pixel_6164', 'Naetik_5G', 'Moto_sindhu\'s phone', 'Redmi 12C')
+        // 7. AirPort, Wi-Fi or Wireless network services (blocks all mobile hotspots, SSIDs)
         if lowerService.contains("airport") || lowerService.contains("wifi") || lowerService.contains("wi-fi") || lowerService.contains("wireless") {
             return true
         }
 
-        // 3. Reverse DNS bundle identifier format check (e.g. "ch.protonvpn.mac", "org.videolan.vlc")
-        // Internal app state storage, not user logins
+        // 8. Reverse DNS bundle identifier format check (e.g. "ch.protonvpn.mac", "org.videolan.vlc")
         if lowerService.contains(".") && !lowerService.contains(" ") && (
             lowerService.hasPrefix("com.") || lowerService.hasPrefix("ch.") ||
             lowerService.hasPrefix("org.") || lowerService.hasPrefix("net.") ||
@@ -189,7 +287,7 @@ public final class KeychainManager: @unchecked Sendable {
             return true
         }
 
-        // 4. Hex strings, UUIDs, and curly-brace GUIDs in account or service
+        // 9. Hex strings, UUIDs, and curly-brace GUIDs in account or service
         let uuidPattern = "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
         if lowerAccount.range(of: uuidPattern, options: .regularExpression) != nil ||
            lowerService.range(of: uuidPattern, options: .regularExpression) != nil {
@@ -200,14 +298,14 @@ public final class KeychainManager: @unchecked Sendable {
             return true
         }
 
-        // 5. MAC address pattern (e.g., AA:BB:CC:DD:EE:FF)
+        // 10. MAC address pattern (e.g., AA:BB:CC:DD:EE:FF)
         let macPattern = "([0-9a-f]{2}:){5}[0-9a-f]{2}"
         if lowerAccount.range(of: macPattern, options: .regularExpression) != nil ||
            lowerService.range(of: macPattern, options: .regularExpression) != nil {
             return true
         }
 
-        // 6. High entropy / raw crypto tokens without spaces (30+ characters without email @ or space)
+        // 11. High entropy / raw crypto tokens without spaces (30+ characters without email @ or space)
         if lowerAccount.count >= 30 && !lowerAccount.contains(" ") && !lowerAccount.contains("@") {
             return true
         }
@@ -215,7 +313,7 @@ public final class KeychainManager: @unchecked Sendable {
             return true
         }
 
-        // 7. Missing both account and server
+        // 12. Missing both account and server
         if lowerAccount.isEmpty && lowerServer.isEmpty {
             return true
         }
@@ -263,10 +361,13 @@ public final class KeychainManager: @unchecked Sendable {
                     }
                 }
 
+                let rawTitle = label.isEmpty ? (server.isEmpty ? "Keychain Login" : server) : label
+                let title = Self.cleanTitle(rawTitle)
+
                 if !account.isEmpty || !server.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
-                        title: label.isEmpty ? (server.isEmpty ? "Keychain Login" : server) : label,
+                        title: title,
                         username: account.isEmpty ? nil : account,
                         password: nil,
                         urls: urlStr.isEmpty ? [] : [urlStr],
@@ -297,15 +398,21 @@ public final class KeychainManager: @unchecked Sendable {
                 let account = item[kSecAttrAccount as String] as? String ?? ""
                 let label = item[kSecAttrLabel as String] as? String ?? serviceName
 
+                // Skip entries with no account (these are system cryptographic tokens or state)
+                if account.isEmpty { continue }
+
                 // Filter out developer registrations and system internal tokens
                 if Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label) {
                     continue
                 }
 
+                let rawTitle = label.isEmpty ? serviceName : label
+                let title = Self.cleanTitle(rawTitle)
+
                 if !account.isEmpty || !serviceName.isEmpty {
                     let vaultItem = VaultItem(
                         type: .login,
-                        title: label.isEmpty ? serviceName : label,
+                        title: title,
                         username: account.isEmpty ? nil : account,
                         password: nil,
                         urls: [],
@@ -325,7 +432,7 @@ public final class KeychainManager: @unchecked Sendable {
         guard let password = item.password, !password.isEmpty else { return false }
         let pwdData = Data(password.utf8)
         let username = item.username ?? ""
-        let title = item.title
+        let title = Self.cleanTitle(item.title)
 
         var server = ""
         if let firstUrl = item.urls.first, let urlObj = URL(string: firstUrl), let host = urlObj.host {
@@ -347,7 +454,7 @@ public final class KeychainManager: @unchecked Sendable {
             kSecClass as String: kSecClassInternetPassword,
             kSecAttrServer as String: server,
             kSecAttrAccount as String: username,
-            kSecAttrLabel as String: "Kloak — \(title)",
+            kSecAttrLabel as String: title,
             kSecAttrComment as String: "Mirrored from Kloak Password Manager",
             kSecValueData as String: pwdData,
             kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
@@ -412,6 +519,7 @@ public final class KeychainManager: @unchecked Sendable {
                 let serviceName = item[kSecAttrService as String] as? String ?? ""
                 if serviceName == self.service { return false }
                 let account = item[kSecAttrAccount as String] as? String ?? ""
+                if account.isEmpty { return false }
                 let label = item[kSecAttrLabel as String] as? String ?? serviceName
                 return !Self.isSystemOrDeveloperItem(server: "", service: serviceName, account: account, label: label)
             }.count
@@ -500,7 +608,7 @@ public final class KeychainManager: @unchecked Sendable {
 
                         results.append(VaultItem(
                             type: itemType,
-                            title: name.isEmpty ? "Imported Credential" : name,
+                            title: Self.cleanTitle(name.isEmpty ? "Imported Credential" : name),
                             username: username.isEmpty ? nil : username,
                             password: password.isEmpty ? nil : password,
                             urls: urls,
@@ -546,7 +654,8 @@ public final class KeychainManager: @unchecked Sendable {
 
             let cols = parseCSVRow(line)
             let fallbackName = provider != nil ? "\(provider!.displayName) Login" : "iCloud Login"
-            let title = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? fallbackName
+            let rawTitle = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? fallbackName
+            let title = Self.cleanTitle(rawTitle)
             let url = safeCol(cols, urlIdx)
             let user = safeCol(cols, userIdx)
             let pass = safeCol(cols, passIdx)

@@ -114,6 +114,7 @@ public final class VaultStore: ObservableObject {
             ) {
                 continue
             }
+            imported.title = KeychainManager.cleanTitle(imported.title)
             if !imported.tags.contains("Imported") {
                 imported.tags.append("Imported")
             }
@@ -201,14 +202,27 @@ public final class VaultStore: ObservableObject {
                 return false
             }
 
-            // Success - sanitize items to purge any previously imported developer registrations or system items
-            let sanitizedItems = payload.items.filter { item in
-                !KeychainManager.isSystemOrDeveloperItem(
+            // Success - sanitize items to purge any previously imported developer registrations, system items, or app safe storage keys, and strip title prefixes
+            var sanitizedItems: [VaultItem] = []
+            var didModify = false
+
+            for var item in payload.items {
+                if KeychainManager.isSystemOrDeveloperItem(
                     server: item.urls.first ?? "",
                     service: item.title,
                     account: item.username ?? "",
                     label: item.title
-                )
+                ) {
+                    didModify = true
+                    continue
+                }
+
+                let cleanedTitle = KeychainManager.cleanTitle(item.title)
+                if cleanedTitle != item.title {
+                    item.title = cleanedTitle
+                    didModify = true
+                }
+                sanitizedItems.append(item)
             }
 
             self.vaultKey = unwrappedVaultKey
@@ -220,7 +234,7 @@ public final class VaultStore: ObservableObject {
             self.isUnlocked = true
             self.lastError = nil
 
-            if sanitizedItems.count != payload.items.count {
+            if didModify {
                 self.saveVault()
             }
 
@@ -281,13 +295,26 @@ public final class VaultStore: ObservableObject {
 
                         let payload = try JSONDecoder().decode(VaultPayload.self, from: decryptedPayloadData)
 
-                        let sanitizedItems = payload.items.filter { item in
-                            !KeychainManager.isSystemOrDeveloperItem(
+                        var sanitizedItems: [VaultItem] = []
+                        var didModify = false
+
+                        for var item in payload.items {
+                            if KeychainManager.isSystemOrDeveloperItem(
                                 server: item.urls.first ?? "",
                                 service: item.title,
                                 account: item.username ?? "",
                                 label: item.title
-                            )
+                            ) {
+                                didModify = true
+                                continue
+                            }
+
+                            let cleanedTitle = KeychainManager.cleanTitle(item.title)
+                            if cleanedTitle != item.title {
+                                item.title = cleanedTitle
+                                didModify = true
+                            }
+                            sanitizedItems.append(item)
                         }
 
                         self.vaultKey = validKey
@@ -299,7 +326,7 @@ public final class VaultStore: ObservableObject {
                         self.isUnlocked = true
                         self.lastError = nil
 
-                        if sanitizedItems.count != payload.items.count {
+                        if didModify {
                             self.saveVault()
                         }
 
@@ -363,10 +390,12 @@ public final class VaultStore: ObservableObject {
     // MARK: - CRUD Helpers
 
     public func saveItem(_ item: VaultItem) {
-        if let idx = items.firstIndex(where: { $0.id == item.id }) {
-            items[idx] = item
+        var cleaned = item
+        cleaned.title = KeychainManager.cleanTitle(item.title)
+        if let idx = items.firstIndex(where: { $0.id == cleaned.id }) {
+            items[idx] = cleaned
         } else {
-            items.append(item)
+            items.append(cleaned)
         }
         recordUserActivity()
         saveVault()
@@ -393,7 +422,16 @@ public final class VaultStore: ObservableObject {
 
     public func bulkImport(_ importedItems: [VaultItem]) -> (Int, [String]) {
         var addedCount = 0
-        for item in importedItems {
+        for var item in importedItems {
+            if KeychainManager.isSystemOrDeveloperItem(
+                server: item.urls.first ?? "",
+                service: item.title,
+                account: item.username ?? "",
+                label: item.title
+            ) {
+                continue
+            }
+            item.title = KeychainManager.cleanTitle(item.title)
             if !items.contains(where: { $0.title == item.title && $0.username == item.username }) {
                 items.append(item)
                 addedCount += 1
