@@ -126,6 +126,23 @@ public struct ItemDetailView: View {
                                     .foregroundColor(LiquidGlassTheme.primaryAccent)
                                     .clipShape(Capsule())
                             }
+
+                            if let tree = DomainTreeService.shared.connectedTree(for: item) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                                        .font(.system(size: 9))
+                                    Text(tree.displayName)
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .lineLimit(1)
+                                        .fixedSize()
+                                }
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
+                                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                .clipShape(Capsule())
+                                .help("Smart SSO Tree: Automatically inputs on \(tree.supportedHighlights.joined(separator: ", "))")
+                            }
                         }
                     }
 
@@ -283,6 +300,58 @@ public struct ItemDetailView: View {
                                     .background(Color.black.opacity(0.25))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
+                        }
+
+                        // Connected Ecosystem & App Tree Section
+                        if let tree = DomainTreeService.shared.connectedTree(for: item) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                    Text("CONNECTED ECOSYSTEM & APP TREE")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text("SSO Auto-Match")
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                                        .clipShape(Capsule())
+                                }
+
+                                Text(tree.description)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary.opacity(0.9))
+
+                                // Supported Highlights Chips
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(tree.supportedHighlights, id: \.self) { highlight in
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "checkmark.circle.fill")
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                                Text(highlight)
+                                                    .font(.system(size: 10, weight: .medium))
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.white.opacity(0.06))
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .background(LiquidGlassTheme.primaryAccent.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(LiquidGlassTheme.primaryAccent.opacity(0.2), lineWidth: 0.8)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
                     .padding(16)

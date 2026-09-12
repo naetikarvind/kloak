@@ -515,6 +515,15 @@ public struct SettingsView: View {
                         Text("Enables autofill, search, 2FA generation, and quick-access directly inside Chrome, Arc, Brave, and Raycast.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
+
+                        Divider().opacity(0.15)
+
+                        Toggle("Smart Website & App Tree Engine", isOn: $settings.smartDomainTreeEnabled)
+                            .onChange(of: settings.smartDomainTreeEnabled) { _, _ in onSaveSettings(settings) }
+
+                        Text("Automatically understands domain hierarchies and Single Sign-On ecosystems. For example, a single Google credential will seamlessly autofill on YouTube, Gmail, Google Drive, Chrome, and native Google apps.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
                     }
                     .padding(14)
                     .background(Color.black.opacity(0.2))

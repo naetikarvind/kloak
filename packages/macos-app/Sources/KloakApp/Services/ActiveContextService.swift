@@ -95,7 +95,18 @@ public final class ActiveContextService: @unchecked Sendable {
         for item in activeItems {
             var score = 0
 
-            // ── 1. Browser Domain Matching (Strict eTLD+1) ──
+            // ── 1. Smart Website & App Tree Engine Match (DomainTreeService) ──
+            let treeResult = DomainTreeService.shared.match(
+                targetUrl: context.activeUrl,
+                targetAppBundle: context.bundleIdentifier,
+                targetAppName: context.appName,
+                item: item
+            )
+            if treeResult.isMatch {
+                score = max(score, treeResult.score)
+            }
+
+            // ── 2. Browser Domain Direct Matching (Strict host & eTLD+1) ──
             if let activeUrl = context.activeUrl, !activeUrl.isEmpty {
                 let pageRD = registrableDomain(from: activeUrl)
                 let pageHost = URL(string: activeUrl)?.host?.lowercased()
@@ -111,26 +122,25 @@ public final class ActiveContextService: @unchecked Sendable {
                     }
                     // eTLD+1 match (e.g. github.com stored, login.github.com visited)
                     if let prd = pageRD, let ird = itemRD, prd == ird {
-                        score = max(score, 80)
+                        score = max(score, 85)
                         continue
                     }
-                    // NEVER use title fuzzy matching as a suggestion qualifier
                 }
             }
 
-            // ── 2. Native Desktop App Match (non-browser: Slack, Figma, etc.) ──
+            // ── 3. Native Desktop App Direct Match (non-browser: Slack, Figma, etc.) ──
             if !context.isBrowser || context.activeDomain == nil {
                 let cleanAppName = context.appName.lowercased().replacingOccurrences(of: ".app", with: "")
                 // App name must appear in item title or tags (no URL needed for native apps)
                 if item.title.lowercased() == cleanAppName || cleanAppName.contains(item.title.lowercased()) {
-                    score = max(score, 60)
+                    score = max(score, 65)
                 }
                 if item.tags.contains(where: { $0.lowercased() == cleanAppName }) {
-                    score = max(score, 40)
+                    score = max(score, 45)
                 }
             }
 
-            // ── 3. Quality Boosts ──
+            // ── 4. Quality Boosts ──
             if score > 0 {
                 if item.favorite { score += 20 }
                 if !item.updatedAt.isEmpty { score += 10 }

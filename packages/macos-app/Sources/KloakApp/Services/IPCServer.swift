@@ -304,13 +304,21 @@ public final class IPCServer: ObservableObject {
             let scoredMatches: [(item: VaultItem, score: Int)] = store.items.compactMap { item in
                 guard !item.trashed else { return nil }
                 var bestScore = 0
+
+                // 1. Smart Website & App Tree Engine Match (DomainTreeService)
+                let treeResult = DomainTreeService.shared.match(targetUrl: urlParam, item: item)
+                if treeResult.isMatch {
+                    bestScore = max(bestScore, treeResult.score)
+                }
+
+                // 2. Direct host & eTLD+1 matching
                 for u in item.urls {
                     let itemHost = URL(string: u)?.host?.lowercased() ?? ""
                     let itemRD = registrableDomain(from: u)
                     // Exact host match
                     if let ph = pageHost, ph == itemHost { bestScore = max(bestScore, 100); continue }
                     // eTLD+1 match
-                    if let prd = pageRD, let ird = itemRD, prd == ird { bestScore = max(bestScore, 80); continue }
+                    if let prd = pageRD, let ird = itemRD, prd == ird { bestScore = max(bestScore, 85); continue }
                 }
                 guard bestScore > 0 else { return nil }
                 var score = bestScore

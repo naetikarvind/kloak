@@ -608,9 +608,20 @@ public struct SuggestedHeroRow: View {
             )
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.title)
-                    .font(.system(size: 12, weight: .bold))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(item.title)
+                        .font(.system(size: 12, weight: .bold))
+                        .lineLimit(1)
+                    if let tree = DomainTreeService.shared.connectedTree(for: item) {
+                        Text(tree.rootBrand)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(LiquidGlassTheme.primaryAccent)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                }
                 Text(item.username ?? item.identity?.fullName ?? item.card?.cardholderName ?? item.alias?.aliasEmail ?? item.type.displayName)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)

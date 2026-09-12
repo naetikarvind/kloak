@@ -305,6 +305,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var customForwardingEmail: String?
     public var autoMaskUntrustedSites: Bool
     public var threatSensitivity: String // "high", "balanced", "low"
+    public var smartDomainTreeEnabled: Bool
 
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
@@ -319,7 +320,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         connectedAccountToken: nil,
         customForwardingEmail: nil,
         autoMaskUntrustedSites: true,
-        threatSensitivity: "balanced"
+        threatSensitivity: "balanced",
+        smartDomainTreeEnabled: true
     )
 
     public init(
@@ -335,7 +337,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         connectedAccountToken: String? = nil,
         customForwardingEmail: String? = nil,
         autoMaskUntrustedSites: Bool = true,
-        threatSensitivity: String = "balanced"
+        threatSensitivity: String = "balanced",
+        smartDomainTreeEnabled: Bool = true
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -350,6 +353,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.customForwardingEmail = customForwardingEmail
         self.autoMaskUntrustedSites = autoMaskUntrustedSites
         self.threatSensitivity = threatSensitivity
+        self.smartDomainTreeEnabled = smartDomainTreeEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -367,6 +371,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.customForwardingEmail = try container.decodeIfPresent(String.self, forKey: .customForwardingEmail)
         self.autoMaskUntrustedSites = try container.decodeIfPresent(Bool.self, forKey: .autoMaskUntrustedSites) ?? true
         self.threatSensitivity = try container.decodeIfPresent(String.self, forKey: .threatSensitivity) ?? "balanced"
+        self.smartDomainTreeEnabled = try container.decodeIfPresent(Bool.self, forKey: .smartDomainTreeEnabled) ?? true
     }
 }
 

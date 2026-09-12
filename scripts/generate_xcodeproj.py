@@ -36,6 +36,7 @@ files = [
     ("CryptoEngine.swift", "Sources/KloakApp/Services/CryptoEngine.swift", "sourcecode.swift"),
     ("ThreatDetectorService.swift", "Sources/KloakApp/Services/ThreatDetectorService.swift", "sourcecode.swift"),
     ("OAuthManager.swift", "Sources/KloakApp/Services/OAuthManager.swift", "sourcecode.swift"),
+    ("DomainTreeService.swift", "Sources/KloakApp/Services/DomainTreeService.swift", "sourcecode.swift"),
     ("AppIcon.icon", "AppIcon.icon", "folder"),
     ("Info.plist", "Info.plist", "text.plist.xml"),
     ("Kloak.entitlements", "Kloak.entitlements", "text.plist.entitlements")
