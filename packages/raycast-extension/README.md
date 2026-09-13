@@ -8,13 +8,13 @@ A fast, local-first Raycast extension for **Kloak Password Manager**. Access, ge
 
 ## Features
 
-- 🔍 **Search Vault**: Instant fuzzy search across all logins, secure notes, credit cards, identities, email aliases, and authenticators.
+- 🔍 **Search Vault**: Instant search and filter across all logins, secure notes, credit cards, identities, email aliases, and authenticators.
 - 📋 **Auto-Clearing Clipboard**: Copy passwords or 2FA codes with customizable auto-clear timer to protect clipboard privacy.
 - 🎲 **Password Generator**: Generate high-entropy passwords or memorable EFF wordlist passphrases.
-- ⏱️ **Built-in Authenticator (TOTP)**: Real-time 2FA codes with live progress indicators.
+- ⏱️ **Built-in Authenticator**: Real-time 2FA codes (TOTP & HOTP) with live progress countdown indicators.
 - ➕ **Add Entry**: Quickly save new logins, notes, and cards without leaving Raycast.
 - 🔒 **Lock Vault**: Instantly wipe in-memory keys and secure your vault.
-- 🔄 **Import & Export**: Seamlessly migrate credentials to and from 1Password, Bitwarden, LastPass, Apple Passwords, and Chrome.
+- 🔄 **Import & Export**: Seamlessly import credentials from 1Password, Bitwarden, LastPass, Apple Passwords, and Chrome; export to Bitwarden JSON or encrypted Kloak backups.
 
 ## Requirements
 
