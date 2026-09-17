@@ -5,7 +5,7 @@ public struct MenuBarView: View {
     @ObservedObject var vaultStore: VaultStore = .shared
 
     @State private var searchText: String = ""
-    @State private var selectedFilter: MenuBarFilter = .suggestions
+    @State private var selectedFilter: MenuBarFilter = .all
     @State private var selectedItemId: String? = nil
     @State private var copiedFeedback: String? = nil
 
@@ -48,10 +48,7 @@ public struct MenuBarView: View {
 
         switch selectedFilter {
         case .suggestions:
-            if !smartSuggestions.isEmpty {
-                return smartSuggestions
-            }
-            return base
+            return smartSuggestions
         case .all:
             break
         case .logins:
@@ -259,24 +256,37 @@ public struct MenuBarView: View {
                         )
 
                         // Filter Chips
-                        HStack(spacing: 4) {
-                            ForEach(MenuBarFilter.allCases) { filter in
-                                Button(action: { selectedFilter = filter }) {
-                                    Text(filter.rawValue)
-                                        .font(.system(size: 10, weight: selectedFilter == filter ? .bold : .medium))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(
-                                            selectedFilter == filter
-                                            ? LiquidGlassTheme.primaryAccent.opacity(0.25)
-                                            : Color.white.opacity(0.05)
-                                        )
-                                        .foregroundColor(selectedFilter == filter ? .white : .secondary)
-                                        .clipShape(Capsule())
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(MenuBarFilter.allCases) { filter in
+                                    Button(action: { selectedFilter = filter }) {
+                                        Text(filter.rawValue)
+                                            .font(.system(size: 10.5, weight: selectedFilter == filter ? .bold : .medium))
+                                            .lineLimit(1)
+                                            .fixedSize(horizontal: true, vertical: false)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4.5)
+                                            .background(
+                                                selectedFilter == filter
+                                                ? LiquidGlassTheme.primaryAccent.opacity(0.28)
+                                                : Color.white.opacity(0.06)
+                                            )
+                                            .foregroundColor(selectedFilter == filter ? .white : .secondary)
+                                            .clipShape(Capsule())
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(
+                                                        selectedFilter == filter
+                                                        ? LiquidGlassTheme.primaryAccent.opacity(0.6)
+                                                        : Color.white.opacity(0.08),
+                                                        lineWidth: 0.75
+                                                    )
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
-                            Spacer()
+                            .padding(.horizontal, 2)
                         }
                     }
                     .padding(10)
@@ -402,26 +412,59 @@ public struct MenuBarView: View {
                                 }
 
                                 if filteredItems.isEmpty {
-                                    VStack(spacing: 8) {
+                                    VStack(spacing: 10) {
                                         Spacer()
-                                        Image(systemName: liveBrowserUrl != nil ? "key.slash" : "magnifyingglass")
-                                            .font(.system(size: 24))
-                                            .foregroundColor(.secondary.opacity(0.4))
-                                        if let liveUrl = liveBrowserUrl, let host = URL(string: liveUrl)?.host {
-                                            Text("No passwords for \(host.replacingOccurrences(of: "www.", with: ""))")
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .foregroundColor(.secondary)
-                                            Text("Try searching or add a new login.")
-                                                .font(.system(size: 10))
-                                                .foregroundColor(.secondary.opacity(0.6))
+                                        if selectedFilter == .suggestions {
+                                            Image(systemName: "sparkles")
+                                                .font(.system(size: 26))
+                                                .foregroundColor(LiquidGlassTheme.primaryAccent.opacity(0.8))
+
+                                            if let ctx = activeContext, !ctx.displayContext.isEmpty && ctx.displayContext != "App" && ctx.displayContext != "Finder" {
+                                                Text("No suggestions for \(ctx.displayContext)")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundColor(.primary)
+                                                Text("No credentials match this application or website.")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(.secondary)
+                                                    .multilineTextAlignment(.center)
+                                                    .padding(.horizontal, 24)
+                                            } else {
+                                                Text("No Active Suggestions")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundColor(.primary)
+                                                Text("Open a supported website or app to see matching logins.")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(.secondary)
+                                                    .multilineTextAlignment(.center)
+                                                    .padding(.horizontal, 24)
+                                            }
+
+                                            Button(action: { selectedFilter = .all }) {
+                                                Text("Browse All Credentials")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                            }
+                                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                                            .padding(.top, 4)
                                         } else {
-                                            Text(searchText.isEmpty ? "No items found" : "No matches")
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.secondary)
+                                            Image(systemName: liveBrowserUrl != nil ? "key.slash" : "magnifyingglass")
+                                                .font(.system(size: 24))
+                                                .foregroundColor(.secondary.opacity(0.4))
+                                            if let liveUrl = liveBrowserUrl, let host = URL(string: liveUrl)?.host {
+                                                Text("No passwords for \(host.replacingOccurrences(of: "www.", with: ""))")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundColor(.secondary)
+                                                Text("Try searching or add a new login.")
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(.secondary.opacity(0.6))
+                                            } else {
+                                                Text(searchText.isEmpty ? "No items found" : "No matches")
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(.secondary)
+                                            }
                                         }
                                         Spacer()
                                     }
-                                    .frame(maxWidth: .infinity, minHeight: 120)
+                                    .frame(maxWidth: .infinity, minHeight: 140)
                                 } else {
                                     ForEach(filteredItems) { item in
                                         MenuBarItemRow(
@@ -483,7 +526,7 @@ public struct MenuBarView: View {
                 }
             }
         }
-        .frame(width: 350, height: 460)
+        .frame(width: 375, height: 475)
         .background(.ultraThinMaterial)
         .onAppear {
             refreshContext()
@@ -515,7 +558,7 @@ public struct MenuBarView: View {
         self.activeContext = ctx
         let suggestions = ActiveContextService.shared.findSmartSuggestions(in: vaultStore.items, context: ctx)
         self.smartSuggestions = suggestions
-        if !suggestions.isEmpty && ctx.activeDomain != nil {
+        if !suggestions.isEmpty {
             self.selectedFilter = .suggestions
         }
     }

@@ -434,6 +434,23 @@ public final class VaultStore: ObservableObject {
         saveVault()
     }
 
+    public func createFolder(name: String) -> VaultFolder {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return VaultFolder(id: UUID().uuidString, name: "") }
+        let id = "f_" + UUID().uuidString.prefix(8).lowercased()
+        let newFolder = VaultFolder(id: id, name: trimmed)
+        self.folders.append(newFolder)
+        recordUserActivity()
+        saveVault()
+        return newFolder
+    }
+
+    public func deleteFolder(id: String) {
+        self.folders.removeAll { $0.id == id }
+        recordUserActivity()
+        saveVault()
+    }
+
     public func updateSettings(_ newSettings: VaultSettings) {
         self.settings = newSettings
         if newSettings.biometricsEnabled {

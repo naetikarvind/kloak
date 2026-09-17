@@ -142,7 +142,13 @@ public struct VaultMainView: View {
                 items: items,
                 folders: folders,
                 onLock: onLock,
-                onAddItem: { isShowingNewItemSheet = true }
+                onAddItem: { isShowingNewItemSheet = true },
+                onCreateFolder: { name in
+                    _ = VaultStore.shared.createFolder(name: name)
+                },
+                onDeleteFolder: { id in
+                    VaultStore.shared.deleteFolder(id: id)
+                }
             )
             .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
         } detail: {
@@ -228,6 +234,8 @@ public struct VaultMainView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationSplitViewStyle(.balanced)
+        .tint(LiquidGlassTheme.primaryAccent)
+        .accentColor(LiquidGlassTheme.primaryAccent)
         .animation(.spring(response: 0.36, dampingFraction: 0.85, blendDuration: 0.2), value: isUtilitySection)
         .animation(.easeInOut(duration: 0.22), value: selection)
         .animation(.easeInOut(duration: 0.18), value: selectedItemId)

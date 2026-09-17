@@ -29,7 +29,25 @@ public struct ActiveContext: Sendable {
 public final class ActiveContextService: @unchecked Sendable {
     public static let shared = ActiveContextService()
 
-    private init() {}
+    private var lastExternalApp: NSRunningApplication?
+
+    private init() {
+        // Track the last active non-Kloak app so when MenuBarExtra opens, we know what app the user was just in
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
+            let bundleId = app.bundleIdentifier ?? ""
+            if bundleId != Bundle.main.bundleIdentifier &&
+               bundleId != "com.kloak.app" &&
+               bundleId != "app.kloak.macos" &&
+               app.activationPolicy == .regular {
+                self?.lastExternalApp = app
+            }
+        }
+    }
 
     /// Detects the user's active frontmost application and browser URL.
     public func getActiveContext() -> ActiveContext {
@@ -38,11 +56,12 @@ public final class ActiveContextService: @unchecked Sendable {
         let nonKloakApps = runningApps.filter {
             $0.isActive &&
             $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            $0.bundleIdentifier != "com.kloak.app" &&
             $0.bundleIdentifier != "app.kloak.macos" &&
             $0.activationPolicy == .regular
         }
 
-        guard let frontApp = nonKloakApps.first ?? NSWorkspace.shared.frontmostApplication else {
+        guard let frontApp = nonKloakApps.first ?? lastExternalApp ?? NSWorkspace.shared.frontmostApplication else {
             return ActiveContext(appName: "Finder", bundleIdentifier: "com.apple.finder", activeDomain: nil, activeUrl: nil)
         }
 

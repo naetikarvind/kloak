@@ -22,6 +22,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return false
     }
+
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag {
+            if let window = sender.windows.first(where: { $0.canBecomeKey }) ?? sender.windows.first {
+                window.makeKeyAndOrderFront(nil)
+            }
+        }
+        return true
+    }
 }
 
 @main
@@ -99,6 +108,7 @@ public struct KloakApp: App {
                 OAuthManager.shared.handleIncomingURL(url)
             }
             .frame(minWidth: 420, minHeight: 480)
+            .tint(LiquidGlassTheme.primaryAccent)
             .background(.ultraThinMaterial)
         }
         .windowStyle(.hiddenTitleBar)

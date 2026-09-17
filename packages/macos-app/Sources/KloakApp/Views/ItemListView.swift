@@ -88,6 +88,8 @@ public struct ItemListView: View {
                     }
                 }
                 .listStyle(.inset)
+                .tint(LiquidGlassTheme.primaryAccent)
+                .accentColor(LiquidGlassTheme.primaryAccent)
                 .animation(.spring(response: 0.35, dampingFraction: 0.75), value: items)
             }
         }

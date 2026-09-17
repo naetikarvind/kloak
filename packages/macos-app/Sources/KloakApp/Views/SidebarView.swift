@@ -17,6 +17,11 @@ public struct SidebarView: View {
     var folders: [VaultFolder]
     var onLock: () -> Void
     var onAddItem: () -> Void
+    var onCreateFolder: ((String) -> Void)? = nil
+    var onDeleteFolder: ((String) -> Void)? = nil
+
+    @State private var isShowingNewFolderAlert: Bool = false
+    @State private var newFolderName: String = ""
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -57,28 +62,56 @@ public struct SidebarView: View {
                     }
                 }
 
-                if !folders.isEmpty {
-                    Section("Folders") {
-                        ForEach(folders) { folder in
-                            let count = items.filter { item in
-                                guard !item.trashed else { return false }
-                                if item.tags.contains(folder.id) { return true }
-                                if item.tags.contains(where: { $0.lowercased() == folder.name.lowercased() }) { return true }
-                                if folder.name.lowercased() == "imported" && item.tags.contains(where: {
-                                    let lower = $0.lowercased()
-                                    return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
-                                }) {
-                                    return true
-                                }
-                                return false
-                            }.count
-
-                            NavigationLink(value: NavigationSection.folder(folder.id)) {
-                                Label(folder.name, systemImage: "folder.fill")
+                Section(header: HStack {
+                    Text("Folders")
+                    Spacer()
+                    Button(action: {
+                        newFolderName = ""
+                        isShowingNewFolderAlert = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Add New Folder")
+                }) {
+                    ForEach(folders) { folder in
+                        let count = items.filter { item in
+                            guard !item.trashed else { return false }
+                            if item.tags.contains(folder.id) { return true }
+                            if item.tags.contains(where: { $0.lowercased() == folder.name.lowercased() }) { return true }
+                            if folder.name.lowercased() == "imported" && item.tags.contains(where: {
+                                let lower = $0.lowercased()
+                                return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
+                            }) {
+                                return true
                             }
-                            .badge(count)
+                            return false
+                        }.count
+
+                        NavigationLink(value: NavigationSection.folder(folder.id)) {
+                            Label(folder.name, systemImage: "folder.fill")
+                        }
+                        .badge(count)
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                onDeleteFolder?(folder.id)
+                            } label: {
+                                Label("Delete Folder", systemImage: "trash")
+                            }
                         }
                     }
+
+                    Button(action: {
+                        newFolderName = ""
+                        isShowingNewFolderAlert = true
+                    }) {
+                        Label("Add Folder...", systemImage: "folder.badge.plus")
+                            .font(.system(size: 12))
+                            .foregroundColor(LiquidGlassTheme.primaryAccent)
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 Section("Tools") {
@@ -127,6 +160,18 @@ public struct SidebarView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
             }
+        }
+        .alert("New Folder", isPresented: $isShowingNewFolderAlert) {
+            TextField("Folder Name", text: $newFolderName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let trimmed = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    onCreateFolder?(trimmed)
+                }
+            }
+        } message: {
+            Text("Enter a name for the new folder to organize your credentials.")
         }
     }
 }

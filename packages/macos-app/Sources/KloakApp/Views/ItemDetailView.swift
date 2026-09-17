@@ -459,6 +459,46 @@ public struct ItemDetailView: View {
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+        } else if item.type == .login {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PASSWORD")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    Text("No password saved")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .italic()
+
+                    Spacer()
+
+                    Button(action: {
+                        editTitle = item.title
+                        editUsername = item.username ?? ""
+                        editPassword = ""
+                        editUrls = item.urls
+                        editNotes = item.notes ?? ""
+                        isEditing = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Add Password")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(10)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
 
         // URLs
