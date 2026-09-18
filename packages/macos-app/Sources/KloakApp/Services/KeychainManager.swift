@@ -15,15 +15,24 @@ public final class KeychainManager: @unchecked Sendable {
     // MARK: - Master Key Secure Enclave / Keychain Storage
 
     public func storeKey(keyData: Data) -> Bool {
-        let query: [String: Any] = [
+        var access: SecAccess?
+        // Open access list allows ad-hoc builds of Kloak to access without prompting for keychain passwords
+        _ = SecAccessCreate("Kloak" as CFString, nil, &access)
+
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+            kSecValueData as String: keyData
         ]
 
-        SecItemDelete(query as CFDictionary)
+        if let access = access {
+            query[kSecAttrAccess as String] = access
+        } else {
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+        }
+
+        clearKey()
         let status = SecItemAdd(query as CFDictionary, nil)
         return status == errSecSuccess
     }

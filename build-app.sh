@@ -15,10 +15,16 @@ echo ""
 # ── 1. Build Xcode App (Release) ─────────────────────────────────────────────
 echo "→ Building with xcodebuild (release)..."
 cd "$MACOS_APP_DIR"
+# Clean any legacy ad-hoc master key envelope from the keychain to prevent system prompts
+security delete-generic-password -s "app.kloak.vault" 2>/dev/null || true
+
 xcodebuild -project Kloak.xcodeproj \
            -scheme Kloak \
            -configuration Release \
            -derivedDataPath "$MACOS_APP_DIR/DerivedData" \
+           CODE_SIGN_IDENTITY="" \
+           CODE_SIGNING_REQUIRED=NO \
+           CODE_SIGNING_ALLOWED=NO \
            build
 
 BUILT_APP="$MACOS_APP_DIR/DerivedData/Build/Products/Release/$APP_NAME.app"

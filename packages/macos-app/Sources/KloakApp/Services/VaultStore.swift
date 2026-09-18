@@ -147,8 +147,8 @@ public final class VaultStore: ObservableObject {
         let fileData = try JSONEncoder().encode(vaultFile)
         try fileData.write(to: Self.vaultFileURL, options: .atomic)
 
-        // 9. Store in Keychain for biometric unlock if requested
-        if enableBiometrics {
+        // 9. Store in Keychain for biometric unlock if requested and keychain sync enabled
+        if enableBiometrics && keychainSyncEnabled {
             _ = KeychainManager.shared.storeKey(keyData: vaultKeyData)
         } else {
             KeychainManager.shared.clearKey()
@@ -255,9 +255,13 @@ public final class VaultStore: ObservableObject {
                 self.saveVault()
             }
 
-            // Store in Keychain for biometric unlock across sessions
-            let keyData = CryptoEngine.shared.keyToData(unwrappedVaultKey)
-            _ = KeychainManager.shared.storeKey(keyData: keyData)
+            // Store in Keychain for biometric unlock across sessions only if keychain sync is enabled
+            if self.settings.keychainSyncEnabled {
+                let keyData = CryptoEngine.shared.keyToData(unwrappedVaultKey)
+                _ = KeychainManager.shared.storeKey(keyData: keyData)
+            } else {
+                KeychainManager.shared.clearKey()
+            }
 
             startAutoLockTimer()
             return true
@@ -270,13 +274,19 @@ public final class VaultStore: ObservableObject {
     // MARK: - Unlock with Biometrics (Touch ID)
 
     public var hasBiometricSession: Bool {
-        return sessionVaultKey != nil || KeychainManager.shared.retrieveKey() != nil
+        if sessionVaultKey != nil {
+            return true
+        }
+        if settings.keychainSyncEnabled {
+            return KeychainManager.shared.retrieveKey() != nil
+        }
+        return false
     }
 
     public func unlockWithBiometrics() async -> Bool {
         let candidateKey: SymmetricKey? = {
             if let key = sessionVaultKey { return key }
-            if let data = KeychainManager.shared.retrieveKey() {
+            if settings.keychainSyncEnabled, let data = KeychainManager.shared.retrieveKey() {
                 return CryptoEngine.shared.keyFromData(data)
             }
             return nil
@@ -453,7 +463,7 @@ public final class VaultStore: ObservableObject {
 
     public func updateSettings(_ newSettings: VaultSettings) {
         self.settings = newSettings
-        if newSettings.biometricsEnabled {
+        if newSettings.biometricsEnabled && newSettings.keychainSyncEnabled {
             if let key = vaultKey {
                 _ = KeychainManager.shared.storeKey(keyData: CryptoEngine.shared.keyToData(key))
             }
