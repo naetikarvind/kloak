@@ -273,6 +273,23 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    public var displaySubtitle: String {
+        if let u = username, !u.isEmpty { return u }
+        if let fn = identity?.fullName, !fn.isEmpty { return fn }
+        if let ch = card?.cardholderName, !ch.isEmpty { return ch }
+        if let al = alias?.aliasEmail, !al.isEmpty { return al }
+        return type.displayName
+    }
+
+    public var displayAccountName: String? {
+        if let u = username, !u.isEmpty { return u }
+        if let e = oauth?.accountEmail, !e.isEmpty { return e }
+        if let fn = identity?.fullName, !fn.isEmpty { return fn }
+        if let ch = card?.cardholderName, !ch.isEmpty { return ch }
+        if let al = alias?.aliasEmail, !al.isEmpty { return al }
+        return nil
+    }
 }
 
 // MARK: - Vault Folder
