@@ -6,6 +6,7 @@ public enum NavigationSection: Hashable {
     case category(ItemType)
     case folder(String)
     case trash
+    case duplicates
     case generator
     case importExport
     case settings
@@ -134,6 +135,20 @@ public struct SidebarView: View {
                 }
 
                 Section(header: sectionHeader("Tools")) {
+                    let dupCount = DuplicateDetectorService.shared.findDuplicateAccounts(in: items).count
+                    let reusedCount = DuplicateDetectorService.shared.findReusedPasswords(in: items).count
+                    let totalHealthIssues = dupCount + reusedCount
+
+                    NavigationLink(value: NavigationSection.duplicates) {
+                        Label {
+                            Text("Duplicates")
+                        } icon: {
+                            Image(systemName: "doc.on.doc.fill")
+                                .foregroundColor(totalHealthIssues > 0 ? LiquidGlassTheme.amberAccent : .secondary)
+                        }
+                        .badge(totalHealthIssues)
+                    }
+
                     NavigationLink(value: NavigationSection.generator) {
                         Label("Password Generator", systemImage: "dice.fill")
                     }

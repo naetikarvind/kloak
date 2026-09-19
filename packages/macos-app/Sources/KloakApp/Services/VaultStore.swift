@@ -518,6 +518,64 @@ public final class VaultStore: ObservableObject {
         return (addedCount, [])
     }
 
+    // MARK: - Duplicate Management & Resolution
+
+    public func mergeDuplicateGroup(_ group: DuplicateAccountGroup) {
+        let (merged, trashedIds) = DuplicateDetectorService.shared.smartMerge(items: group.items)
+        
+        if let idx = items.firstIndex(where: { $0.id == merged.id }) {
+            items[idx] = merged
+        } else {
+            items.append(merged)
+        }
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        for id in trashedIds {
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].trashed = true
+                items[idx].updatedAt = now
+            }
+        }
+
+        recordUserActivity()
+        saveVault()
+    }
+
+    @discardableResult
+    public func autoMergeAllIdenticalDuplicates() -> Int {
+        let groups = DuplicateDetectorService.shared.findDuplicateAccounts(in: items)
+        let exactGroups = groups.filter { $0.isExactMatch }
+        guard !exactGroups.isEmpty else { return 0 }
+
+        for group in exactGroups {
+            mergeDuplicateGroup(group)
+        }
+
+        return exactGroups.count
+    }
+
+    @discardableResult
+    public func bulkImportWithResolution(toAdd: [VaultItem], toUpdate: [VaultItem]) -> Int {
+        var modifiedCount = 0
+
+        for updatedItem in toUpdate {
+            if let idx = items.firstIndex(where: { $0.id == updatedItem.id }) {
+                items[idx] = updatedItem
+                modifiedCount += 1
+            }
+        }
+
+        for var newItem in toAdd {
+            newItem.title = KeychainManager.cleanTitle(newItem.title)
+            items.append(newItem)
+            modifiedCount += 1
+        }
+
+        recordUserActivity()
+        saveVault()
+        return modifiedCount
+    }
+
     // MARK: - Master Password Change
 
     public func changeMasterPassword(oldPassword: String, newPassword: String) async -> Bool {

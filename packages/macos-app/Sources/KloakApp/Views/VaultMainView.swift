@@ -47,7 +47,7 @@ public struct VaultMainView: View {
 
     private var isUtilitySection: Bool {
         switch selection {
-        case .generator, .importExport, .settings:
+        case .generator, .importExport, .settings, .duplicates:
             return true
         default:
             return false
@@ -90,7 +90,7 @@ public struct VaultMainView: View {
             }
         case .trash:
             base = items.filter { $0.trashed }
-        case .generator, .importExport, .settings:
+        case .generator, .importExport, .settings, .duplicates:
             base = []
         }
 
@@ -115,6 +115,18 @@ public struct VaultMainView: View {
     @ViewBuilder
     private var utilityColumnView: some View {
         switch selection {
+        case .duplicates:
+            DuplicateManagerView(
+                items: $items,
+                onSaveItem: onSaveItem,
+                onDeleteItem: onDeleteItem,
+                onMergeGroup: { group in
+                    VaultStore.shared.mergeDuplicateGroup(group)
+                },
+                onAutoMergeAll: {
+                    VaultStore.shared.autoMergeAllIdenticalDuplicates()
+                }
+            )
         case .generator:
             GeneratorView()
         case .importExport:
@@ -300,7 +312,7 @@ public struct VaultMainView: View {
 
     private func triggerWindowResize(for sec: NavigationSection, animated: Bool = true) {
         switch sec {
-        case .settings:
+        case .settings, .duplicates:
             WindowSizeManager.shared.resize(to: .vaultSettings, animated: animated)
         case .generator:
             WindowSizeManager.shared.resize(to: .vaultGenerator, animated: animated)

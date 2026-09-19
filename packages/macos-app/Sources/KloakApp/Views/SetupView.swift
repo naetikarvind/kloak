@@ -1061,26 +1061,16 @@ public struct SetupView: View {
                 return
             }
 
-            var existingKeys = Set(importedFileItems.map { "\($0.title)_\($0.username ?? "")" })
-            var addedCount = 0
-            for item in items {
-                let key = "\(item.title)_\(item.username ?? "")"
-                if !existingKeys.contains(key) {
-                    importedFileItems.append(item)
-                    existingKeys.insert(key)
-                    addedCount += 1
-                } else if let idx = importedFileItems.firstIndex(where: { "\($0.title)_\($0.username ?? "")" == key }) {
-                    if let newPass = item.password, !newPass.isEmpty {
-                        importedFileItems[idx].password = newPass
-                    }
-                    if let newTotp = item.totpSecret, !newTotp.isEmpty {
-                        importedFileItems[idx].totpSecret = newTotp
-                    }
-                    if !item.urls.isEmpty {
-                        importedFileItems[idx].urls = item.urls
-                    }
+            var allStaged = importedFileItems + items
+            let dupGroups = DuplicateDetectorService.shared.findDuplicateAccounts(in: allStaged)
+            for group in dupGroups {
+                let (merged, trashedIds) = DuplicateDetectorService.shared.smartMerge(items: group.items)
+                allStaged.removeAll { trashedIds.contains($0.id) }
+                if let idx = allStaged.firstIndex(where: { $0.id == merged.id }) {
+                    allStaged[idx] = merged
                 }
             }
+            importedFileItems = allStaged
 
             importedFileName = url.lastPathComponent
             importedFileProvider = provider

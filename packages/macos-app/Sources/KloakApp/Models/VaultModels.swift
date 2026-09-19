@@ -401,3 +401,132 @@ public struct VaultPayload: Codable, Sendable {
     public var settings: VaultSettings
     public var updatedAt: String
 }
+
+// MARK: - Duplicate & Reused Detection Models
+
+public struct DuplicateAccountGroup: Identifiable, Hashable, Sendable {
+    public var id: String // Unique account key, e.g. "normalizedDomain_normalizedUser"
+    public var title: String
+    public var username: String
+    public var items: [VaultItem]
+    public var isExactMatch: Bool // All passwords and secrets are identical
+
+    public init(id: String, title: String, username: String, items: [VaultItem], isExactMatch: Bool) {
+        self.id = id
+        self.title = title
+        self.username = username
+        self.items = items
+        self.isExactMatch = isExactMatch
+    }
+}
+
+public struct ReusedPasswordGroup: Identifiable, Hashable, Sendable {
+    public var id: String
+    public var password: String
+    public var items: [VaultItem]
+
+    public init(id: String = UUID().uuidString, password: String, items: [VaultItem]) {
+        self.id = id
+        self.password = password
+        self.items = items
+    }
+}
+
+public enum ImportDuplicateStrategy: String, CaseIterable, Identifiable, Sendable {
+    case updateExisting = "update_existing"
+    case skipDuplicate = "skip_duplicate"
+    case keepBoth = "keep_both"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .updateExisting: return "Update Existing"
+        case .skipDuplicate: return "Skip Duplicates"
+        case .keepBoth: return "Keep Both"
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .updateExisting: return "Overwrites and enriches matching vault items with newer data from the file."
+        case .skipDuplicate: return "Keeps current vault entries untouched and only adds new unique logins."
+        case .keepBoth: return "Adds duplicate items as separate entries with a numbered copy indicator."
+        }
+    }
+
+    public var iconName: String {
+        switch self {
+        case .updateExisting: return "arrow.triangle.2.circlepath.circle.fill"
+        case .skipDuplicate: return "forward.fill"
+        case .keepBoth: return "plus.square.fill.on.square.fill"
+        }
+    }
+}
+
+public enum FileImportItemStatus: String, CaseIterable, Identifiable, Sendable {
+    case new = "new"
+    case exactMatch = "exact_match"
+    case conflict = "conflict"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .new: return "New Item"
+        case .exactMatch: return "Exact Duplicate"
+        case .conflict: return "Conflicting Duplicate"
+        }
+    }
+}
+
+public struct FileImportComparisonItem: Identifiable, Hashable, Sendable {
+    public var id: String
+    public var fileItem: VaultItem
+    public var matchedVaultItem: VaultItem?
+    public var status: FileImportItemStatus
+    public var selectedStrategy: ImportDuplicateStrategy
+
+    public init(
+        id: String = UUID().uuidString,
+        fileItem: VaultItem,
+        matchedVaultItem: VaultItem? = nil,
+        status: FileImportItemStatus,
+        selectedStrategy: ImportDuplicateStrategy = .updateExisting
+    ) {
+        self.id = id
+        self.fileItem = fileItem
+        self.matchedVaultItem = matchedVaultItem
+        self.status = status
+        self.selectedStrategy = selectedStrategy
+    }
+}
+
+public struct FileImportComparisonResult: Identifiable, Sendable {
+    public var id: String
+    public var items: [FileImportComparisonItem]
+    public var fileName: String?
+
+    public init(id: String = UUID().uuidString, items: [FileImportComparisonItem], fileName: String? = nil) {
+        self.id = id
+        self.items = items
+        self.fileName = fileName
+    }
+
+    public var newCount: Int {
+        items.filter { $0.status == .new }.count
+    }
+
+    public var exactMatchCount: Int {
+        items.filter { $0.status == .exactMatch }.count
+    }
+
+    public var conflictCount: Int {
+        items.filter { $0.status == .conflict }.count
+    }
+
+    public var duplicateCount: Int {
+        exactMatchCount + conflictCount
+    }
+}
+

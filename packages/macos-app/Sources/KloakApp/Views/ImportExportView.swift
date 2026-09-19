@@ -14,6 +14,7 @@ public struct ImportExportView: View {
     @State private var exportResultText: String?
     @State private var keychainStatusText: String?
     @State private var isShowingFilePicker: Bool = false
+    @State private var pendingComparison: FileImportComparisonResult? = nil
 
     let sources = [
         "Bitwarden (JSON / CSV)",
@@ -158,6 +159,24 @@ public struct ImportExportView: View {
             }
             .padding(20)
         }
+        .sheet(item: $pendingComparison) { comp in
+            ImportDuplicateResolverSheet(
+                comparison: comp,
+                onConfirm: { globalStrat, overrides in
+                    let (toAdd, toUpdate) = DuplicateDetectorService.shared.resolveImport(
+                        comparison: comp,
+                        globalStrategy: globalStrat,
+                        overrides: overrides
+                    )
+                    let resolvedCount = VaultStore.shared.bulkImportWithResolution(toAdd: toAdd, toUpdate: toUpdate)
+                    importStatus = "Imported & resolved \(resolvedCount) items from \(comp.fileName ?? "file")!"
+                    pendingComparison = nil
+                },
+                onCancel: {
+                    pendingComparison = nil
+                }
+            )
+        }
     }
 
     private func importDirectFromKeychain() {
@@ -190,12 +209,35 @@ public struct ImportExportView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             do {
-                let content = try String(contentsOf: url, encoding: .utf8)
-                let (count, warnings) = onImport(content, selectedSource)
-                importStatus = "Imported \(count) items from \(url.lastPathComponent)!"
-                importWarnings = warnings
+                var (parsedItems, _) = try KeychainManager.shared.importFromFile(url: url)
+                if parsedItems.isEmpty {
+                    let content = try String(contentsOf: url, encoding: .utf8)
+                    let (res, _) = KeychainManager.shared.importFromContent(content, filename: url.lastPathComponent, provider: nil)
+                    parsedItems = res
+                }
+
+                guard !parsedItems.isEmpty else {
+                    importStatus = "No valid credentials found in \(url.lastPathComponent)."
+                    return
+                }
+
+                // Run comparison against existing vault
+                let comparison = DuplicateDetectorService.shared.compareFileWithVault(
+                    fileItems: parsedItems,
+                    vaultItems: items,
+                    fileName: url.lastPathComponent
+                )
+
+                if comparison.duplicateCount > 0 {
+                    // Present resolution sheet for duplicate review
+                    pendingComparison = comparison
+                } else {
+                    // Direct import as all items are new
+                    let added = VaultStore.shared.bulkImportWithResolution(toAdd: parsedItems, toUpdate: [])
+                    importStatus = "Successfully imported \(added) new items from \(url.lastPathComponent)!"
+                }
             } catch {
-                importStatus = "Failed to read file: \(error.localizedDescription)"
+                importStatus = "Failed to import file: \(error.localizedDescription)"
             }
         }
     }
