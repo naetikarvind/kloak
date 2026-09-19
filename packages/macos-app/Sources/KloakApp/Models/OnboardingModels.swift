@@ -15,7 +15,7 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .cloudAccounts: return "Cloud Accounts"
-        case .appleKeychain: return "Apple Keychain"
+        case .appleKeychain: return "Import Passwords"
         case .vaultPassword: return "Master Password"
         case .ecosystem: return "Integrations"
         case .complete: return "Ready"
@@ -25,7 +25,7 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
     public var subtitle: String {
         switch self {
         case .cloudAccounts: return "Connect Google, Proton, or Microsoft"
-        case .appleKeychain: return "Link Apple Keychain & Safari credentials"
+        case .appleKeychain: return "Import from any password manager or Apple Keychain"
         case .vaultPassword: return "Initialize local vault encryption"
         case .ecosystem: return "Browser & Raycast native bridges"
         case .complete: return "Your vault is ready"

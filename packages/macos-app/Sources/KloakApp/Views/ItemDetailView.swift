@@ -74,7 +74,7 @@ public struct ItemDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 // Header Card
-                HStack(spacing: 14) {
+                HStack(alignment: .center, spacing: 12) {
                     FaviconView(
                         urls: isEditing ? editUrls : item.urls,
                         title: isEditing ? editTitle : item.title,
@@ -109,7 +109,6 @@ public struct ItemDetailView: View {
                                 Text(item.type.displayName)
                                     .font(.system(size: 11, weight: .medium))
                                     .lineLimit(1)
-                                    .fixedSize()
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 2)
                                     .background(Color.white.opacity(0.08))
@@ -125,9 +124,8 @@ public struct ItemDetailView: View {
                                         .font(.system(size: 9))
                                     Text(folder.name)
                                         .font(.system(size: 11, weight: .semibold))
+                                        .lineLimit(1)
                                 }
-                                .lineLimit(1)
-                                .fixedSize()
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
                                 .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
@@ -137,7 +135,6 @@ public struct ItemDetailView: View {
                                 Text(tag)
                                     .font(.system(size: 11, weight: .medium))
                                     .lineLimit(1)
-                                    .fixedSize()
                                     .padding(.horizontal, 7)
                                     .padding(.vertical, 2)
                                     .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
@@ -152,7 +149,6 @@ public struct ItemDetailView: View {
                                     Text(tree.displayName)
                                         .font(.system(size: 11, weight: .semibold))
                                         .lineLimit(1)
-                                        .fixedSize()
                                 }
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 2)
@@ -163,8 +159,9 @@ public struct ItemDetailView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 4)
 
                     if isEditing {
                         HStack(spacing: 8) {
@@ -246,7 +243,7 @@ public struct ItemDetailView: View {
 
                 // EDIT MODE FORM
                 if isEditing {
-                    VStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 16) {
                         switch item.type {
                         case .login:
                             loginEditSection
@@ -282,9 +279,10 @@ public struct ItemDetailView: View {
                                     }
                                     .labelsHidden()
                                     .pickerStyle(.menu)
+
+                                    Spacer()
                                 }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
+                                .padding(10)
                                 .background(Color.black.opacity(0.3))
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .overlay(
@@ -292,6 +290,7 @@ public struct ItemDetailView: View {
                                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                                 )
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
                         // Notes section (common to all items)
@@ -438,7 +437,8 @@ public struct ItemDetailView: View {
                     .padding(.top, 8)
                 }
             }
-            .padding(20)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .animation(.easeInOut(duration: 0.22), value: item.id)
         .onChange(of: item.id) {
@@ -685,6 +685,7 @@ public struct ItemDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
+                .fixedSize()
             }
             .padding(10)
             .background(Color.black.opacity(0.3))

@@ -105,8 +105,23 @@ public final class VaultStore: ObservableObject {
             finalItems.append(contentsOf: Self.defaultSeedItems)
         }
         for var imported in importedItems {
-            // Strictly exclude any developer registration or system internal item
-            if KeychainManager.isSystemOrDeveloperItem(
+            // Only apply system/developer heuristic filter to raw unauthenticated Keychain items (which lack passwords).
+            // Never drop user-imported items from files, cloud providers, or items with explicit passwords.
+            let isUserCredential = imported.password != nil ||
+                                  imported.tags.contains("Apple Passwords") ||
+                                  imported.tags.contains("Google Chrome") ||
+                                  imported.tags.contains("Bitwarden") ||
+                                  imported.tags.contains("1Password") ||
+                                  imported.tags.contains("KeePass") ||
+                                  imported.tags.contains("Proton Pass") ||
+                                  imported.tags.contains("Dashlane") ||
+                                  imported.tags.contains("LastPass") ||
+                                  imported.tags.contains("File Import") ||
+                                  imported.tags.contains("Google") ||
+                                  imported.tags.contains("Proton") ||
+                                  imported.tags.contains("Microsoft")
+
+            if !isUserCredential && KeychainManager.isSystemOrDeveloperItem(
                 server: imported.urls.first ?? "",
                 service: imported.title,
                 account: imported.username ?? "",

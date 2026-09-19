@@ -23,10 +23,42 @@ public struct SidebarView: View {
     @State private var isShowingNewFolderAlert: Bool = false
     @State private var newFolderName: String = ""
 
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.secondary.opacity(0.75))
+            .padding(.leading, 8)
+    }
+
+    private var foldersHeader: some View {
+        HStack {
+            Text("FOLDERS")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.secondary.opacity(0.75))
+                .padding(.leading, 8)
+            Spacer()
+            Button(action: {
+                newFolderName = ""
+                isShowingNewFolderAlert = true
+            }) {
+                Image(systemName: "plus")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(.trailing, 4)
+            }
+            .buttonStyle(.plain)
+            .help("Add New Folder")
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
+            // Traffic lights clearance for hiddenTitleBar window style
+            Color.clear
+                .frame(height: 28)
+
             List(selection: $selection) {
-                Section("Vault") {
+                Section(header: sectionHeader("Vault")) {
                     NavigationLink(value: NavigationSection.allItems) {
                         Label {
                             Text("All Items")
@@ -46,7 +78,7 @@ public struct SidebarView: View {
                     }
                 }
 
-                Section("Categories") {
+                Section(header: sectionHeader("Categories")) {
                     ForEach(ItemType.allCases) { type in
                         NavigationLink(value: NavigationSection.category(type)) {
                             Label {
@@ -62,20 +94,7 @@ public struct SidebarView: View {
                     }
                 }
 
-                Section(header: HStack {
-                    Text("Folders")
-                    Spacer()
-                    Button(action: {
-                        newFolderName = ""
-                        isShowingNewFolderAlert = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Add New Folder")
-                }) {
+                Section(header: foldersHeader) {
                     ForEach(folders) { folder in
                         let count = items.filter { item in
                             guard !item.trashed else { return false }
@@ -114,7 +133,7 @@ public struct SidebarView: View {
                     .buttonStyle(.plain)
                 }
 
-                Section("Tools") {
+                Section(header: sectionHeader("Tools")) {
                     NavigationLink(value: NavigationSection.generator) {
                         Label("Password Generator", systemImage: "dice.fill")
                     }
@@ -134,6 +153,7 @@ public struct SidebarView: View {
                 }
             }
             .listStyle(.sidebar)
+            .safeAreaPadding(.leading, 4)
 
             // Pinned Bottom Lock Vault Button
             VStack(spacing: 0) {

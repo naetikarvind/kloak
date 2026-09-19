@@ -69,6 +69,10 @@ public struct KloakApp: App {
                             vaultStore.updateSettings(newSettings)
                         },
                         onImport: { content, format in
+                            let (items, _) = KeychainManager.shared.importFromContent(content, filename: nil, provider: nil)
+                            if !items.isEmpty {
+                                return vaultStore.bulkImport(items)
+                            }
                             let parsedItems = parseImportContent(content, format: format)
                             return vaultStore.bulkImport(parsedItems)
                         },
@@ -110,6 +114,11 @@ public struct KloakApp: App {
             .frame(minWidth: 420, minHeight: 480)
             .tint(LiquidGlassTheme.primaryAccent)
             .background(.ultraThinMaterial)
+            .background(
+                WindowAccessor { window in
+                    WindowSizeManager.shared.registerWindow(window)
+                }
+            )
         }
         .windowStyle(.hiddenTitleBar)
         .windowToolbarStyle(.unified)
@@ -301,4 +310,26 @@ private func safeCol(_ cols: [String], _ idx: Int?) -> String? {
     guard let i = idx, i < cols.count else { return nil }
     let val = cols[i].trimmingCharacters(in: .whitespaces)
     return val.isEmpty ? nil : val
+}
+
+struct WindowAccessor: NSViewRepresentable {
+    let callback: (NSWindow) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async {
+            if let window = view.window {
+                callback(window)
+            }
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async {
+            if let window = nsView.window {
+                callback(window)
+            }
+        }
+    }
 }

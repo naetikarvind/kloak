@@ -392,14 +392,17 @@ public struct OnboardingAccountConnectSheet: View {
         let panel = NSOpenPanel()
         panel.title = "Select \(provider.displayName) Passwords Export"
         panel.prompt = "Import"
-        panel.allowedContentTypes = [.commaSeparatedText, .json, .plainText]
+        var allowedTypes: [UTType] = [.commaSeparatedText, .json, .plainText, .data]
+        if let csvType = UTType(filenameExtension: "csv") { allowedTypes.append(csvType) }
+        if let jsonType = UTType(filenameExtension: "json") { allowedTypes.append(jsonType) }
+        panel.allowedContentTypes = allowedTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
 
         if panel.runModal() == .OK, let url = panel.url {
             do {
-                let content = try String(contentsOf: url, encoding: .utf8)
+                let content = try KeychainManager.readFileContent(at: url)
                 let items = KeychainManager.shared.importFromProviderContent(content, provider: provider)
                 if !items.isEmpty {
                     self.importedItems.append(contentsOf: items)

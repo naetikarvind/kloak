@@ -16,10 +16,15 @@ public struct SetupView: View {
     @State private var enableBiometrics: Bool = true
     @FocusState private var focusedField: SetupField?
 
-    // Step 2: Apple Keychain State
+    // Step 2: Passwords Import & Keychain State
     @State private var isScanningKeychain: Bool = false
     @State private var keychainScanResult: KeychainScanPreview? = nil
     @State private var importedKeychainItems: [VaultItem] = []
+    @State private var importedFileItems: [VaultItem] = []
+    @State private var importedFileName: String? = nil
+    @State private var importedFileProvider: String? = nil
+    @State private var isTargetedForDrop: Bool = false
+    @State private var isImportingFile: Bool = false
     @State private var csvImportCount: Int = 0
     @State private var keychainPasswordInput: String = ""
     @State private var showKeychainPasswordInput: Bool = false
@@ -353,25 +358,25 @@ public struct SetupView: View {
         }
     }
 
-    // MARK: - Step 2: Apple Keychain Integration
+    // MARK: - Step 2: Passwords & Vault Import
 
     private var step2KeychainView: some View {
         VStack(spacing: 18) {
             VStack(spacing: 4) {
-                Text("Connect Apple Keychain")
+                Text("Import Passwords & Vault")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.primary)
 
-                Text("Import your existing Safari and macOS passwords directly into Kloak with zero cloud transmission.")
+                Text("Import your existing passwords from Apple Keychain, Safari, Chrome, Bitwarden, 1Password, KeePass, Proton, or any CSV / JSON export file.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
+                    .frame(maxWidth: 480)
             }
             .padding(.top, 6)
 
             VStack(alignment: .leading, spacing: 14) {
-                // Option A: iCloud Passwords Export CSV Import
+                // Option A: Password Export File (Drag & Drop or Browse)
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 14) {
                         ZStack {
@@ -379,66 +384,122 @@ public struct SetupView: View {
                                 .fill(LiquidGlassTheme.primaryAccent.opacity(0.18))
                                 .frame(width: 44, height: 44)
 
-                            Image(systemName: "icloud.and.arrow.down.fill")
+                            Image(systemName: "arrow.down.doc.fill")
                                 .font(.system(size: 20))
                                 .foregroundColor(LiquidGlassTheme.primaryAccent)
                         }
 
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("iCloud Passwords / Safari Export (.csv)")
-                                .font(.system(size: 14, weight: .bold))
+                            HStack(spacing: 6) {
+                                Text("Import Password File")
+                                    .font(.system(size: 14, weight: .bold))
 
-                            Text("Import all Safari and iCloud credentials via exported CSV")
+                                if !importedFileItems.isEmpty {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                        Text("\(importedFileItems.count) loaded")
+                                    }
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                                    .clipShape(Capsule())
+                                }
+                            }
+
+                            Text("Drop or select exported passwords from any password manager")
                                 .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
 
                         Spacer()
 
-                        Button(action: handleSelectApplePasswordsCSV) {
+                        Button(action: handleSelectPasswordFile) {
                             HStack(spacing: 6) {
-                                Image(systemName: "doc.badge.plus")
-                                Text("Import Passwords.csv")
+                                Image(systemName: isImportingFile ? "hourglass" : "doc.badge.plus")
+                                Text(importedFileItems.isEmpty ? "Choose File..." : "Change File...")
                             }
                             .font(.system(size: 11, weight: .semibold))
                         }
                         .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                        .disabled(isImportingFile)
                     }
 
-                    // How to export instructions
-                    HStack(spacing: 8) {
-                        Image(systemName: "info.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(LiquidGlassTheme.tealAccent)
-
-                        Text("Tip: In macOS System Settings → Passwords, click '...' → 'Export All Passwords...', then select that file here.")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.secondary)
+                    // Provider Badges (Supported Managers)
+                    HStack(spacing: 4) {
+                        ForEach(["Apple Passwords", "Chrome", "Bitwarden", "1Password", "KeePass", "Proton Pass", "LastPass"], id: \.self) { mgr in
+                            Text(mgr)
+                                .font(.system(size: 9, weight: .medium))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.white.opacity(0.06))
+                                .clipShape(Capsule())
+                        }
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                    if csvImportCount > 0 {
+                    // Success Feedback or Tip
+                    if let fileName = importedFileName, !importedFileItems.isEmpty {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
                                 .font(.system(size: 12))
 
-                            Text("\(csvImportCount) credential(s) loaded from Passwords.csv")
+                            Text("\(importedFileItems.count) credential(s) parsed from \(fileName) (\(importedFileProvider ?? "Imported"))")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
+
+                            Spacer()
+
+                            Button(action: {
+                                importedFileItems.removeAll()
+                                importedFileName = nil
+                                importedFileProvider = nil
+                                keychainFeedback = nil
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.tealAccent)
+
+                            Text("Supported: .csv, .json, .xml, .1pux, .1pif, or plain text. You can also drag & drop the file directly here.")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                 }
                 .padding(12)
-                .background(Color.black.opacity(0.25))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isTargetedForDrop ? LiquidGlassTheme.primaryAccent.opacity(0.15) : Color.black.opacity(0.25))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    isTargetedForDrop
+                                    ? LiquidGlassTheme.primaryAccent
+                                    : (importedFileItems.isEmpty ? Color.white.opacity(0.08) : LiquidGlassTheme.emeraldAccent.opacity(0.3)),
+                                    lineWidth: isTargetedForDrop ? 2 : 1
+                                )
+                        )
+                )
+                .onDrop(of: [.fileURL], isTargeted: $isTargetedForDrop) { providers in
+                    handleDropFile(providers: providers)
+                }
 
                 // Option B: Local Keychain Direct Scan
                 HStack(spacing: 14) {
@@ -492,7 +553,7 @@ public struct SetupView: View {
                             Image(systemName: "square.and.arrow.down.fill")
                                 .font(.system(size: 12))
                                 .foregroundColor(LiquidGlassTheme.primaryAccent)
-                            Text("Import all detected passwords into Kloak upon creation")
+                            Text("Include detected macOS Keychain logins in vault")
                                 .font(.system(size: 12, weight: .medium))
                         }
                     }
@@ -518,7 +579,7 @@ public struct SetupView: View {
                 if let feedback = keychainFeedback {
                     Text(feedback)
                         .font(.system(size: 11))
-                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .foregroundColor(feedback.contains("Failed") || feedback.contains("No ") ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.emeraldAccent)
                 }
             }
             .padding(20)
@@ -849,13 +910,29 @@ public struct SetupView: View {
                 .font(.system(size: 12))
 
                 HStack {
-                    Label("Apple Keychain", systemImage: "key.horizontal.fill")
+                    Label("Imported Credentials", systemImage: "key.horizontal.fill")
                     Spacer()
-                    let count = importKeychainLogins ? importedKeychainItems.count : 0
-                    Text("\(count) items ready to import")
-                        .foregroundColor(count > 0 ? LiquidGlassTheme.emeraldAccent : .secondary)
+                    let totalCount = importedFileItems.count + (importKeychainLogins ? importedKeychainItems.count : 0)
+                    if totalCount > 0 {
+                        Text("\(totalCount) items ready to import")
+                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    } else {
+                        Text("None (Fresh Start)")
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .font(.system(size: 12))
+
+                if !importedFileItems.isEmpty {
+                    HStack {
+                        Label("Imported File", systemImage: "doc.text.fill")
+                        Spacer()
+                        Text("\(importedFileProvider ?? "File"): \(importedFileName ?? "") (\(importedFileItems.count) items)")
+                            .font(.system(size: 11))
+                            .foregroundColor(LiquidGlassTheme.tealAccent)
+                    }
+                    .font(.system(size: 12))
+                }
 
                 HStack {
                     Label("Connected Accounts", systemImage: "cloud.fill")
@@ -947,51 +1024,92 @@ public struct SetupView: View {
         }
     }
 
-    private func handleSelectApplePasswordsCSV() {
+    private func handleSelectPasswordFile() {
         let panel = NSOpenPanel()
-        panel.title = "Select Apple Passwords CSV Export"
-        panel.prompt = "Import Passwords"
-        panel.allowedContentTypes = [.commaSeparatedText, .plainText]
+        panel.title = "Select Password Export File"
+        panel.prompt = "Import File"
+        var allowedTypes: [UTType] = [
+            .commaSeparatedText,
+            .json,
+            .xml,
+            .plainText,
+            .data
+        ]
+        if let csvType = UTType(filenameExtension: "csv") { allowedTypes.append(csvType) }
+        if let jsonType = UTType(filenameExtension: "json") { allowedTypes.append(jsonType) }
+        if let xmlType = UTType(filenameExtension: "xml") { allowedTypes.append(xmlType) }
+        if let p1uxType = UTType(filenameExtension: "1pux") { allowedTypes.append(p1uxType) }
+        if let p1ifType = UTType(filenameExtension: "1pif") { allowedTypes.append(p1ifType) }
+
+        panel.allowedContentTypes = allowedTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
 
         if panel.runModal() == .OK, let url = panel.url {
-            do {
-                let content = try String(contentsOf: url, encoding: .utf8)
-                let items = KeychainManager.shared.importFromApplePasswordsCSV(content)
-                if !items.isEmpty {
-                    var existingKeys = Set(importedKeychainItems.map { "\($0.title)_\($0.username ?? "")" })
-                    var addedCount = 0
-                    for item in items {
-                        let key = "\(item.title)_\(item.username ?? "")"
-                        if !existingKeys.contains(key) {
-                            importedKeychainItems.append(item)
-                            existingKeys.insert(key)
-                            addedCount += 1
-                        } else if let idx = importedKeychainItems.firstIndex(where: { "\($0.title)_\($0.username ?? "")" == key }) {
-                            if let newPass = item.password, !newPass.isEmpty {
-                                importedKeychainItems[idx].password = newPass
-                            }
-                            if let newTotp = item.totpSecret, !newTotp.isEmpty {
-                                importedKeychainItems[idx].totpSecret = newTotp
-                            }
-                            if !item.urls.isEmpty {
-                                importedKeychainItems[idx].urls = item.urls
-                            }
-                            addedCount += 1
-                        }
+            handleImportPasswordFile(from: url)
+        }
+    }
+
+    private func handleImportPasswordFile(from url: URL) {
+        isImportingFile = true
+        defer { isImportingFile = false }
+        do {
+            let (items, provider) = try KeychainManager.shared.importFromFile(url: url)
+            guard !items.isEmpty else {
+                keychainFeedback = "No credentials could be parsed from \(url.lastPathComponent). Please check the file format."
+                return
+            }
+
+            var existingKeys = Set(importedFileItems.map { "\($0.title)_\($0.username ?? "")" })
+            var addedCount = 0
+            for item in items {
+                let key = "\(item.title)_\(item.username ?? "")"
+                if !existingKeys.contains(key) {
+                    importedFileItems.append(item)
+                    existingKeys.insert(key)
+                    addedCount += 1
+                } else if let idx = importedFileItems.firstIndex(where: { "\($0.title)_\($0.username ?? "")" == key }) {
+                    if let newPass = item.password, !newPass.isEmpty {
+                        importedFileItems[idx].password = newPass
                     }
-                    csvImportCount = items.count
-                    importKeychainLogins = true
-                    keychainFeedback = "Successfully imported \(items.count) password(s) from \(url.lastPathComponent) (Total staged: \(importedKeychainItems.count))!"
-                } else {
-                    keychainFeedback = "No passwords found in \(url.lastPathComponent). Please ensure it is an exported CSV from Apple Passwords or Safari."
+                    if let newTotp = item.totpSecret, !newTotp.isEmpty {
+                        importedFileItems[idx].totpSecret = newTotp
+                    }
+                    if !item.urls.isEmpty {
+                        importedFileItems[idx].urls = item.urls
+                    }
                 }
-            } catch {
-                keychainFeedback = "Failed to read CSV file: \(error.localizedDescription)"
+            }
+
+            importedFileName = url.lastPathComponent
+            importedFileProvider = provider
+            importKeychainLogins = true
+            keychainFeedback = "Successfully imported \(items.count) password(s) from \(provider) (\(url.lastPathComponent))!"
+        } catch {
+            keychainFeedback = "Failed to import file: \(error.localizedDescription)"
+        }
+    }
+
+    private func handleDropFile(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+            var fileURL: URL?
+            if let url = item as? URL {
+                fileURL = url
+            } else if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
+                fileURL = url
+            } else if let str = item as? String, let url = URL(string: str) {
+                fileURL = url
+            }
+
+            if let url = fileURL {
+                DispatchQueue.main.async {
+                    self.handleImportPasswordFile(from: url)
+                }
             }
         }
+        return true
     }
 
     private func binding(for provider: CloudProvider) -> Binding<OnboardingAccountConnection> {
@@ -1020,10 +1138,34 @@ public struct SetupView: View {
         errorMessage = nil
 
         let activeConnections = [googleConnection, protonConnection, microsoftConnection].filter { $0.isConnected }
-        var itemsToImport = importKeychainLogins ? importedKeychainItems : []
-        if importKeychainLogins && itemsToImport.isEmpty {
-            itemsToImport = KeychainManager.shared.importFromKeychain()
-            importedKeychainItems = itemsToImport
+        
+        var combinedItems: [VaultItem] = []
+        // 1. Always include file-imported items
+        combinedItems.append(contentsOf: importedFileItems)
+
+        // 2. Include keychain items if enabled
+        if importKeychainLogins {
+            if importedKeychainItems.isEmpty {
+                importedKeychainItems = KeychainManager.shared.importFromKeychain()
+            }
+            var existingKeys = Set(combinedItems.map { "\($0.title)_\($0.username ?? "")" })
+            for item in importedKeychainItems {
+                let key = "\(item.title)_\(item.username ?? "")"
+                if !existingKeys.contains(key) {
+                    combinedItems.append(item)
+                    existingKeys.insert(key)
+                }
+            }
+        } else {
+            // Include non-keychain credentials (e.g. cloud sheet imports) even if Keychain toggle is off
+            var existingKeys = Set(combinedItems.map { "\($0.title)_\($0.username ?? "")" })
+            for item in importedKeychainItems where !item.tags.contains("Apple Keychain") {
+                let key = "\(item.title)_\(item.username ?? "")"
+                if !existingKeys.contains(key) {
+                    combinedItems.append(item)
+                    existingKeys.insert(key)
+                }
+            }
         }
 
         Task {
@@ -1032,7 +1174,7 @@ public struct SetupView: View {
                     masterPassword: password,
                     enableBiometrics: enableBiometrics,
                     seedSampleData: seedSampleData,
-                    importedItems: itemsToImport,
+                    importedItems: combinedItems,
                     connectedAccounts: activeConnections,
                     keychainSyncEnabled: enableKeychainSync
                 )

@@ -150,7 +150,7 @@ public struct VaultMainView: View {
                     VaultStore.shared.deleteFolder(id: id)
                 }
             )
-            .navigationSplitViewColumnWidth(min: 200, ideal: 230, max: 280)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 270)
         } detail: {
             ZStack {
                 if isUtilitySection {
@@ -205,7 +205,7 @@ public struct VaultMainView: View {
                                 }
                             }
                         )
-                        .frame(minWidth: 260, idealWidth: 290, maxWidth: 340)
+                        .frame(minWidth: 260, idealWidth: 280, maxWidth: 320)
                         .background(Color.black.opacity(0.12))
 
                         Divider()
@@ -248,7 +248,7 @@ public struct VaultMainView: View {
                                 .transition(.opacity)
                             }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .frame(minWidth: 380, maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .transition(
                         .asymmetric(

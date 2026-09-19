@@ -570,181 +570,412 @@ public final class KeychainManager: @unchecked Sendable {
         return syncedCount
     }
 
-    // MARK: - Cross-Platform Passwords & Vault Importers (Apple, Google, Microsoft, Proton)
+    // MARK: - Universal Passwords & Vault Importers (Apple, Chrome, Bitwarden, 1Password, KeePass, Proton, Dashlane, LastPass)
 
     public func importFromApplePasswordsCSV(_ content: String) -> [VaultItem] {
-        return importFromProviderContent(content, provider: nil)
+        return importFromContent(content, filename: "Passwords.csv", provider: nil).items
     }
 
     public func importFromProviderContent(_ content: String, provider: CloudProvider?) -> [VaultItem] {
-        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return [] }
+        return importFromContent(content, filename: nil, provider: provider).items
+    }
 
-        // 1. Try JSON formats (Proton Pass JSON, Bitwarden JSON, Kloak JSON)
-        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
-            if let data = trimmed.data(using: .utf8),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                // Check for Bitwarden / Kloak items array
-                if let jsonItems = (json["items"] as? [[String: Any]]) ?? (json["vaults"] as? [[String: Any]]) {
-                    var results: [VaultItem] = []
-                    for entry in jsonItems {
-                        let name = (entry["name"] as? String) ?? (entry["title"] as? String) ?? ""
-                        var username = entry["username"] as? String ?? ""
-                        var password = entry["password"] as? String ?? ""
-                        var urls: [String] = []
-                        var totp: String? = entry["totp"] as? String ?? entry["totpSecret"] as? String
-                        let notes = (entry["notes"] as? String) ?? (entry["description"] as? String)
+    public func importFromFile(url: URL) throws -> (items: [VaultItem], providerName: String) {
+        let content = try Self.readFileContent(at: url)
+        return importFromContent(content, filename: url.lastPathComponent, provider: nil)
+    }
 
-                        if let login = entry["login"] as? [String: Any] {
-                            username = login["username"] as? String ?? username
-                            password = login["password"] as? String ?? password
-                            totp = login["totp"] as? String ?? totp
-                            if let uriList = login["uris"] as? [[String: Any]] {
-                                urls = uriList.compactMap { $0["uri"] as? String }
-                            }
-                        }
-                        if let singleUrl = entry["url"] as? String, !singleUrl.isEmpty {
-                            urls.append(singleUrl)
-                        }
+    public static func readFileContent(at url: URL) throws -> String {
+        let data = try Data(contentsOf: url)
+        if let str = String(data: data, encoding: .utf8) {
+            return stripBOM(str)
+        }
+        if let str = String(data: data, encoding: .isoLatin1) {
+            return stripBOM(str)
+        }
+        if let str = String(data: data, encoding: .windowsCP1252) {
+            return stripBOM(str)
+        }
+        if let str = String(data: data, encoding: .macOSRoman) {
+            return stripBOM(str)
+        }
+        if let str = String(data: data, encoding: .utf16) {
+            return stripBOM(str)
+        }
+        throw NSError(domain: "KloakVault", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to read password file. Unsupported text encoding."])
+    }
 
-                        let itemType: ItemType
-                        if let typeStr = entry["type"] as? String {
-                            itemType = typeStr == "note" || typeStr == "secureNote" ? .secureNote :
-                                       typeStr == "card" ? .card :
-                                       typeStr == "alias" ? .emailAlias : .login
-                        } else if let typeNum = entry["type"] as? Int {
-                            itemType = typeNum == 2 ? .secureNote : typeNum == 3 ? .card : .login
-                        } else {
-                            itemType = .login
-                        }
+    public static func stripBOM(_ str: String) -> String {
+        var res = str
+        if res.hasPrefix("\u{FEFF}") {
+            res.removeFirst()
+        }
+        return res
+    }
 
-                        let tagList: [String]
-                        if let p = provider {
-                            tagList = [p.displayName, "\(p.displayName) Passwords"]
-                        } else {
-                            tagList = ["Apple Keychain", "iCloud Passwords"]
-                        }
+    public func importFromContent(_ rawContent: String, filename: String? = nil, provider: CloudProvider? = nil) -> (items: [VaultItem], providerName: String) {
+        let content = Self.stripBOM(rawContent.trimmingCharacters(in: .whitespacesAndNewlines))
+        if content.isEmpty { return ([], "Empty File") }
 
-                        results.append(VaultItem(
-                            type: itemType,
-                            title: Self.cleanTitle(name.isEmpty ? "Imported Credential" : name),
-                            username: username.isEmpty ? nil : username,
-                            password: password.isEmpty ? nil : password,
-                            urls: urls,
-                            notes: notes,
-                            totpSecret: totp,
-                            tags: tagList
-                        ))
-                    }
-                    if !results.isEmpty { return results }
-                }
+        // 1. Detect KeePass XML
+        if content.hasPrefix("<") && (content.contains("<KeePassFile>") || content.contains("<Entry>")) {
+            let items = Self.parseKeePassXML(content)
+            if !items.isEmpty {
+                return (items, "KeePass")
             }
         }
 
-        // 2. CSV parsing for Apple Passwords, Google Passwords, Microsoft Edge, Proton Pass
+        // 2. Detect JSON (Bitwarden, 1Password, Proton, Kloak, Generic)
+        if content.hasPrefix("{") || content.hasPrefix("[") {
+            let (items, pName) = Self.parseJSONExport(content, filename: filename, provider: provider)
+            if !items.isEmpty {
+                return (items, pName)
+            }
+        }
+
+        // 3. RFC 4180 CSV Parsing
+        let (csvItems, csvProvider) = Self.parseCSVExport(content, filename: filename, provider: provider)
+        return (csvItems, csvProvider)
+    }
+
+    private static func parseJSONExport(_ content: String, filename: String?, provider: CloudProvider?) -> (items: [VaultItem], providerName: String) {
+        guard let data = content.data(using: .utf8),
+              let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
+            return ([], "JSON")
+        }
+
         var results: [VaultItem] = []
-        let lines = trimmed.components(separatedBy: .newlines)
-        guard lines.count > 1 else { return results }
+        var detectedProvider = "Password Manager (JSON)"
 
-        let headers = parseCSVRow(lines[0])
-        let headerLower = headers.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }
+        let fn = filename?.lowercased() ?? ""
+        if fn.contains("bitwarden") { detectedProvider = "Bitwarden" }
+        else if fn.contains("1password") { detectedProvider = "1Password" }
+        else if fn.contains("proton") { detectedProvider = "Proton Pass" }
+        else if let p = provider { detectedProvider = p.displayName }
 
-        let titleIdx = headerLower.firstIndex(where: { ["title", "name", "entry", "item_name"].contains($0) })
-        let urlIdx = headerLower.firstIndex(where: { ["url", "website", "domain", "uri", "login_uri", "website_url"].contains($0) })
-        let userIdx = headerLower.firstIndex(where: { ["username", "user name", "email", "account", "login_username"].contains($0) })
-        let passIdx = headerLower.firstIndex(where: { ["password", "pass", "login_password"].contains($0) })
-        let notesIdx = headerLower.firstIndex(where: { ["notes", "note", "comments", "description", "extra"].contains($0) })
-        let totpIdx = headerLower.firstIndex(where: { ["otpauth", "totp", "otp", "otpsecret", "login_totp"].contains($0) })
+        var itemDictionaries: [[String: Any]] = []
 
-        let defaultTags: [String] = {
-            if let p = provider {
-                switch p {
-                case .google: return ["Google", "Chrome Passwords"]
-                case .microsoft: return ["Microsoft", "Edge Passwords"]
-                case .proton: return ["Proton", "Proton Pass"]
+        if let dict = jsonObject as? [String: Any] {
+            if let items = dict["items"] as? [[String: Any]] {
+                itemDictionaries = items
+                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
+            } else if let vaults = dict["vaults"] as? [[String: Any]] {
+                itemDictionaries = vaults
+                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
+            } else if let accounts = dict["accounts"] as? [[String: Any]] {
+                itemDictionaries = accounts
+                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "1Password" }
+            }
+        } else if let array = jsonObject as? [[String: Any]] {
+            itemDictionaries = array
+        }
+
+        for entry in itemDictionaries {
+            let name = (entry["name"] as? String) ?? (entry["title"] as? String) ?? ""
+            var username = entry["username"] as? String ?? ""
+            var password = entry["password"] as? String ?? ""
+            var urls: [String] = []
+            var totp: String? = (entry["totp"] as? String) ?? (entry["totpSecret"] as? String)
+            let notes = (entry["notes"] as? String) ?? (entry["description"] as? String)
+            let tags: [String] = [detectedProvider, "Imported"]
+
+            // Bitwarden login sub-object
+            if let login = entry["login"] as? [String: Any] {
+                username = (login["username"] as? String) ?? username
+                password = (login["password"] as? String) ?? password
+                totp = (login["totp"] as? String) ?? totp
+                if let uriList = login["uris"] as? [[String: Any]] {
+                    urls.append(contentsOf: uriList.compactMap { $0["uri"] as? String })
                 }
             }
-            return ["Apple Keychain", "iCloud Passwords"]
-        }()
 
-        for i in 1..<lines.count {
-            let line = lines[i].trimmingCharacters(in: .whitespacesAndNewlines)
-            if line.isEmpty { continue }
-
-            let cols = parseCSVRow(line)
-            let fallbackName = provider != nil ? "\(provider!.displayName) Login" : "iCloud Login"
-            let rawTitle = safeCol(cols, titleIdx) ?? safeCol(cols, urlIdx) ?? fallbackName
-            let title = Self.cleanTitle(rawTitle)
-            let url = safeCol(cols, urlIdx)
-            let user = safeCol(cols, userIdx)
-            let pass = safeCol(cols, passIdx)
-            let note = safeCol(cols, notesIdx)
-            var totpSecret: String? = nil
-
-            if let raw = safeCol(cols, totpIdx), !raw.isEmpty {
-                if raw.lowercased().hasPrefix("otpauth://") {
-                    if let urlComp = URLComponents(string: raw),
-                       let secretParam = urlComp.queryItems?.first(where: { $0.name == "secret" })?.value {
-                        totpSecret = secretParam
+            // 1Password fields array
+            if let fields = entry["fields"] as? [[String: Any]] {
+                for f in fields {
+                    let id = (f["id"] as? String)?.lowercased() ?? ""
+                    let designation = (f["designation"] as? String)?.lowercased() ?? ""
+                    let value = f["value"] as? String ?? ""
+                    if designation == "username" || id == "username" || id == "user" {
+                        if username.isEmpty { username = value }
+                    } else if designation == "password" || id == "password" {
+                        if password.isEmpty { password = value }
+                    } else if id.contains("totp") || id.contains("one-time") {
+                        if totp == nil || totp!.isEmpty { totp = value }
                     }
-                } else {
-                    totpSecret = raw
                 }
             }
 
-            if user != nil || pass != nil || !title.isEmpty {
+            if let singleUrl = entry["url"] as? String, !singleUrl.isEmpty {
+                urls.append(singleUrl)
+            }
+
+            let itemType: ItemType
+            if let typeStr = entry["type"] as? String {
+                itemType = typeStr == "note" || typeStr == "secureNote" ? .secureNote :
+                           typeStr == "card" ? .card :
+                           typeStr == "alias" ? .emailAlias : .login
+            } else if let typeNum = entry["type"] as? Int {
+                itemType = typeNum == 2 ? .secureNote : typeNum == 3 ? .card : .login
+            } else {
+                itemType = .login
+            }
+
+            let finalTitle = cleanTitle(name.isEmpty ? (username.isEmpty ? "Imported Credential" : username) : name)
+            if !username.isEmpty || !password.isEmpty || !finalTitle.isEmpty {
+                results.append(VaultItem(
+                    type: itemType,
+                    title: finalTitle,
+                    username: username.isEmpty ? nil : username,
+                    password: password.isEmpty ? nil : password,
+                    urls: urls,
+                    notes: notes,
+                    totpSecret: extractTotpSecret(totp),
+                    tags: tags
+                ))
+            }
+        }
+
+        return (results, detectedProvider)
+    }
+
+    private static func parseKeePassXML(_ text: String) -> [VaultItem] {
+        var items: [VaultItem] = []
+        let entryBlocks = text.components(separatedBy: "<Entry>")
+        guard entryBlocks.count > 1 else { return [] }
+
+        for block in entryBlocks.dropFirst() {
+            guard let endIdx = block.range(of: "</Entry>")?.lowerBound else { continue }
+            let entryContent = String(block[..<endIdx])
+
+            var title: String?
+            var user: String?
+            var pass: String?
+            var url: String?
+            var notes: String?
+            var totp: String?
+
+            let stringBlocks = entryContent.components(separatedBy: "<String>")
+            for sb in stringBlocks.dropFirst() {
+                guard let kStart = sb.range(of: "<Key>")?.upperBound,
+                      let kEnd = sb.range(of: "</Key>")?.lowerBound,
+                      let vStart = sb.range(of: "<Value")?.upperBound,
+                      let vEnd = sb.range(of: "</Value>")?.lowerBound,
+                      kStart < kEnd, vStart < vEnd else { continue }
+
+                let key = String(sb[kStart..<kEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+                var valuePart = String(sb[vStart..<vEnd])
+                if let closeTag = valuePart.range(of: ">")?.upperBound {
+                    valuePart = String(valuePart[closeTag...])
+                }
+                let val = valuePart.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .replacingOccurrences(of: "&amp;", with: "&")
+                    .replacingOccurrences(of: "&lt;", with: "<")
+                    .replacingOccurrences(of: "&gt;", with: ">")
+                    .replacingOccurrences(of: "&quot;", with: "\"")
+
+                switch key.lowercased() {
+                case "title": title = val
+                case "username", "user name": user = val
+                case "password": pass = val
+                case "url", "web site", "website": url = val
+                case "notes", "comment", "comments": notes = val
+                case "otp", "totp", "otpauth": totp = val
+                default: break
+                }
+            }
+
+            let finalTitle = title ?? user ?? url ?? "KeePass Entry"
+            if (user != nil && !user!.isEmpty) || (pass != nil && !pass!.isEmpty) || !finalTitle.isEmpty {
+                items.append(VaultItem(
+                    type: .login,
+                    title: cleanTitle(finalTitle),
+                    username: user,
+                    password: pass,
+                    urls: (url != nil && !url!.isEmpty) ? [url!] : [],
+                    notes: notes,
+                    totpSecret: extractTotpSecret(totp),
+                    tags: ["KeePass", "Imported"]
+                ))
+            }
+        }
+        return items
+    }
+
+    private static func parseCSVExport(_ content: String, filename: String?, provider: CloudProvider?) -> (items: [VaultItem], providerName: String) {
+        let rows = parseRFC4180CSV(content)
+        guard rows.count > 1 else { return ([], "CSV File") }
+
+        let headers = rows[0].map { header in
+            var h = header.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if h.hasPrefix("\u{feff}") { h.removeFirst() }
+            return h
+        }
+
+        // Provider auto-detection from headers and filename
+        var detected = "Password File"
+        let fn = filename?.lowercased() ?? ""
+
+        if headers.contains("otpauth") && (headers.contains("title") || fn.contains("passwords") || fn.contains("apple") || fn.contains("safari")) {
+            detected = "Apple Passwords"
+        } else if headers.contains("login_uri") || headers.contains("login_totp") || fn.contains("bitwarden") {
+            detected = "Bitwarden"
+        } else if headers.contains("name") && headers.contains("url") && headers.contains("username") && headers.contains("password") && !headers.contains("otpauth") {
+            detected = "Google Chrome"
+        } else if (headers.contains("favorite") && headers.contains("archived") && headers.contains("tags")) || fn.contains("1password") {
+            detected = "1Password"
+        } else if headers.contains("grouping") || headers.contains("fav") || fn.contains("lastpass") {
+            detected = "LastPass"
+        } else if (headers.contains("account") && headers.contains("login name")) || fn.contains("keepass") {
+            detected = "KeePass"
+        } else if headers.contains("create_time") || headers.contains("modify_time") || fn.contains("proton") {
+            detected = "Proton Pass"
+        } else if headers.contains("secondary_login") || fn.contains("dashlane") {
+            detected = "Dashlane"
+        } else if let p = provider {
+            detected = p.displayName
+        }
+
+        // Column Index Matching
+        let passIdx = headers.firstIndex(where: { ["password", "pass", "login_password", "pin", "code"].contains($0) })
+        let totpIdx = headers.firstIndex(where: { ["otpauth", "totp", "otp", "otpsecret", "login_totp", "authenticator", "two-factor", "2fa", "secret key"].contains($0) })
+        let userIdx = headers.firstIndex(where: { ["username", "user name", "login name", "login_username", "email", "login", "user", "login id", "loginid", "account name"].contains($0) })
+        let titleIdx = headers.firstIndex(where: {
+            if $0 == "account" && userIdx != nil { return true }
+            return ["title", "name", "entry", "item_name", "service", "label", "system", "app"].contains($0)
+        }) ?? headers.firstIndex(where: { ["title", "name", "entry"].contains($0) })
+        let urlIdx = headers.firstIndex(where: { ["url", "website", "domain", "uri", "login_uri", "website_url", "web site", "login url", "site", "host"].contains($0) })
+        let notesIdx = headers.firstIndex(where: { ["notes", "note", "comments", "comment", "description", "extra", "memo", "instructions"].contains($0) })
+        let folderIdx = headers.firstIndex(where: { ["folder", "group", "grouping", "category", "tags", "tag"].contains($0) })
+        let favIdx = headers.firstIndex(where: { ["favorite", "fav", "starred"].contains($0) })
+
+        var results: [VaultItem] = []
+
+        for row in rows.dropFirst() {
+            guard !row.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { continue }
+
+            let rawTitle = safeCol(row, titleIdx) ?? safeCol(row, urlIdx) ?? safeCol(row, userIdx) ?? "Imported Login"
+            let title = cleanTitle(rawTitle)
+            let user = safeCol(row, userIdx)
+            let pass = safeCol(row, passIdx)
+            let url = safeCol(row, urlIdx)
+            let note = safeCol(row, notesIdx)
+            let rawTotp = safeCol(row, totpIdx)
+            let folder = safeCol(row, folderIdx)
+            let isFav = safeCol(row, favIdx)?.lowercased() == "true" || safeCol(row, favIdx) == "1"
+
+            var tagList: [String] = [detected, "Imported"]
+            if let f = folder, !f.isEmpty && !tagList.contains(f) {
+                tagList.insert(f, at: 0)
+            }
+
+            if user != nil || pass != nil || !title.isEmpty || url != nil {
                 results.append(VaultItem(
                     type: .login,
                     title: title,
                     username: user,
                     password: pass,
-                    urls: url != nil && !url!.isEmpty ? [url!] : [],
-                    notes: (note != nil && !note!.isEmpty) ? note : nil,
-                    totpSecret: totpSecret,
-                    tags: defaultTags
+                    urls: (url != nil && !url!.isEmpty) ? [url!] : [],
+                    notes: note,
+                    totpSecret: extractTotpSecret(rawTotp),
+                    tags: tagList,
+                    favorite: isFav
                 ))
             }
         }
 
-        return results
+        return (results, detected)
     }
 
-    private func parseCSVRow(_ row: String) -> [String] {
-        var fields: [String] = []
-        var current = ""
-        var inQuotes = false
-        let chars = Array(row)
-        var idx = 0
-
-        while idx < chars.count {
-            let ch = chars[idx]
-            if ch == "\"" {
-                if inQuotes && idx + 1 < chars.count && chars[idx + 1] == "\"" {
-                    current.append("\"")
-                    idx += 2
-                    continue
-                } else {
-                    inQuotes.toggle()
-                    idx += 1
-                    continue
-                }
-            } else if ch == "," && !inQuotes {
-                fields.append(current)
-                current = ""
-                idx += 1
-                continue
-            } else {
-                current.append(ch)
-                idx += 1
+    private static func extractTotpSecret(_ raw: String?) -> String? {
+        guard let r = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !r.isEmpty else { return nil }
+        if r.lowercased().hasPrefix("otpauth://") {
+            if let comp = URLComponents(string: r),
+               let sec = comp.queryItems?.first(where: { $0.name.lowercased() == "secret" })?.value {
+                return sec.trimmingCharacters(in: .whitespacesAndNewlines)
             }
         }
-        fields.append(current)
-        return fields
+        return r
     }
 
-    private func safeCol(_ cols: [String], _ idx: Int?) -> String? {
+    public static func parseRFC4180CSV(_ text: String) -> [[String]] {
+        var records: [[String]] = []
+        var currentRecord: [String] = []
+        var currentField = ""
+        var inQuotes = false
+        let chars = Array(text)
+        var i = 0
+        let n = chars.count
+
+        while i < n {
+            let ch = chars[i]
+            if inQuotes {
+                if ch == "\"" {
+                    if i + 1 < n && chars[i + 1] == "\"" {
+                        currentField.append("\"")
+                        i += 2
+                        continue
+                    } else {
+                        inQuotes = false
+                        i += 1
+                        continue
+                    }
+                } else {
+                    currentField.append(ch)
+                    i += 1
+                    continue
+                }
+            } else {
+                if ch == "\"" {
+                    inQuotes = true
+                    i += 1
+                    continue
+                } else if ch == "," {
+                    currentRecord.append(currentField)
+                    currentField = ""
+                    i += 1
+                    continue
+                } else if ch == "\r" {
+                    if i + 1 < n && chars[i + 1] == "\n" {
+                        i += 1
+                    }
+                    currentRecord.append(currentField)
+                    currentField = ""
+                    if !currentRecord.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                        records.append(currentRecord)
+                    }
+                    currentRecord = []
+                    i += 1
+                    continue
+                } else if ch == "\n" {
+                    currentRecord.append(currentField)
+                    currentField = ""
+                    if !currentRecord.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                        records.append(currentRecord)
+                    }
+                    currentRecord = []
+                    i += 1
+                    continue
+                } else {
+                    currentField.append(ch)
+                    i += 1
+                    continue
+                }
+            }
+        }
+
+        if !currentField.isEmpty || !currentRecord.isEmpty {
+            currentRecord.append(currentField)
+            if !currentRecord.allSatisfy({ $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+                records.append(currentRecord)
+            }
+        }
+
+        return records
+    }
+
+    private static func safeCol(_ cols: [String], _ idx: Int?) -> String? {
         guard let i = idx, i < cols.count else { return nil }
-        let val = cols[i].trimmingCharacters(in: .whitespaces)
+        let val = cols[i].trimmingCharacters(in: .whitespacesAndNewlines)
         return val.isEmpty ? nil : val
     }
 }

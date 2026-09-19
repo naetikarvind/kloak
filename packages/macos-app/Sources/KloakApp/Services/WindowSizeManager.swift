@@ -14,9 +14,34 @@ public final class WindowSizeManager {
         case vaultImport     // 920 x 720 (2-column import & export)
     }
 
+    public weak var mainWindow: NSWindow? = nil
     private var resizeWorkItem: DispatchWorkItem? = nil
 
     private init() {}
+
+    public func registerWindow(_ window: NSWindow) {
+        self.mainWindow = window
+    }
+
+    public var currentWindow: NSWindow? {
+        if let win = mainWindow, win.isVisible {
+            return win
+        }
+        if let key = NSApp.keyWindow, key.isVisible && !(key is NSPanel) && key.canBecomeMain {
+            return key
+        }
+        if let main = NSApp.mainWindow, main.isVisible && !(main is NSPanel) && main.canBecomeMain {
+            return main
+        }
+        return NSApp.windows.first(where: {
+            $0.isVisible &&
+            !($0 is NSPanel) &&
+            $0.canBecomeMain &&
+            $0.className != "_NSMenuBarExtraWindow" &&
+            !$0.className.contains("StatusBar") &&
+            !$0.className.contains("MenuBar")
+        })
+    }
 
     public func resize(to mode: AppWindowMode, animated: Bool = true) {
         resizeWorkItem?.cancel()
@@ -28,21 +53,19 @@ public final class WindowSizeManager {
         resizeWorkItem = work
 
         if animated {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.012, execute: work)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.04, execute: work)
         } else {
             work.perform()
         }
     }
 
     private func performResize(to mode: AppWindowMode, animated: Bool) {
-        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: {
-            $0.isVisible && !($0 is NSPanel) && $0.canBecomeMain
-        }) ?? NSApp.windows.first else {
+        guard let window = currentWindow else {
             return
         }
 
-        // Respect fullscreen / maximized state
-        if window.styleMask.contains(.fullScreen) || window.isZoomed {
+        // Only skip if window is in macOS full screen space (where setFrame cannot be applied)
+        if window.styleMask.contains(.fullScreen) {
             return
         }
 
@@ -57,8 +80,8 @@ public final class WindowSizeManager {
             targetSize = CGSize(width: 620, height: 680)
             minSize = CGSize(width: 540, height: 600)
         case .vaultItems:
-            targetSize = CGSize(width: 1060, height: 720)
-            minSize = CGSize(width: 860, height: 560)
+            targetSize = CGSize(width: 1080, height: 740)
+            minSize = CGSize(width: 960, height: 580)
         case .vaultSettings:
             targetSize = CGSize(width: 960, height: 760)
             minSize = CGSize(width: 780, height: 580)
@@ -99,17 +122,8 @@ public final class WindowSizeManager {
 
             let newFrame = NSRect(x: newX, y: newY, width: targetSize.width, height: targetSize.height)
 
-            if abs(currentFrame.width - targetSize.width) > 4 || abs(currentFrame.height - targetSize.height) > 4 {
-                if animated {
-                    NSAnimationContext.runAnimationGroup { context in
-                        context.duration = 0.36
-                        context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
-                        context.allowsImplicitAnimation = true
-                        window.animator().setFrame(newFrame, display: true)
-                    }
-                } else {
-                    window.setFrame(newFrame, display: true)
-                }
+            if abs(currentFrame.width - targetSize.width) > 3 || abs(currentFrame.height - targetSize.height) > 3 {
+                window.setFrame(newFrame, display: true, animate: animated)
             }
         }
     }
