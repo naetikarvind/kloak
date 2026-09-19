@@ -82,7 +82,8 @@ We believe in complete transparency. Here is why Kloak requests each browser per
 SUPPORT & COMMUNITY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• Open Source & Privacy Policy: https://kloak.app/privacy
+• Live Privacy Policy (Web Store Submission URL): https://naetikarvind.github.io/kloak/privacy.html
+• Open Source Repository: https://github.com/naetikarvind/kloak
 • Issues & Feedback: https://github.com/naetikarvind/kloak/issues
 • Requires: Google Chrome 116+ and the Kloak macOS App (or companion native host).
 
