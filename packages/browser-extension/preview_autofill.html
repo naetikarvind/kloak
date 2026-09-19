@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Kloak Autofill Preview</title>
+  <style>
+    body {
+      background: #0d0c14;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .page-context {
+      width: 440px;
+      margin-bottom: 8px;
+    }
+    .field-label {
+      font-size: 13px;
+      color: #9E9AA8;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+    .mock-input {
+      width: 100%;
+      box-sizing: border-box;
+      height: 42px;
+      background: #111017;
+      border: 1.5px solid #6D4AFF;
+      border-radius: 8px;
+      padding: 0 40px 0 14px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(109, 74, 255, 0.25);
+    }
+    .kloak-field-badge {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      background: #14121F;
+      border: 1px solid rgba(109, 74, 255, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .kloak-field-badge svg {
+      width: 13px;
+      height: 13px;
+      fill: #6D4AFF;
+    }
+
+    /* ── Content script .kloak-popup styles ── */
+    .kloak-popup {
+      width: 440px;
+      background: #14121F;
+      border: 1px solid rgba(109, 74, 255, 0.4);
+      border-radius: 10px;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.65), 0 0 20px rgba(109, 74, 255, 0.18);
+      color: #FFFFFF;
+      font-size: 12px;
+      overflow: hidden;
+    }
+    .kloak-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 12px;
+      background: #1C1929;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .kloak-brand {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #A5A1B2;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .kloak-brand svg {
+      width: 14px;
+      height: 14px;
+      fill: #6D4AFF;
+    }
+    .kloak-close-btn {
+      color: #9E9AA8;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .kloak-section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #7A758B;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      padding: 10px 14px 4px 14px;
+    }
+    .kloak-card {
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .kloak-card-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .kloak-item-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(109, 74, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #6D4AFF;
+    }
+    .kloak-item-info { flex: 1; }
+    .kloak-item-username { font-size: 13px; font-weight: 600; color: #fff; }
+    .kloak-item-title { font-size: 11px; color: #9E9AA8; margin-top: 1px; }
+    .kloak-btn-fill {
+      background: #6D4AFF;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(109, 74, 255, 0.4);
+    }
+    .kloak-pwd-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0,0,0,0.3);
+      border-radius: 6px;
+      padding: 5px 10px;
+    }
+    .kloak-pwd-label { color: #7A758B; font-size: 9px; font-weight: 700; }
+    .kloak-pwd-value { font-family: monospace; color: #D1CFDA; font-size: 12px; letter-spacing: 1px; }
+    .kloak-pwd-actions { display: flex; gap: 6px; font-size: 12px; }
+
+    .kloak-gen-btn-box {
+      padding: 8px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      background: rgba(109, 74, 255, 0.04);
+    }
+    .kloak-btn-generator {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #252233;
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      border-radius: 7px;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      color: #fff;
+    }
+    .kloak-gen-left { display: flex; align-items: center; gap: 8px; }
+    .kloak-gen-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      background: rgba(109, 74, 255, 0.25);
+      color: #A78BFA;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+    .kloak-gen-title { font-size: 12px; font-weight: 600; }
+    .kloak-gen-sub { font-size: 10px; color: #9E9AA8; }
+    .kloak-gen-arrow { font-size: 13px; color: #A78BFA; font-weight: bold; }
+
+    .kloak-ai-inspector-section {
+      background: #181528;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding: 8px 14px;
+    }
+    .kloak-ai-toggle-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+    .kloak-ai-left { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; }
+    .kloak-ai-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 6px #10B981;
+    }
+    .kloak-ai-badge {
+      font-size: 9.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .kloak-ai-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .kloak-ai-card {
+      background: #131120;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 5px;
+      padding: 6px 8px;
+    }
+    .kloak-ai-card-lbl { font-size: 8.5px; font-weight: 700; color: #7A758B; text-transform: uppercase; }
+    .kloak-ai-card-val { font-size: 10.5px; font-weight: 600; color: #fff; margin-top: 2px; }
+
+    .kloak-alias-footer {
+      padding: 8px 14px;
+      background: #181624;
+    }
+    .kloak-btn-alias {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 210, 180, 0.08);
+      border: 1px solid rgba(0, 210, 180, 0.3);
+      border-radius: 7px;
+      padding: 8px 10px;
+    }
+    .kloak-alias-left { display: flex; align-items: center; gap: 8px; }
+    .kloak-alias-title { font-size: 11px; font-weight: 600; color: #00D2B4; }
+    .kloak-alias-sub { font-size: 9.5px; color: #9E9AA8; }
+    .kloak-alias-arrow { font-size: 13px; font-weight: 700; color: #00D2B4; }
+  </style>
+</head>
+<body>
+  <div class="page-context">
+    <div class="field-label">
+      <span>Sign in to GitHub</span>
+      <span style="color: #6D4AFF;">Kloak Autofill Ready</span>
+    </div>
+    <div class="input-wrapper">
+      <input type="text" class="mock-input" value="naetik" autofocus>
+      <div class="kloak-field-badge">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="kloak-popup">
+    <div class="kloak-header">
+      <div class="kloak-brand">
+        <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+        <span>Kloak (github.com)</span>
+      </div>
+      <span class="kloak-close-btn">✕</span>
+    </div>
+
+    <div class="kloak-section-title">Saved Logins</div>
+    <div class="kloak-card">
+      <div class="kloak-card-top">
+        <div class="kloak-item-avatar">G</div>
+        <div class="kloak-item-info">
+          <div class="kloak-item-username">naetik</div>
+          <div class="kloak-item-title">github.com <span style="color: #10B981; font-weight: 600;">• 2FA Active</span></div>
+        </div>
+        <button class="kloak-btn-fill">Fill</button>
+      </div>
+      <div class="kloak-pwd-row">
+        <span class="kloak-pwd-label">PASS</span>
+        <span class="kloak-pwd-value">••••••••••••••••</span>
+        <div class="kloak-pwd-actions">
+          <span>👁️</span>
+          <span>📋</span>
+          <span>👤</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="kloak-gen-btn-box">
+      <div class="kloak-btn-generator">
+        <div class="kloak-gen-left">
+          <div class="kloak-gen-icon">⚡</div>
+          <div>
+            <div class="kloak-gen-title">Generate Strong Password</div>
+            <div class="kloak-gen-sub">18 chars • High entropy • Open Generator in Kloak</div>
+          </div>
+        </div>
+        <span class="kloak-gen-arrow">↗</span>
+      </div>
+    </div>
+
+    <div class="kloak-ai-inspector-section">
+      <div class="kloak-ai-toggle-btn">
+        <div class="kloak-ai-left">
+          <span class="kloak-ai-dot"></span>
+          <span>🧠 AI Security &amp; Domain Inspector</span>
+        </div>
+        <span class="kloak-ai-badge">🟢 0% Risk • Safe</span>
+      </div>
+      <div class="kloak-ai-grid">
+        <div class="kloak-ai-card">
+          <div class="kloak-ai-card-lbl">🔒 TLS Certificate</div>
+          <div class="kloak-ai-card-val">DigiCert EV • Verified</div>
+        </div>
+        <div class="kloak-ai-card">
+          <div class="kloak-ai-card-lbl">🏢 Domain Intel</div>
+          <div class="kloak-ai-card-val">GitHub, Inc. • 16 yrs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="kloak-alias-footer">
+      <div class="kloak-btn-alias">
+        <div class="kloak-alias-left">
+          <span style="font-size: 16px;">🛡️</span>
+          <div>
+            <div class="kloak-alias-title">Generate Custom Alias for github.com</div>
+            <div class="kloak-alias-sub">Masks real email • Auto-forwards to inbox</div>
+          </div>
+        </div>
+        <span class="kloak-alias-arrow">→</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
