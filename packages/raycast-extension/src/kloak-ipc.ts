@@ -77,7 +77,7 @@ export interface KloakItem {
   updatedAt?: string;
 }
 
-export async function requestDaemon(method: string, params: any = {}): Promise<any> {
+export async function requestDaemon<T = any>(method: string, params: any = {}): Promise<T> {
   return new Promise((resolve, reject) => {
     const client = net.createConnection(SOCKET_PATH);
     let buffer = '';

@@ -1,12 +1,16 @@
 import SwiftUI
+import AppKit
 
 public struct ItemListView: View {
     var items: [VaultItem]
+    var folders: [VaultFolder] = []
     var currentSection: NavigationSection = .allItems
     @Binding var selectedItemId: String?
     @Binding var searchText: String
     var onToggleFavorite: (String) -> Void
     var onAddItem: (() -> Void)? = nil
+    var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
+    var onDeleteItem: ((String) -> Void)? = nil
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -77,12 +81,15 @@ public struct ItemListView: View {
                     ForEach(items) { item in
                         ItemRowView(
                             item: item,
+                            folders: folders,
                             currentSection: currentSection,
                             onToggleFavorite: {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                                     onToggleFavorite(item.id)
                                 }
-                            }
+                            },
+                            onMoveToFolder: onMoveToFolder,
+                            onDeleteItem: onDeleteItem
                         )
                         .tag(item.id)
                     }
@@ -98,8 +105,17 @@ public struct ItemListView: View {
 
 public struct ItemRowView: View {
     let item: VaultItem
+    var folders: [VaultFolder] = []
     var currentSection: NavigationSection = .allItems
     var onToggleFavorite: () -> Void
+    var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
+    var onDeleteItem: ((String) -> Void)? = nil
+
+    private var currentFolder: VaultFolder? {
+        folders.first(where: { f in
+            item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
+        })
+    }
 
     private var isWeakPassword: Bool {
         guard let p = item.password, !p.isEmpty else { return false }
@@ -223,5 +239,68 @@ public struct ItemRowView: View {
             .fixedSize(horizontal: true, vertical: false)
         }
         .padding(.vertical, 3)
+        .contextMenu {
+            if !folders.isEmpty {
+                Menu {
+                    Button(action: { onMoveToFolder?(item, nil) }) {
+                        HStack {
+                            Text("No Folder (General)")
+                            if currentFolder == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    ForEach(folders) { f in
+                        Button(action: { onMoveToFolder?(item, f) }) {
+                            HStack {
+                                Text(f.name)
+                                if currentFolder?.id == f.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Move to Folder", systemImage: "folder")
+                }
+
+                Divider()
+            }
+
+            if let user = item.username, !user.isEmpty {
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(user, forType: .string)
+                }) {
+                    Label("Copy Username", systemImage: "person")
+                }
+            }
+
+            if let pass = item.password, !pass.isEmpty {
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(pass, forType: .string)
+                }) {
+                    Label("Copy Password", systemImage: "key")
+                }
+            }
+
+            Divider()
+
+            Button(action: onToggleFavorite) {
+                Label(item.favorite ? "Unfavorite" : "Favorite", systemImage: item.favorite ? "star.slash" : "star")
+            }
+
+            if onDeleteItem != nil {
+                Divider()
+
+                Button(role: .destructive, action: { onDeleteItem?(item.id) }) {
+                    Label("Delete Credential", systemImage: "trash")
+                }
+            }
+        }
     }
 }

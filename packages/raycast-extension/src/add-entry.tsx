@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Form, ActionPanel, Action, Icon, showToast, Toast, useNavigation } from "@raycast/api";
 import { requestDaemon } from "./kloak-ipc.js";
 import * as crypto from "node:crypto";
@@ -20,6 +20,18 @@ export default function AddEntryCommand() {
   const [title, setTitle] = useState<string>("");
   const [tagsInput, setTagsInput] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedFolder, setSelectedFolder] = useState<string>("");
+
+  useEffect(() => {
+    requestDaemon<Array<{ id: string; name: string }>>("vault.getFolders")
+      .then((res) => {
+        if (Array.isArray(res) && res.length > 0) {
+          setFolders(res);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Login fields
   const [username, setUsername] = useState<string>("");
@@ -71,6 +83,14 @@ export default function AddEntryCommand() {
     }
 
     try {
+      const finalTags = tagsInput.split(",").map((s) => s.trim()).filter(Boolean);
+      if (selectedFolder) {
+        const f = folders.find((item) => item.id === selectedFolder);
+        if (f && !finalTags.some((t) => t.toLowerCase() === f.name.toLowerCase())) {
+          finalTags.push(f.name);
+        }
+      }
+
       const itemPayload: any = {
         type,
         title: title.trim() || (
@@ -81,7 +101,7 @@ export default function AddEntryCommand() {
           "Untitled"
         ),
         notes: notes.trim() || undefined,
-        tags: tagsInput.split(",").map((s) => s.trim()).filter(Boolean)
+        tags: finalTags
       };
 
       if (type === "login") {
@@ -282,6 +302,17 @@ export default function AddEntryCommand() {
             <Form.TextField id="authCounter" title="Initial Counter" placeholder="0" value={authCounter} onChange={setAuthCounter} />
           )}
         </>
+      )}
+
+      {folders.length > 0 && (
+        <Form.Dropdown id="folder" title="Folder" value={selectedFolder} onChange={setSelectedFolder}>
+          <Form.Dropdown.Item value="" title="No Folder (General)" icon={Icon.Tray} />
+          <Form.Dropdown.Section title="Folders">
+            {folders.map((f) => (
+              <Form.Dropdown.Item key={f.id} value={f.id} title={f.name} icon={Icon.Folder} />
+            ))}
+          </Form.Dropdown.Section>
+        </Form.Dropdown>
       )}
 
       <Form.TextField id="tags" title="Tags" placeholder="e.g. personal, work, finance (comma separated)" value={tagsInput} onChange={setTagsInput} />

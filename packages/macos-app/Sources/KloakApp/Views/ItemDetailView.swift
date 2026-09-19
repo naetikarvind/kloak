@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct ItemDetailView: View {
     @Binding var item: VaultItem
+    var folders: [VaultFolder] = []
     var currentSection: NavigationSection = .allItems
     var onSave: (VaultItem) -> Void
     var onDelete: (String) -> Void
@@ -27,6 +28,7 @@ public struct ItemDetailView: View {
     // Edit Mode States
     @State private var isEditing: Bool = false
     @State private var editTitle: String = ""
+    @State private var editFolderId: String = ""
     @State private var editUsername: String = ""
     @State private var editPassword: String = ""
     @State private var editUrls: [String] = []
@@ -115,7 +117,23 @@ public struct ItemDetailView: View {
                                     .clipShape(Capsule())
                             }
 
-                            if let tag = item.tags.first(where: { $0.lowercased() != "imported" }) {
+                            if let folder = folders.first(where: { f in
+                                item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
+                            }) {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "folder.fill")
+                                        .font(.system(size: 9))
+                                    Text(folder.name)
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                .lineLimit(1)
+                                .fixedSize()
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
+                                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                                .clipShape(Capsule())
+                            } else if let tag = item.tags.first(where: { $0.lowercased() != "imported" }) {
                                 Text(tag)
                                     .font(.system(size: 11, weight: .medium))
                                     .lineLimit(1)
@@ -242,6 +260,38 @@ public struct ItemDetailView: View {
                             authenticatorEditSection
                         case .secureNote:
                             EmptyView()
+                        }
+
+                        if !folders.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("FOLDER")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.secondary)
+
+                                HStack(spacing: 8) {
+                                    Image(systemName: "folder.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+
+                                    Picker("", selection: $editFolderId) {
+                                        Text("No Folder (General)").tag("")
+                                        Divider()
+                                        ForEach(folders) { f in
+                                            Text(f.name).tag(f.id)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Color.black.opacity(0.3))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                            }
                         }
 
                         // Notes section (common to all items)
@@ -1312,6 +1362,14 @@ public struct ItemDetailView: View {
             editAuthPeriod = auth.period ?? 30
         }
 
+        if let matchingFolder = folders.first(where: { f in
+            item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
+        }) {
+            editFolderId = matchingFolder.id
+        } else {
+            editFolderId = ""
+        }
+
         withAnimation(.easeInOut(duration: 0.22)) {
             isEditing = true
         }
@@ -1392,6 +1450,17 @@ public struct ItemDetailView: View {
         case .secureNote:
             break
         }
+
+        // Update folder tags
+        let folderIds = Set(folders.map { $0.id })
+        let folderNames = Set(folders.map { $0.name.lowercased() })
+        var newTags = updated.tags.filter { tag in
+            !folderIds.contains(tag) && !folderNames.contains(tag.lowercased())
+        }
+        if let selected = folders.first(where: { $0.id == editFolderId }) {
+            newTags.append(selected.name)
+        }
+        updated.tags = newTags
 
         updated.updatedAt = ISO8601DateFormatter().string(from: Date())
         onSave(updated)

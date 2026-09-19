@@ -167,6 +167,7 @@ public struct VaultMainView: View {
                     HStack(spacing: 0) {
                         ItemListView(
                             items: filteredItems,
+                            folders: folders,
                             currentSection: selection,
                             selectedItemId: $selectedItemId,
                             searchText: $searchText,
@@ -177,7 +178,32 @@ public struct VaultMainView: View {
                                     onSaveItem(items[idx])
                                 }
                             },
-                            onAddItem: { isShowingNewItemSheet = true }
+                            onAddItem: { isShowingNewItemSheet = true },
+                            onMoveToFolder: { item, targetFolder in
+                                if let idx = items.firstIndex(where: { $0.id == item.id }) {
+                                    let folderIds = Set(folders.map { $0.id })
+                                    let folderNames = Set(folders.map { $0.name.lowercased() })
+                                    var newTags = items[idx].tags.filter { tag in
+                                        !folderIds.contains(tag) && !folderNames.contains(tag.lowercased())
+                                    }
+                                    if let target = targetFolder {
+                                        newTags.append(target.name)
+                                    }
+                                    items[idx].tags = newTags
+                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                    onSaveItem(items[idx])
+                                }
+                            },
+                            onDeleteItem: { id in
+                                if let idx = items.firstIndex(where: { $0.id == id }) {
+                                    items[idx].trashed = true
+                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                    onDeleteItem(id)
+                                    if selectedItemId == id {
+                                        selectedItemId = nil
+                                    }
+                                }
+                            }
                         )
                         .frame(minWidth: 260, idealWidth: 290, maxWidth: 340)
                         .background(Color.black.opacity(0.12))
@@ -189,6 +215,7 @@ public struct VaultMainView: View {
                             if let selId = selectedItemId, let itemBinding = binding(for: selId) {
                                 ItemDetailView(
                                     item: itemBinding,
+                                    folders: folders,
                                     currentSection: selection,
                                     onSave: { updated in
                                         if let idx = items.firstIndex(where: { $0.id == updated.id }) {
@@ -253,6 +280,11 @@ public struct VaultMainView: View {
                     if case .category(let t) = selection { return t }
                     return .login
                 }(),
+                folders: folders,
+                initialFolderId: {
+                    if case .folder(let fId) = selection { return fId }
+                    return nil
+                }(),
                 onAdd: { newItem in
                     items.append(newItem)
                     onSaveItem(newItem)
@@ -290,11 +322,14 @@ public struct VaultMainView: View {
 
 public struct NewItemSheet: View {
     var initialType: ItemType = .login
+    var folders: [VaultFolder] = []
+    var initialFolderId: String? = nil
     var onAdd: (VaultItem) -> Void
     var onCancel: () -> Void
 
     @State private var type: ItemType = .login
     @State private var title: String = ""
+    @State private var selectedFolderId: String = ""
     @State private var notes: String = ""
 
     // Login fields
@@ -342,13 +377,18 @@ public struct NewItemSheet: View {
 
     public init(
         initialType: ItemType = .login,
+        folders: [VaultFolder] = [],
+        initialFolderId: String? = nil,
         onAdd: @escaping (VaultItem) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.initialType = initialType
+        self.folders = folders
+        self.initialFolderId = initialFolderId
         self.onAdd = onAdd
         self.onCancel = onCancel
         self._type = State(initialValue: initialType)
+        self._selectedFolderId = State(initialValue: initialFolderId ?? "")
     }
 
     public var body: some View {
@@ -443,6 +483,35 @@ public struct NewItemSheet: View {
                             .background(Color.black.opacity(0.3))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                             .focused($isTitleFocused)
+                    }
+
+                    // Folder
+                    if !folders.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("FOLDER")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+
+                                Picker("", selection: $selectedFolderId) {
+                                    Text("No Folder (General)").tag("")
+                                    Divider()
+                                    ForEach(folders) { f in
+                                        Text(f.name).tag(f.id)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
                     }
 
                     // Type-specific input fields
@@ -898,6 +967,11 @@ public struct NewItemSheet: View {
             break
         }
 
+        var itemTags: [String] = []
+        if let sel = folders.first(where: { $0.id == selectedFolderId }) {
+            itemTags.append(sel.name)
+        }
+
         let item = VaultItem(
             type: type,
             title: finalTitle,
@@ -909,7 +983,8 @@ public struct NewItemSheet: View {
             card: cardObj,
             identity: idObj,
             alias: aliasObj,
-            authenticatorDetails: authObj
+            authenticatorDetails: authObj,
+            tags: itemTags
         )
 
         onAdd(item)
