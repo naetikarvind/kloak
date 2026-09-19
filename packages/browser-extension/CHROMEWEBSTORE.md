@@ -7,8 +7,11 @@
 - **Category**: Productivity / Privacy & Security
 - **Short Description** (128 / 132 chars max):
   Local-first password manager with instant autofill, built-in 2FA authenticator, phishing protection, and desktop vault sync.
-- **Single Purpose Statement** (Developer Dashboard):
-  Autofills saved login credentials and two-factor authentication codes from your local Kloak vault into web forms with built-in phishing defense.
+- **Single Purpose Statement (Concise — Recommended for Dashboard input field)**:
+  Securely autofill and manage login credentials and two-factor authentication codes from the local Kloak vault into web forms.
+
+- **Single Purpose Description (Detailed / Reviewer Explanation)**:
+  The single purpose of Kloak Password Manager is to securely autofill login credentials, passkeys, and two-factor authentication (TOTP) codes from the user's local, encrypted vault directly into website login fields. All features—including 1-click autofill, credential lookup, secure password generation for registration forms, and anti-phishing domain verification—exist solely to facilitate and protect this singular credential filling flow.
 
 ---
 
