@@ -37,6 +37,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 public struct KloakApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var vaultStore = VaultStore.shared
+    @ObservedObject private var devModeManager = DevModeManager.shared
 
     public init() {
         IPCServer.shared.start()
@@ -111,6 +112,9 @@ public struct KloakApp: App {
             .onOpenURL { url in
                 OAuthManager.shared.handleIncomingURL(url)
             }
+            .sheet(isPresented: $devModeManager.showSheet) {
+                DevModeSheet()
+            }
             .frame(minWidth: 420, minHeight: 480)
             .tint(LiquidGlassTheme.primaryAccent)
             .background(.ultraThinMaterial)
@@ -127,6 +131,12 @@ public struct KloakApp: App {
                 Button("About Kloak") {
                     NSApp.orderFrontStandardAboutPanel(nil)
                 }
+            }
+            CommandGroup(after: .appInfo) {
+                Button("Developer Mode...") {
+                    devModeManager.showSheet = true
+                }
+                .keyboardShortcut("d", modifiers: [.command, .option])
             }
             CommandGroup(after: .windowSize) {
                 Button("Auto-Fit Window Size") {
