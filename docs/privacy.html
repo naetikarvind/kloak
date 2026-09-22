@@ -527,13 +527,17 @@
         Summary of Our Privacy Commitments
       </div>
       <p style="margin-bottom: 0; color: #e2e8f0;">
-        Kloak was created on the fundamental principle of <strong>absolute local-first security and zero-knowledge data privacy</strong>. We do not operate user accounts, we do not operate remote databases for your passwords, we do not run tracking or analytics, and we will never monetize, sell, or disclose your personal data.
+        Kloak was created on the fundamental principle of <strong>absolute local-first security and zero-knowledge data privacy</strong>. We do not operate user accounts, we do not operate remote databases for your passwords, we do not run tracking or analytics, and <strong>neither the desktop app nor the browser extension ever shares any data back to our servers or developers</strong>. All data found, inspected, or managed is kept <strong>100% natively within your local operating system</strong>.
       </p>
 
       <div class="summary-grid">
         <div class="summary-box">
           <strong>🔒 100% On-Device Vault</strong>
           <span>All credentials and 2FA secrets are encrypted locally with AES-256-GCM. Zero cloud storage.</span>
+        </div>
+        <div class="summary-box" style="border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08);">
+          <strong style="color: var(--emerald);">🛡️ Zero Data Sent Back</strong>
+          <span>Neither the app nor extension shares any data back. All found data is kept 100% natively on your system.</span>
         </div>
         <div class="summary-box">
           <strong>🚫 No Remote Code</strong>
@@ -596,7 +600,7 @@
         <strong>Collection Scope:</strong> The extension queries your credentials from the local desktop vault only when you navigate to a matching domain or click the extension popup/side-panel. <em>Authentication information is never uploaded, synced, or transmitted to any remote cloud server.</em>
       </p>
 
-      <div class="sub-heading">2.2 Website Content &amp; Input Fields</div>
+      <div class="sub-heading">2.2 Website Content &amp; Input Fields (Processed 100% Natively)</div>
       <p>
         <strong>What is accessed:</strong> Form input elements (specifically HTML <span class="code-badge">&lt;input type="password"&gt;</span>, <span class="code-badge">&lt;input type="email"&gt;</span>, <span class="code-badge">&lt;input type="text"&gt;</span>, and two-factor authentication fields) on web pages visited by the user.
       </p>
@@ -604,7 +608,7 @@
         <strong>Source &amp; Method of Collection:</strong> Detected locally within the browser page Document Object Model (DOM) by the extension's content script (<span class="code-badge">content.js</span>).
       </p>
       <p>
-        <strong>Collection Scope:</strong> The content script inspects input attributes purely to display the Kloak autofill badge inside the field and insert the requested login credentials upon explicit user action. <em>No page body text, personal messages, or unrelated webpage content is collected, copied, or recorded.</em>
+        <strong>Native On-Device Isolation &amp; Zero Data Sent Back:</strong> The content script inspects input attributes purely to display the Kloak autofill badge inside the field and insert the requested login credentials upon explicit user action. <em>All found form elements and input structures remain strictly native to the local system and browser session. Neither the extension nor the application ever sends any found data back to our servers, developers, or external infrastructure.</em>
       </p>
 
       <div class="sub-heading">2.3 Web History &amp; Active Tab Domain (URLs)</div>
@@ -615,7 +619,7 @@
         <strong>Source &amp; Method of Collection:</strong> Read in transient, volatile local memory when a tab is loaded or focused.
       </p>
       <p>
-        <strong>Collection Scope:</strong> The domain hostname is evaluated solely to search the local vault for matching logins and verify domain legitimacy against phishing attacks. <em>Your browsing history is never recorded, never logged to disk, and never sent across the internet.</em>
+        <strong>Collection Scope &amp; Zero Remote Sharing:</strong> The domain hostname is evaluated solely in local RAM to search the local vault for matching logins and verify domain legitimacy against phishing attacks. <em>Your browsing history is never recorded, never logged to disk, and never shared back to any server or remote entity.</em>
       </p>
 
       <div class="sub-heading">2.4 Financial &amp; Payment Information (Optional)</div>
@@ -715,6 +719,15 @@
         <li><strong>Full Vault Purge:</strong> You can completely wipe the local vault (<span class="code-badge">~/.kloak</span>) via the Kloak Settings menu or Developer Mode reset.</li>
         <li><strong>Extension Uninstallation:</strong> Uninstalling the extension immediately purges all data stored in <span class="code-badge">chrome.storage.local</span>.</li>
       </ul>
+
+      <div class="sub-heading">4.4 All Found and Managed Data Remains Natively on the Local System</div>
+      <p>
+        Kloak enforces strict local data confinement across both the native desktop application and browser extension:
+      </p>
+      <ul>
+        <li><strong>Native Operating System Confinement:</strong> All data found, detected, imported, or managed—including login fields identified by the extension, credentials stored in the vault, imported CSV/JSON records, generated passkeys, and domain matching records—is kept 100% natively within your device's filesystem (<span class="code-badge">~/.kloak/vault.kloak</span>) and native macOS Keychain.</li>
+        <li><strong>No Data Sent Back:</strong> Neither the desktop app nor the browser extension ever transmits, syncs, or shares any data back to our servers, developers, or external infrastructure. There are no telemetry pings, no phone-home mechanisms, no diagnostic callbacks, and no background log uploads. All data remains exclusively within the user's native operating system environment.</li>
+      </ul>
     </section>
 
     <!-- Section 5: User Data Sharing (MANDATORY SECTION) -->
@@ -727,6 +740,8 @@
       <div class="highlight-statement rose">
         <strong>Absolute Prohibition on Selling &amp; Sharing:</strong>
         <ul style="margin: 8px 0 0 18px;">
+          <li><strong>Neither the app nor the extension shares any data back to our developers, servers, or any remote entities.</strong></li>
+          <li><strong>All found data is kept strictly and natively within your local operating system at all times.</strong></li>
           <li><strong>We do NOT sell, rent, lease, license, or monetize user data to third parties under any circumstances.</strong></li>
           <li><strong>We do NOT share, transfer, or disclose user data to third parties, data brokers, advertising networks, or analytics providers.</strong></li>
           <li><strong>We do NOT transmit passwords, credentials, usernames, or vault contents over the public internet.</strong></li>
