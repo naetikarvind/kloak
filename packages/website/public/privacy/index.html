@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Privacy Policy — Kloak Password Manager</title>
-  <meta name="description" content="Privacy Policy for Kloak Password Manager and its Chrome Browser Extension. Zero-knowledge, local-first, zero remote tracking.">
-  <link rel="canonical" href="https://kloak.app/privacy">
+  <meta name="description" content="Privacy Policy for Kloak Password Manager and its Chrome Web Store Extension. Detailed disclosure of user data collection, handling, storage, and sharing in compliance with Chrome Web Store User Data Privacy policies.">
+  <link rel="canonical" href="https://naetikarvind.github.io/kloak/privacy.html">
   <style>
     :root {
       --bg: #07090e;
@@ -18,6 +18,7 @@
       --emerald-glow: rgba(16, 185, 129, 0.25);
       --purple: #8b5cf6;
       --rose: #f43f5e;
+      --amber: #f59e0b;
       --text: #f8fafc;
       --text-muted: #94a3b8;
       --text-dim: #64748b;
@@ -54,7 +55,7 @@
     }
 
     .container {
-      max-width: 960px;
+      max-width: 980px;
       margin: 0 auto;
       padding: 0 24px;
     }
@@ -64,11 +65,11 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 24px 0;
+      padding: 20px 0;
       border-bottom: 1px solid var(--card-border);
       position: sticky;
       top: 0;
-      background: rgba(7, 9, 14, 0.85);
+      background: rgba(7, 9, 14, 0.88);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       z-index: 100;
@@ -102,7 +103,7 @@
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 24px;
+      gap: 20px;
       font-size: 14px;
       font-weight: 500;
     }
@@ -136,11 +137,11 @@
       text-decoration: none;
     }
 
-    /* Policy Content */
+    /* Policy Header */
     .policy-header {
-      padding: 64px 0 36px 0;
+      padding: 56px 0 32px 0;
       border-bottom: 1px solid var(--card-border);
-      margin-bottom: 40px;
+      margin-bottom: 36px;
     }
 
     .badge-pill {
@@ -160,18 +161,18 @@
     }
 
     .policy-title {
-      font-size: 42px;
+      font-size: 40px;
       font-weight: 800;
       letter-spacing: -1.2px;
-      line-height: 1.15;
+      line-height: 1.2;
       margin-bottom: 12px;
     }
 
     .policy-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: 18px;
-      font-size: 14px;
+      gap: 16px;
+      font-size: 13.5px;
       color: var(--text-muted);
     }
 
@@ -181,13 +182,13 @@
       gap: 6px;
     }
 
-    /* Highlights / Callout */
+    /* Summary Card */
     .summary-card {
       background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(59, 130, 246, 0.05));
       border: 1px solid rgba(16, 185, 129, 0.25);
       border-radius: 16px;
       padding: 24px;
-      margin-bottom: 48px;
+      margin-bottom: 40px;
       box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
     }
 
@@ -203,9 +204,9 @@
 
     .summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
-      margin-top: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 16px;
     }
 
     .summary-box {
@@ -218,37 +219,76 @@
     .summary-box strong {
       display: block;
       color: var(--text);
-      font-size: 14px;
+      font-size: 13.5px;
       margin-bottom: 4px;
     }
 
     .summary-box span {
-      font-size: 13px;
+      font-size: 12.5px;
       color: var(--text-muted);
       line-height: 1.5;
       display: block;
     }
 
-    /* Markdown Body */
+    /* Compliance Banner */
+    .compliance-banner {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 36px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .compliance-banner-icon {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #93c5fd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .compliance-banner-content h4 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #93c5fd;
+      margin-bottom: 4px;
+    }
+
+    .compliance-banner-content p {
+      font-size: 13px;
+      color: #cbd5e1;
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+
+    /* Sections */
     .section-block {
-      margin-bottom: 44px;
+      margin-bottom: 48px;
     }
 
     .section-heading {
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 700;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.4px;
       color: var(--text);
       margin-bottom: 16px;
       display: flex;
       align-items: center;
       gap: 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
       padding-bottom: 8px;
     }
 
     .section-number {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       color: var(--primary);
       background: rgba(59, 130, 246, 0.15);
@@ -258,29 +298,62 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .sub-heading {
+      font-size: 16px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin: 20px 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     p {
       color: #cbd5e1;
-      margin-bottom: 16px;
-      font-size: 15px;
+      margin-bottom: 14px;
+      font-size: 14.5px;
+      line-height: 1.7;
     }
 
     ul, ol {
-      margin: 12px 0 20px 24px;
+      margin: 10px 0 18px 24px;
       color: #cbd5e1;
-      font-size: 15px;
+      font-size: 14.5px;
     }
 
     li {
       margin-bottom: 8px;
+      line-height: 1.6;
     }
 
-    /* Permissions Table */
+    .highlight-statement {
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 3px solid var(--primary);
+      padding: 12px 18px;
+      margin: 16px 0;
+      border-radius: 0 8px 8px 0;
+      font-size: 14px;
+      color: #f1f5f9;
+    }
+
+    .highlight-statement.emerald {
+      border-left-color: var(--emerald);
+      background: rgba(16, 185, 129, 0.04);
+    }
+
+    .highlight-statement.rose {
+      border-left-color: var(--rose);
+      background: rgba(244, 63, 94, 0.04);
+    }
+
+    /* Table */
     .table-container {
       width: 100%;
       overflow-x: auto;
-      margin: 20px 0;
+      margin: 18px 0 24px 0;
       border-radius: 12px;
       border: 1px solid var(--card-border);
       background: var(--card-bg);
@@ -290,26 +363,26 @@
       width: 100%;
       border-collapse: collapse;
       text-align: left;
-      font-size: 14px;
+      font-size: 13.5px;
     }
 
     th {
       background: rgba(255, 255, 255, 0.05);
-      padding: 14px 16px;
+      padding: 12px 16px;
       font-weight: 700;
       color: var(--text);
       border-bottom: 1px solid var(--card-border);
-      font-size: 13px;
+      font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
     }
 
     td {
-      padding: 14px 16px;
+      padding: 12px 16px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
       color: #cbd5e1;
       vertical-align: top;
-      line-height: 1.6;
+      line-height: 1.5;
     }
 
     tr:last-child td {
@@ -321,21 +394,49 @@
       background: rgba(59, 130, 246, 0.15);
       color: #93c5fd;
       border: 1px solid rgba(59, 130, 246, 0.3);
-      padding: 2px 8px;
-      border-radius: 6px;
+      padding: 2px 7px;
+      border-radius: 5px;
       font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 12px;
+      font-size: 11.5px;
       font-weight: 600;
       white-space: nowrap;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status-badge.green {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-badge.blue {
+      background: rgba(59, 130, 246, 0.15);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .status-badge.amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
     }
 
     /* Footer */
     footer {
       border-top: 1px solid var(--card-border);
-      padding: 40px 0;
-      margin-top: 60px;
+      padding: 36px 0;
+      margin-top: 50px;
       color: var(--text-dim);
-      font-size: 14px;
+      font-size: 13.5px;
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
@@ -350,14 +451,14 @@
 
     @media (max-width: 640px) {
       .policy-title {
-        font-size: 32px;
+        font-size: 30px;
       }
       .summary-grid {
         grid-template-columns: 1fr;
       }
       .navbar {
         flex-direction: column;
-        gap: 16px;
+        gap: 14px;
         align-items: flex-start;
       }
     }
@@ -368,20 +469,20 @@
   <!-- Navbar -->
   <header class="navbar">
     <div class="container" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-      <a href="/" class="brand">
+      <a href="index.html" class="brand">
         <div class="brand-badge">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
           </svg>
         </div>
         <span>Kloak</span>
       </a>
       <nav class="nav-links">
-        <a href="/">Overview</a>
-        <a href="/#features">Features</a>
-        <a href="/#downloads">Downloads</a>
+        <a href="index.html">Overview</a>
+        <a href="index.html#features">Features</a>
+        <a href="privacy.html" style="color: var(--text);">Privacy Policy</a>
         <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer" class="btn-github">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
           </svg>
           GitHub
@@ -391,31 +492,31 @@
   </header>
 
   <main class="container">
-    <!-- Header -->
+    <!-- Policy Header -->
     <div class="policy-header">
       <div class="badge-pill">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
         </svg>
-        Zero-Knowledge Guarantee
+        Zero-Knowledge • Local-First
       </div>
-      <h1 class="policy-title">Privacy Policy for Kloak</h1>
+      <h1 class="policy-title">Privacy Policy for Kloak Password Manager</h1>
       <div class="policy-meta">
         <div class="meta-item">
           <strong>Effective Date:</strong> September 19, 2026
         </div>
         <div class="meta-item">•</div>
         <div class="meta-item">
-          <strong>Last Updated:</strong> September 19, 2026
+          <strong>Last Updated:</strong> September 22, 2026
         </div>
         <div class="meta-item">•</div>
         <div class="meta-item">
-          <strong>Covers:</strong> macOS Application &amp; Chrome Web Store Extension
+          <strong>Covers:</strong> Chrome Web Store Extension (ID: <span class="code-badge">hajgkgmajepndkhjhcgjenjnfojlphod</span>) &amp; macOS Desktop App
         </div>
       </div>
     </div>
 
-    <!-- Summary Card -->
+    <!-- Summary of Core Privacy Principles -->
     <div class="summary-card">
       <div class="summary-title">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -423,70 +524,233 @@
           <line x1="12" y1="16" x2="12" y2="12"></line>
           <line x1="12" y1="8" x2="12.01" y2="8"></line>
         </svg>
-        Summary of Our Privacy Principles
+        Summary of Our Privacy Commitments
       </div>
       <p style="margin-bottom: 0; color: #e2e8f0;">
-        Kloak was built from the ground up on the principle of <strong>absolute local-first security</strong>. We do not operate user accounts, we do not host a cloud database for your passwords, we do not run telemetry or analytics, and we will never monetize, track, or sell your personal information.
+        Kloak was created on the fundamental principle of <strong>absolute local-first security and zero-knowledge data privacy</strong>. We do not operate user accounts, we do not operate remote databases for your passwords, we do not run tracking or analytics, and we will never monetize, sell, or disclose your personal data.
       </p>
 
       <div class="summary-grid">
         <div class="summary-box">
           <strong>🔒 100% On-Device Vault</strong>
-          <span>All passwords, 2FA secrets, and personal records are encrypted with AES-256-GCM directly on your machine.</span>
+          <span>All credentials and 2FA secrets are encrypted locally with AES-256-GCM. Zero cloud storage.</span>
         </div>
         <div class="summary-box">
-          <strong>🚫 No Remote Code Execution</strong>
-          <span>The Chrome extension executes only statically bundled local code. It never loads scripts or libraries from remote CDNs.</span>
+          <strong>🚫 No Remote Code</strong>
+          <span>100% of extension code is statically bundled at build time. No scripts or CDNs are loaded at runtime.</span>
         </div>
         <div class="summary-box">
-          <strong>🌐 Zero Remote Tracking</strong>
-          <span>We do not collect IP addresses, browsing histories, page content, device identifiers, or analytics telemetry.</span>
+          <strong>🌐 Zero Tracking &amp; Ads</strong>
+          <span>No analytics, no telemetry, no tracking cookies, and zero advertising profiling.</span>
         </div>
         <div class="summary-box">
           <strong>💻 Local IPC Only</strong>
-          <span>The browser extension communicates with your local desktop application via local native messaging and loopback (127.0.0.1).</span>
+          <span>Extension communicates exclusively with the local native desktop daemon (<span class="code-badge">app.kloak.native</span>).</span>
         </div>
       </div>
     </div>
 
-    <!-- Section 1: Scope -->
+    <!-- Chrome Web Store User Data Compliance Notice -->
+    <div class="compliance-banner">
+      <div class="compliance-banner-icon">✓</div>
+      <div class="compliance-banner-content">
+        <h4>Chrome Web Store User Data Privacy Compliance</h4>
+        <p>
+          This document strictly satisfies the Google Chrome Web Store Developer Program Policies regarding <strong>User Data Privacy</strong> (including the four required sections: <strong>User Data Collection</strong>, <strong>User Data Handling</strong>, <strong>User Data Storage</strong>, and <strong>User Data Sharing</strong>).
+        </p>
+      </div>
+    </div>
+
+    <!-- Section 1: Introduction & Single Purpose -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">1</span> Scope of this Policy</h2>
+      <h2 class="section-heading"><span class="section-number">1</span> Scope &amp; Single Purpose Specification</h2>
       <p>
-        This Privacy Policy applies to all software and services provided under the <strong>Kloak</strong> project, including:
+        This Privacy Policy applies to the <strong>Kloak Password Manager</strong> software ecosystem, specifically:
       </p>
       <ul>
-        <li><strong>Kloak Password Manager</strong> (Native macOS Application);</li>
-        <li><strong>Kloak Password Manager Extension</strong> (Manifest V3 Google Chrome, Brave, Edge, and Chromium browser extension published on the Chrome Web Store);</li>
-        <li><strong>Kloak Raycast Extension</strong> (macOS command-bar extension);</li>
-        <li>The Kloak open-source software repository and static web properties.</li>
+        <li><strong>Kloak Password Manager Chrome Extension</strong> (Chrome Web Store Extension ID: <span class="code-badge">hajgkgmajepndkhjhcgjenjnfojlphod</span>);</li>
+        <li><strong>Kloak Password Manager Native macOS Application</strong>;</li>
+        <li><strong>Kloak Raycast Extension</strong>;</li>
+        <li>Official open-source repositories and documentation hosted under <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer">github.com/naetikarvind/kloak</a>.</li>
+      </ul>
+      <div class="highlight-statement">
+        <strong>Single Purpose Declaration:</strong> The single purpose of the Kloak Chrome Extension is to <em>securely autofill login credentials, passkeys, and two-factor authentication (TOTP) codes from the user's local, encrypted vault directly into website login forms</em> upon user request. All features—including field badge overlays, credential lookups, strong password generation, and domain phishing verification—exist solely to facilitate and protect this singular credential filling flow.
+      </div>
+    </section>
+
+    <!-- Section 2: User Data Collection (MANDATORY SECTION) -->
+    <section class="section-block">
+      <h2 class="section-heading"><span class="section-number">2</span> User Data Collection</h2>
+      <p>
+        In accordance with Chrome Web Store User Data policies, this section explicitly discloses every category of data accessed, handled, or collected by the extension:
+      </p>
+
+      <div class="sub-heading">2.1 Authentication Information (Credentials &amp; Secrets)</div>
+      <p>
+        <strong>What is accessed:</strong> Usernames, login email addresses, account passwords, passkeys, Time-based One-Time Password (TOTP) secret keys, security notes, and optional payment card entries.
+      </p>
+      <p>
+        <strong>Source &amp; Method of Collection:</strong> Provided directly and voluntarily by the user (either manually entered, imported from a previous password manager file, or saved when logging into a website).
+      </p>
+      <p>
+        <strong>Collection Scope:</strong> The extension queries your credentials from the local desktop vault only when you navigate to a matching domain or click the extension popup/side-panel. <em>Authentication information is never uploaded, synced, or transmitted to any remote cloud server.</em>
+      </p>
+
+      <div class="sub-heading">2.2 Website Content &amp; Input Fields</div>
+      <p>
+        <strong>What is accessed:</strong> Form input elements (specifically HTML <span class="code-badge">&lt;input type="password"&gt;</span>, <span class="code-badge">&lt;input type="email"&gt;</span>, <span class="code-badge">&lt;input type="text"&gt;</span>, and two-factor authentication fields) on web pages visited by the user.
+      </p>
+      <p>
+        <strong>Source &amp; Method of Collection:</strong> Detected locally within the browser page Document Object Model (DOM) by the extension's content script (<span class="code-badge">content.js</span>).
+      </p>
+      <p>
+        <strong>Collection Scope:</strong> The content script inspects input attributes purely to display the Kloak autofill badge inside the field and insert the requested login credentials upon explicit user action. <em>No page body text, personal messages, or unrelated webpage content is collected, copied, or recorded.</em>
+      </p>
+
+      <div class="sub-heading">2.3 Web History &amp; Active Tab Domain (URLs)</div>
+      <p>
+        <strong>What is accessed:</strong> The active tab's domain name (e.g. <span class="code-badge">github.com</span>) accessed via the <span class="code-badge">tabs</span> and <span class="code-badge">activeTab</span> browser APIs.
+      </p>
+      <p>
+        <strong>Source &amp; Method of Collection:</strong> Read in transient, volatile local memory when a tab is loaded or focused.
+      </p>
+      <p>
+        <strong>Collection Scope:</strong> The domain hostname is evaluated solely to search the local vault for matching logins and verify domain legitimacy against phishing attacks. <em>Your browsing history is never recorded, never logged to disk, and never sent across the internet.</em>
+      </p>
+
+      <div class="sub-heading">2.4 Financial &amp; Payment Information (Optional)</div>
+      <p>
+        <strong>What is accessed:</strong> Credit card numbers, expiration dates, and cardholder names that you voluntarily save into your local vault.
+      </p>
+      <p>
+        <strong>Collection Scope:</strong> Handled with identical zero-knowledge AES-256-GCM encryption on your local disk. Filled only upon your affirmative 1-click confirmation on checkout forms.
+      </p>
+
+      <div class="sub-heading">2.5 User Settings &amp; Technical Preferences</div>
+      <p>
+        <strong>What is accessed:</strong> Extension display theme (dark/light), auto-lock duration, clipboard auto-clear timeout, and active display modes.
+      </p>
+      <p>
+        <strong>Storage Method:</strong> Saved in the browser's local sandbox via <span class="code-badge">chrome.storage.local</span>.
+      </p>
+
+      <div class="sub-heading">2.6 Categories of User Data That Are NEVER Collected</div>
+      <p>
+        To ensure complete clarity, Kloak affirms that it does <strong>NOT</strong> collect, read, or process:
+      </p>
+      <ul>
+        <li><strong>No Personal Communications:</strong> We do not read or access emails, chat messages, or document contents.</li>
+        <li><strong>No Geolocation Data:</strong> We do not request or track GPS, IP geolocation, or physical location.</li>
+        <li><strong>No Health or Medical Information:</strong> We do not collect health or medical data.</li>
+        <li><strong>No Device Identifiers:</strong> We do not collect MAC addresses, hardware UUIDs, or serial numbers.</li>
+        <li><strong>No Browsing History Logs:</strong> We do not maintain a history of visited URLs.</li>
+        <li><strong>No Telemetry or Analytics:</strong> We do not use Google Analytics, tracking beacons, or telemetry scripts.</li>
       </ul>
     </section>
 
-    <!-- Section 2: Information Handled -->
+    <!-- Section 3: User Data Handling (MANDATORY SECTION) -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">2</span> Information We Handle (And Where It Is Stored)</h2>
+      <h2 class="section-heading"><span class="section-number">3</span> User Data Handling and Use</h2>
       <p>
-        Kloak handles sensitive authentication data only as strictly necessary to fulfill your password management requests. All data stays under your physical control:
+        Google Chrome Web Store policies require an unambiguous explanation of how collected user data is handled, processed, and utilized.
+      </p>
+
+      <div class="sub-heading">3.1 Purpose-Bound Processing</div>
+      <p>
+        Every piece of user data accessed by Kloak is handled solely to execute the application's core functionality:
       </p>
       <ul>
-        <li>
-          <strong>Vault Credentials &amp; Secrets:</strong> Your account usernames, passwords, credit card numbers, personal identity records, secure notes, and Time-based One-Time Password (TOTP) 2FA secrets are encrypted locally using AES-256-GCM. Decryption keys are derived using Argon2id/PBKDF2 and protected by the Apple Secure Enclave / macOS Keychain. They are stored locally on your device's filesystem and are never uploaded to our servers or any cloud provider.
-        </li>
-        <li>
-          <strong>Website URLs &amp; Hostnames:</strong> When you browse the web, the extension checks the active tab's domain name purely in ephemeral local memory to identify matching credentials in your vault and alert you if the active site is an unauthenticated phishing or lookalike domain. Your browsing history is never recorded, logged, or transmitted anywhere.
-        </li>
-        <li>
-          <strong>Extension Settings &amp; Preferences:</strong> Non-sensitive UI preferences (such as auto-lock timeout duration, active theme, and display preferences) are stored locally in your browser's sandboxed storage (<span class="code-badge">chrome.storage.local</span>).
-        </li>
+        <li><strong>Credential Autofill:</strong> Usernames and passwords stored in your local vault are injected into corresponding login fields when you click the field badge or toolbar popup.</li>
+        <li><strong>2FA Verification:</strong> Stored TOTP secrets are processed locally to compute time-synchronized 6-digit one-time codes and fill verification prompts.</li>
+        <li><strong>Anti-Phishing Verification:</strong> The active tab domain is matched against your saved logins to ensure credentials are never exposed to counterfeit, typosquatted, or spoofed lookalike websites.</li>
+        <li><strong>Secure Password Generation:</strong> High-entropy cryptographic random numbers are generated on-demand to create strong passwords for registration forms.</li>
+      </ul>
+
+      <div class="highlight-statement emerald">
+        <strong>Mandatory Chrome Web Store Policy Affirmations:</strong>
+        <ul style="margin: 8px 0 0 18px;">
+          <li><strong>We do NOT use or transfer user data for purposes unrelated to the extension's core single purpose.</strong></li>
+          <li><strong>We do NOT use or transfer user data to serve personalized, targeted, or behavioral advertisements.</strong></li>
+          <li><strong>We do NOT use or transfer user data to determine creditworthiness or for lending purposes.</strong></li>
+          <li><strong>We do NOT use user data for surveillance, user tracking, or data profiling.</strong></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Section 4: User Data Storage (MANDATORY SECTION) -->
+    <section class="section-block">
+      <h2 class="section-heading"><span class="section-number">4</span> User Data Storage, Retention, and Security Safeguards</h2>
+      <p>
+        Transparency regarding where and how data is stored, how long it is retained, and how it is secured is mandatory under Chrome Web Store policies:
+      </p>
+
+      <div class="sub-heading">4.1 Storage Location &amp; Local-First Architecture</div>
+      <p>
+        All user credentials, passwords, passkeys, notes, and 2FA secrets are stored <strong>100% locally on your own computer</strong>:
+      </p>
+      <ul>
+        <li><strong>Local Vault File:</strong> Persisted in an encrypted binary file located on your device at <span class="code-badge">~/.kloak/vault.kloak</span>.</li>
+        <li><strong>Local Extension Settings:</strong> Non-sensitive UI preferences are kept in browser-isolated local storage (<span class="code-badge">chrome.storage.local</span>).</li>
+        <li><strong>Zero Cloud Databases:</strong> Kloak operates no remote user accounts, no cloud sync servers, and no centralized databases. Your data never resides on our infrastructure because we do not operate any storage servers.</li>
+      </ul>
+
+      <div class="sub-heading">4.2 Encryption &amp; Security Measures</div>
+      <p>
+        Your data is protected by industry-standard cryptographic primitives:
+      </p>
+      <ul>
+        <li><strong>Authenticated Encryption:</strong> The local vault is encrypted using <strong>AES-256-GCM</strong> (Galois/Counter Mode), guaranteeing both confidentiality and cryptographic integrity.</li>
+        <li><strong>Key Derivation:</strong> Master keys are derived using <strong>Argon2id</strong> and <strong>PBKDF2-HMAC-SHA256</strong> with high work factors to protect against brute-force attacks.</li>
+        <li><strong>Hardware Protection:</strong> On macOS, master keys are enveloped by the Apple Secure Enclave and protected by Touch ID biometric authentication.</li>
+        <li><strong>Local Inter-Process Communication (IPC):</strong> Communication between the Chrome extension and desktop application occurs strictly over local OS native messaging pipes (<span class="code-badge">app.kloak.native</span>) and loopback socket (<span class="code-badge">127.0.0.1:53152</span>). It never traverses the external network.</li>
+      </ul>
+
+      <div class="sub-heading">4.3 Data Retention &amp; Deletion Procedures</div>
+      <p>
+        Because all data is stored on your device, retention is entirely under your control:
+      </p>
+      <ul>
+        <li><strong>Retention Schedule:</strong> Credentials remain stored locally until you choose to edit or delete them. Active tab URLs inspected in memory are strictly ephemeral and are discarded immediately upon navigation or tab close.</li>
+        <li><strong>Individual Item Deletion:</strong> You can permanently delete individual credentials or records at any time from the extension side-panel or desktop app.</li>
+        <li><strong>Full Vault Purge:</strong> You can completely wipe the local vault (<span class="code-badge">~/.kloak</span>) via the Kloak Settings menu or Developer Mode reset.</li>
+        <li><strong>Extension Uninstallation:</strong> Uninstalling the extension immediately purges all data stored in <span class="code-badge">chrome.storage.local</span>.</li>
       </ul>
     </section>
 
-    <!-- Section 3: Browser Permissions -->
+    <!-- Section 5: User Data Sharing (MANDATORY SECTION) -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">3</span> Browser Permissions &amp; Technical Justification</h2>
+      <h2 class="section-heading"><span class="section-number">5</span> User Data Sharing, Transfer, and Third-Party Disclosures</h2>
       <p>
-        In accordance with Google Chrome Web Store policies, here is an explicit, transparent justification for every browser permission declared in our Manifest V3 configuration:
+        Google Chrome Web Store program policies strictly prohibit omission of data sharing disclosures:
+      </p>
+
+      <div class="highlight-statement rose">
+        <strong>Absolute Prohibition on Selling &amp; Sharing:</strong>
+        <ul style="margin: 8px 0 0 18px;">
+          <li><strong>We do NOT sell, rent, lease, license, or monetize user data to third parties under any circumstances.</strong></li>
+          <li><strong>We do NOT share, transfer, or disclose user data to third parties, data brokers, advertising networks, or analytics providers.</strong></li>
+          <li><strong>We do NOT transmit passwords, credentials, usernames, or vault contents over the public internet.</strong></li>
+        </ul>
+      </div>
+
+      <div class="sub-heading">5.1 Read-Only Phishing Threat Lookups</div>
+      <p>
+        To protect users from fraudulent lookalike domains and brand impersonation attacks, the desktop application may perform read-only queries against public domain infrastructure:
+      </p>
+      <ul>
+        <li><strong>DNS Resolution:</strong> Standard DNS-over-HTTPS queries via Cloudflare Public DNS (<span class="code-badge">1.1.1.1</span>) to verify domain records;</li>
+        <li><strong>Domain Age (RDAP):</strong> Public Registration Data Access Protocol (RDAP) queries to inspect domain registration age (newly registered domains carry high phishing risk).</li>
+      </ul>
+      <p>
+        <strong>Strict Safeguard:</strong> These lookups query <em>only public domain hostnames</em> (e.g. <span class="code-badge">paypal.com</span>). They <strong>never</strong> transmit user credentials, passwords, usernames, IP addresses, or personal information.
+      </p>
+    </section>
+
+    <!-- Section 6: Browser Permissions & Technical Justifications -->
+    <section class="section-block">
+      <h2 class="section-heading"><span class="section-number">6</span> Browser Permissions &amp; Technical Justification</h2>
+      <p>
+        Every browser permission declared in Kloak's Manifest V3 manifest is strictly required for its single purpose:
       </p>
 
       <div class="table-container">
@@ -495,19 +759,19 @@
             <tr>
               <th style="width: 25%;">Permission</th>
               <th style="width: 35%;">Purpose in Kloak</th>
-              <th style="width: 40%;">Privacy &amp; Security Safeguard</th>
+              <th style="width: 40%;">Privacy Safeguard</th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td><span class="code-badge">&lt;all_urls&gt;</span> (host_permissions)</td>
               <td>Enables the autofill content script to detect username, password, and 2FA input fields across arbitrary websites visited by the user.</td>
-              <td>Content scripts run isolated in the browser DOM. No webpage content, text, or inputs are read or transmitted unless the user explicitly triggers autofill on that specific page.</td>
+              <td>Runs isolated in DOM. No webpage text or content is read or transmitted unless the user explicitly clicks autofill on that page.</td>
             </tr>
             <tr>
               <td><span class="code-badge">tabs</span></td>
-              <td>Reads the active tab's domain name to search your local vault for corresponding login credentials and verify domain legitimacy against phishing attempts.</td>
-              <td>Only the domain hostname is inspected in local memory. Browsing history is never stored, logged, or sent over any network.</td>
+              <td>Reads the active tab's domain name to query your local vault for matching logins and verify the domain against phishing lookalikes.</td>
+              <td>Evaluated strictly in volatile local memory. Browsing history is never stored, logged, or sent over any network.</td>
             </tr>
             <tr>
               <td><span class="code-badge">activeTab</span></td>
@@ -522,16 +786,16 @@
             <tr>
               <td><span class="code-badge">sidePanel</span></td>
               <td>Allows users to open and view their vault records in Chrome's native Side Panel alongside web pages.</td>
-              <td>The side panel is rendered entirely offline from local extension assets.</td>
+              <td>Rendered entirely offline from local extension assets.</td>
             </tr>
             <tr>
               <td><span class="code-badge">clipboardWrite</span></td>
               <td>Allows users to copy generated passwords, usernames, and 2FA TOTP codes to their system clipboard.</td>
-              <td>Write-only access; the extension cannot read or inspect preexisting clipboard data.</td>
+              <td>Write-only access; the extension cannot read or inspect preexisting clipboard contents.</td>
             </tr>
             <tr>
               <td><span class="code-badge">storage</span></td>
-              <td>Saves extension UI settings, lock timers, and display modes.</td>
+              <td>Saves extension UI preferences, lock timers, and display modes.</td>
               <td>Uses isolated, local browser storage (<span class="code-badge">chrome.storage.local</span>) without remote cloud sync.</td>
             </tr>
           </tbody>
@@ -539,78 +803,119 @@
       </div>
     </section>
 
-    <!-- Section 4: Remote Code & Telemetry -->
+    <!-- Section 7: Chrome Web Store Privacy Practices Compliance Table -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">4</span> Absolute Ban on Remote Code &amp; Telemetry</h2>
+      <h2 class="section-heading"><span class="section-number">7</span> Chrome Web Store Privacy Practices Disclosure</h2>
       <p>
-        In strict compliance with Google Chrome Web Store policies:
+        The following table matches the declarations submitted in the Chrome Web Store Developer Console under <strong>Privacy practices</strong>:
+      </p>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Data Category</th>
+              <th>Collection Status</th>
+              <th>Remote Storage?</th>
+              <th>Shared with 3rd Parties?</th>
+              <th>Used for Ads / Lending?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Authentication Information</strong><br>(Passwords, credentials, 2FA tokens)</td>
+              <td><span class="status-badge green">Processed Locally</span></td>
+              <td><span class="status-badge blue">No (100% On-Device)</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>Website Content</strong><br>(Form fields &amp; input elements)</td>
+              <td><span class="status-badge green">Processed Locally</span></td>
+              <td><span class="status-badge blue">No (100% On-Device)</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>Web History / URLs</strong><br>(Active tab domain for matching)</td>
+              <td><span class="status-badge green">Ephemeral RAM Only</span></td>
+              <td><span class="status-badge blue">No (Never Logged)</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>Financial Information</strong><br>(Optional payment cards)</td>
+              <td><span class="status-badge green">Processed Locally</span></td>
+              <td><span class="status-badge blue">No (100% On-Device)</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>User Activity / Analytics</strong><br>(Clicks, scrolling, telemetry)</td>
+              <td><span class="status-badge green">Not Collected</span></td>
+              <td><span class="status-badge blue">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>Personal Communications</strong></td>
+              <td><span class="status-badge green">Not Collected</span></td>
+              <td><span class="status-badge blue">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+            <tr>
+              <td><strong>Location Data</strong></td>
+              <td><span class="status-badge green">Not Collected</span></td>
+              <td><span class="status-badge blue">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+              <td><span class="status-badge green">No</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section 8: User Rights & Data Control -->
+    <section class="section-block">
+      <h2 class="section-heading"><span class="section-number">8</span> User Rights &amp; Regulatory Compliance</h2>
+      <p>
+        Because Kloak stores data strictly on your device, you have complete sovereignty over your data under international privacy frameworks:
       </p>
       <ul>
-        <li><strong>No Remotely Hosted Code:</strong> Kloak does not download, load, or execute any remotely hosted JavaScript, WebAssembly, or scripts. 100% of the extension's code and dependencies are statically bundled into the extension package at build time.</li>
-        <li><strong>No Tracking or Analytics:</strong> We do not embed Google Analytics, Mixpanel, Sentry, Meta Pixels, or any third-party telemetry tools in the extension or desktop app.</li>
-        <li><strong>No Commercial Sale of Data:</strong> We do not sell, rent, license, or exchange user data with advertisers, data brokers, or third parties under any circumstances.</li>
+        <li><strong>GDPR (European Union):</strong> Kloak does not transmit or process personal data on remote servers. All processing occurs locally under the user's sole control. Users have absolute rights to access, export, and erase their data locally at any time.</li>
+        <li><strong>CCPA / CPRA (California):</strong> We do not sell or share personal information as defined by California law. No personal information is retained or transferred for monetary or commercial consideration.</li>
+        <li><strong>COPPA (Children's Privacy):</strong> Kloak does not knowingly collect personal information from children under 13. The application is completely local-first and does not operate accounts.</li>
       </ul>
     </section>
 
-    <!-- Section 5: Third Party Lookups -->
+    <!-- Section 9: Remote Code & Telemetry Ban -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">5</span> Read-Only Threat Intelligence Lookups</h2>
+      <h2 class="section-heading"><span class="section-number">9</span> Strict Ban on Remote Code &amp; Third-Party Libraries</h2>
       <p>
-        To protect users from fraudulent lookalike domains and brand impersonation attacks, Kloak includes an active phishing engine. When visiting a previously unverified website, Kloak may perform:
+        In compliance with Google Manifest V3 security requirements:
       </p>
       <ul>
-        <li>A read-only public DNS query (via Cloudflare DNS-over-HTTPS) to verify domain records;</li>
-        <li>A public RDAP query to inspect domain registration age (as newly registered domains carry a higher risk of phishing).</li>
-      </ul>
-      <p>
-        These lookups query only public domain metadata. They <strong>never</strong> transmit your IP address, username, password, identity, or any credential data.
-      </p>
-    </section>
-
-    <!-- Section 6: User Control & Data Retention -->
-    <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">6</span> User Control, Export &amp; Data Deletion</h2>
-      <p>
-        Because all data is stored locally on your device, you have complete and absolute ownership of your data at all times:
-      </p>
-      <ul>
-        <li><strong>Export:</strong> You can export your unencrypted or encrypted vault at any time in standardized formats (CSV, JSON).</li>
-        <li><strong>Deletion:</strong> You can purge individual items, clear your trash, or wipe your entire vault with 1 click in the Kloak settings menu.</li>
-        <li><strong>Uninstallation:</strong> Removing the Kloak desktop application and Chrome extension completely erases all associated data and application state from your computer.</li>
+        <li><strong>No Remotely Hosted Code:</strong> The extension executes only statically bundled local code included in the verified Chrome Web Store package. It never loads scripts, styles, or WebAssembly from remote servers or CDNs.</li>
+        <li><strong>Strict Content Security Policy (CSP):</strong> Disallows <span class="code-badge">eval()</span>, <span class="code-badge">new Function()</span>, and inline scripts.</li>
+        <li><strong>No Telemetry SDKs:</strong> No third-party trackers, crash reporters, or advertising beacons are embedded.</li>
       </ul>
     </section>
 
-    <!-- Section 7: Regulatory Compliance -->
+    <!-- Section 10: Changes & Contact Information -->
     <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">7</span> Regulatory Compliance (GDPR, CCPA/CPRA &amp; COPPA)</h2>
+      <h2 class="section-heading"><span class="section-number">10</span> Policy Updates &amp; Contact Information</h2>
       <p>
-        Because Kloak operates on a zero-knowledge, local-first architecture:
+        We may update this Privacy Policy from time to time to maintain compliance with evolving browser store standards and security regulations. Changes will be posted to this page with an updated "Last Updated" timestamp.
+      </p>
+      <p>
+        For any questions, feedback, or privacy verification inquiries, please contact:
       </p>
       <ul>
-        <li><strong>GDPR (EU):</strong> We do not act as a data controller or data processor of your personal data on remote servers. All processing occurs on your own hardware under your sole authority.</li>
-        <li><strong>CCPA / CPRA (California):</strong> We do not "sell" or "share" your personal information, as defined under California law.</li>
-        <li><strong>Children's Privacy (COPPA):</strong> Kloak does not knowingly collect personal information from children under 13.</li>
-      </ul>
-    </section>
-
-    <!-- Section 8: Changes -->
-    <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">8</span> Changes to this Privacy Policy</h2>
-      <p>
-        If we update this Privacy Policy to reflect software improvements or new regulatory standards, the revised version will be published on this page with an updated "Last Updated" date. Any material architectural changes will be disclosed prominently in the application release notes and open-source commit history.
-      </p>
-    </section>
-
-    <!-- Section 9: Contact -->
-    <section class="section-block">
-      <h2 class="section-heading"><span class="section-number">9</span> Contact Information &amp; Support</h2>
-      <p>
-        If you have questions, feedback, or security inquiries regarding this Privacy Policy or our software practices, please contact us:
-      </p>
-      <ul>
-        <li><strong>Project Repository:</strong> <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer">https://github.com/naetikarvind/kloak</a></li>
-        <li><strong>Issue Tracker:</strong> <a href="https://github.com/naetikarvind/kloak/issues" target="_blank" rel="noopener noreferrer">https://github.com/naetikarvind/kloak/issues</a></li>
-        <li><strong>Privacy Inquiries:</strong> <a href="mailto:privacy@kloak.app">privacy@kloak.app</a> (or via GitHub issue)</li>
+        <li><strong>Privacy &amp; Security Inquiries:</strong> <a href="mailto:privacy@kloak.app">privacy@kloak.app</a></li>
+        <li><strong>Developer &amp; Support Contact:</strong> <a href="mailto:support@kloak.app">support@kloak.app</a></li>
+        <li><strong>Open Source Repository:</strong> <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer">https://github.com/naetikarvind/kloak</a></li>
+        <li><strong>Public Issue Tracker:</strong> <a href="https://github.com/naetikarvind/kloak/issues" target="_blank" rel="noopener noreferrer">https://github.com/naetikarvind/kloak/issues</a></li>
       </ul>
     </section>
   </main>
@@ -621,9 +926,8 @@
       © 2026 Kloak Password Manager. 100% Local-First &amp; Zero-Knowledge.
     </div>
     <div class="footer-links">
-      <a href="/">Home</a>
-      <a href="/#features">Features</a>
-      <a href="/privacy.html" style="color: var(--text);">Privacy Policy</a>
+      <a href="index.html">Home</a>
+      <a href="privacy.html" style="color: var(--text);">Privacy Policy</a>
       <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer">GitHub</a>
     </div>
   </footer>

@@ -104,3 +104,61 @@ SUPPORT & COMMUNITY
 | `clipboardWrite` | Enables users to copy generated passwords, usernames, and 2FA TOTP codes to the system clipboard with a single click. |
 | `storage` | Required to store user UI preferences (theme, default view, auto-lock timeouts) locally within the browser. |
 
+---
+
+## User Data Privacy Compliance (Purple Nickel Resolution)
+
+### Required Sections Checklist
+Google Chrome Web Store User Data Policy mandates that the privacy policy explicitly detail all four stages of user data treatment without omission:
+1. **User Data Collection**: Explicitly covers Authentication Information, Website Content & Input Fields, Active Tab Domain (URLs), Financial Info, and lists non-collected categories (no analytics, no communications, no location, no device IDs).
+2. **User Data Handling & Purpose**: Confines all data processing strictly to the single purpose (credential autofill and password security). Contains required negative declarations: no unrelated usage, no advertising, no creditworthiness/lending, no profiling.
+3. **User Data Storage, Retention & Security**: Discloses local-only storage (`~/.kloak/vault.kloak` and `chrome.storage.local`), AES-256-GCM encryption, Argon2id key derivation, ephemeral memory handling for URLs, and complete local deletion/wipe mechanisms.
+4. **User Data Sharing & Disclosure**: Explicitly declares zero third-party sharing, zero data monetization/sales, and transparently details the read-only public DNS/RDAP queries used for anti-phishing domain checks.
+
+- **Live Privacy Policy URL**: `https://naetikarvind.github.io/kloak/privacy.html`
+- **Fallback URL**: `https://naetikarvind.github.io/kloak/privacy`
+
+---
+
+## Chrome Web Store Appeal / Re-Submission Response
+
+When submitting an Appeal or new revision in the **Chrome Web Store Developer Dashboard**:
+
+### Action in Dashboard:
+1. Navigate to your item: **Kloak Password Manager** (`hajgkgmajepndkhjhcgjenjnfojlphod`).
+2. Go to **Privacy practices** tab:
+   - Verify the Privacy Policy URL is set to: `https://naetikarvind.github.io/kloak/privacy.html`
+   - In **Data usage**, verify that the declared data categories match (Authentication info, Website content).
+   - In **Certification**, ensure all required compliance checkboxes are checked:
+     - [x] "I do not sell user data to third parties"
+     - [x] "I do not use or transfer user data for purposes unrelated to my item's core functionality"
+     - [x] "I do not use or transfer user data to determine creditworthiness or for lending purposes"
+3. Go to **Build > Status** and click **Appeal** (or submit a new review):
+   - Paste the following response text:
+
+### Appeal / Reviewer Notes Template:
+```text
+Dear Chrome Web Store Review Team,
+
+Thank you for your review and feedback regarding our item "Kloak Password Manager" (ID: hajgkgmajepndkhjhcgjenjnfojlphod).
+
+We have thoroughly updated our publicly accessible Privacy Policy (available at https://naetikarvind.github.io/kloak/privacy.html) to strictly rectify the User Data Privacy "Purple Nickel" notice and address all four required sections without omission:
+
+1. User Data Collection (Section 2): Explicitly details every data category accessed (Authentication Information, Website Form Elements, Active Tab Domain URLs, and UI Preferences), source of collection, and explicitly enumerates all data categories that are NEVER collected (no personal communications, no location data, no browsing history logs, no telemetry/analytics).
+
+2. User Data Handling and Purpose (Section 3): Confines all data handling strictly to the item's single purpose (credential autofill and 2FA assistance) and explicitly affirms all mandatory policy statements: no unrelated usage, no personalized advertising, no creditworthiness/lending use, and no surveillance/profiling.
+
+3. User Data Storage, Retention, and Security (Section 4): Discloses that 100% of user vault data is stored on-device (~/.kloak/vault.kloak) and browser settings in chrome.storage.local with zero cloud databases, protected by authenticated AES-256-GCM encryption and Argon2id. Retention schedules and one-click user deletion/wipe procedures are detailed.
+
+4. User Data Sharing, Transfer, and Disclosure (Section 5): Explicitly declares an absolute ban on selling, leasing, or sharing user data with third parties, data brokers, or advertising networks. Read-only domain reputation queries (Cloudflare DoH / RDAP) for anti-phishing protection are transparently documented with strict safeguards ensuring no personal data is transmitted.
+
+Furthermore, our Chrome Web Store Developer Console "Privacy practices" declarations and certification checkboxes have been verified to match our published Privacy Policy.
+
+We kindly request a re-review of our extension. Please let us know if any further information is needed.
+
+Sincerely,
+Kloak Development Team
+privacy@kloak.app
+```
+
+
