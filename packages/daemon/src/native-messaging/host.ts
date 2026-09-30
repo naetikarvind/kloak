@@ -7,6 +7,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as net from 'node:net';
+import * as childProcess from 'node:child_process';
+import { getDefaultVaultDir } from '@kloak/core';
 
 export const NATIVE_HOST_NAME = 'app.kloak.native';
 const IPC_PORT = 53152;
@@ -97,9 +99,15 @@ export class NativeMessagingHost {
     const hostScriptPath = path.resolve(__dirname, '../../dist/native-messaging/host.js');
     const nodePath = process.execPath;
 
-    const wrapperScriptPath = path.join(os.homedir(), '.kloak', 'kloak-native-bridge.sh');
-    const wrapperScript = `#!/bin/sh\nexec "${nodePath}" "${hostScriptPath}" "$@"\n`;
-    fs.writeFileSync(wrapperScriptPath, wrapperScript, { mode: 0o755 });
+    // Generate a platform-appropriate wrapper script (.cmd on Windows, .sh elsewhere)
+    const isWindows = process.platform === 'win32';
+    const wrapperScriptExt = isWindows ? '.cmd' : '.sh';
+    const wrapperScriptPath = path.join(getDefaultVaultDir(), `kloak-native-bridge${wrapperScriptExt}`);
+    const wrapperScript = isWindows
+      ? `@echo off\r\n"${nodePath}" "${hostScriptPath}" %*\r\n`
+      : `#!/bin/sh\nexec "${nodePath}" "${hostScriptPath}" "$@"\n`;
+    const wrapperMode = isWindows ? undefined : 0o755;
+    fs.writeFileSync(wrapperScriptPath, wrapperScript, isWindows ? { encoding: 'utf-8' } : { mode: wrapperMode! });
 
     const chromeManifest = {
       name: NATIVE_HOST_NAME,
@@ -119,6 +127,61 @@ export class NativeMessagingHost {
       allowed_extensions: ['kloak@passwords.app', 'kloak-extension@local']
     };
 
+    // --- Windows: AppData NativeMessagingHosts directories + Registry entries ---
+    if (process.platform === 'win32') {
+      const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+      const appData = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+
+      const windowsTargetDirs = [
+        {
+          dir: path.join(localAppData, 'Google', 'Chrome', 'User Data', 'NativeMessagingHosts'),
+          manifest: chromeManifest,
+          browser: 'chrome'
+        },
+        {
+          dir: path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data', 'NativeMessagingHosts'),
+          manifest: chromeManifest,
+          browser: 'brave'
+        },
+        {
+          dir: path.join(localAppData, 'Microsoft', 'Edge', 'User Data', 'NativeMessagingHosts'),
+          manifest: chromeManifest,
+          browser: 'edge'
+        },
+        {
+          dir: path.join(appData, 'Mozilla', 'NativeMessagingHosts'),
+          manifest: firefoxManifest,
+          browser: 'firefox'
+        }
+      ];
+
+      for (const target of windowsTargetDirs) {
+        try {
+          if (!fs.existsSync(target.dir)) fs.mkdirSync(target.dir, { recursive: true });
+          const manifestPath = path.join(target.dir, `${NATIVE_HOST_NAME}.json`);
+          fs.writeFileSync(manifestPath, JSON.stringify(target.manifest, null, 2));
+          installedPaths.push(manifestPath);
+
+          // Register in Windows Registry for Chromium browsers
+          if (target.browser !== 'firefox') {
+            const regBase = target.browser === 'edge'
+              ? 'Microsoft\\Edge'
+              : target.browser === 'brave'
+                ? 'BraveSoftware\\Brave-Browser'
+                : 'Google\\Chrome';
+            const regKey = `HKCU\\Software\\${regBase}\\NativeMessagingHosts\\${NATIVE_HOST_NAME}`;
+            try {
+              childProcess.execSync(`reg add "${regKey}" /ve /d "${manifestPath}" /f`, { stdio: 'ignore' });
+            } catch {}
+          }
+        } catch (err: any) {
+          console.warn(`Windows: Could not install manifest in ${target.dir}: ${err.message}`);
+        }
+      }
+      return installedPaths;
+    }
+
+    // --- macOS / Linux: Library or XDG paths ---
     const targetDirs = [
       { dir: path.join(os.homedir(), 'Library/Application Support/Google/Chrome/NativeMessagingHosts'), manifest: chromeManifest },
       { dir: path.join(os.homedir(), 'Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts'), manifest: chromeManifest },

@@ -1,6 +1,7 @@
 /**
  * Kloak Daemon — IPC Socket Server
- * Provides Unix Domain Socket & TCP fallback server for Raycast, CLI, and apps.
+ * Provides Unix Domain Socket (macOS/Linux), Windows Named Pipe, and TCP fallback
+ * server for Raycast, CLI, and apps.
  */
 
 import * as net from 'node:net';
@@ -10,7 +11,9 @@ import * as os from 'node:os';
 import { VaultManager, DEFAULT_VAULT_DIR } from '@kloak/core';
 import { generateTotp, generatePassword, generatePassphrase, evaluatePasswordStrength } from '@kloak/core';
 
-export const SOCKET_PATH = path.join(DEFAULT_VAULT_DIR, 'kloak.sock');
+export const SOCKET_PATH = process.platform === 'win32'
+  ? '\\\\.\\pipe\\kloak'
+  : path.join(DEFAULT_VAULT_DIR, 'kloak.sock');
 export const TCP_PORT = 53152;
 export const TCP_HOST = '127.0.0.1';
 
@@ -43,25 +46,31 @@ export class IpcSocketServer {
 
   public start(): Promise<void> {
     return new Promise((resolve) => {
-      // Ensure socket directory exists
-      if (!fs.existsSync(DEFAULT_VAULT_DIR)) {
-        fs.mkdirSync(DEFAULT_VAULT_DIR, { recursive: true, mode: 0o700 });
+      // Ensure socket directory exists (not needed for Windows Named Pipes)
+      if (process.platform !== 'win32') {
+        if (!fs.existsSync(DEFAULT_VAULT_DIR)) {
+          fs.mkdirSync(DEFAULT_VAULT_DIR, { recursive: true, mode: 0o700 });
+        }
+
+        // Cleanup existing socket file if orphaned
+        if (fs.existsSync(SOCKET_PATH)) {
+          try {
+            fs.unlinkSync(SOCKET_PATH);
+          } catch {}
+        }
       }
 
-      // Cleanup existing socket file if orphaned
-      if (fs.existsSync(SOCKET_PATH)) {
-        try {
-          fs.unlinkSync(SOCKET_PATH);
-        } catch {}
-      }
-
-      // Start Unix Domain Socket
+      // Start Unix Domain Socket (macOS/Linux) or Windows Named Pipe
       this.unixServer = net.createServer((socket) => this.handleClient(socket));
       this.unixServer.listen(SOCKET_PATH, () => {
-        try {
-          fs.chmodSync(SOCKET_PATH, 0o600);
-        } catch {}
-        console.log(`[Kloak Daemon] Unix IPC Socket listening at ${SOCKET_PATH}`);
+        // chmod is only meaningful for Unix Domain Socket files, not Named Pipes
+        if (process.platform !== 'win32') {
+          try {
+            fs.chmodSync(SOCKET_PATH, 0o600);
+          } catch {}
+        }
+        const ipcKind = process.platform === 'win32' ? 'Named Pipe' : 'Unix Socket';
+        console.log(`[Kloak Daemon] ${ipcKind} IPC listening at ${SOCKET_PATH}`);
       });
 
       // Start Localhost TCP fallback
@@ -71,8 +80,9 @@ export class IpcSocketServer {
         resolve();
       });
 
+      const ipcKind = process.platform === 'win32' ? 'Named Pipe' : 'Unix Socket';
       this.unixServer.on('error', (err) => {
-        console.error('[Kloak Daemon] Unix Socket error:', err.message);
+        console.error(`[Kloak Daemon] ${ipcKind} error:`, err.message);
       });
 
       this.tcpServer.on('error', (err) => {
@@ -85,7 +95,8 @@ export class IpcSocketServer {
     return new Promise((resolve) => {
       if (this.unixServer) {
         this.unixServer.close();
-        if (fs.existsSync(SOCKET_PATH)) {
+        // Named Pipes on Windows are not backed by files; only clean up on Unix
+        if (process.platform !== 'win32' && fs.existsSync(SOCKET_PATH)) {
           try { fs.unlinkSync(SOCKET_PATH); } catch {}
         }
       }

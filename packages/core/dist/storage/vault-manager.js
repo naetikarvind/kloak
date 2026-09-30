@@ -39,6 +39,7 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VaultManager = exports.DEFAULT_SETTINGS = exports.DEFAULT_VAULT_PATH = exports.DEFAULT_VAULT_DIR = void 0;
+exports.getDefaultVaultDir = getDefaultVaultDir;
 const fs = __importStar(require("node:fs"));
 const path = __importStar(require("node:path"));
 const os = __importStar(require("node:os"));
@@ -46,7 +47,14 @@ const crypto = __importStar(require("node:crypto"));
 const cipher_js_1 = require("../crypto/cipher.js");
 const index_js_1 = require("../parsers/index.js");
 const export_js_1 = require("../parsers/export.js");
-exports.DEFAULT_VAULT_DIR = path.join(os.homedir(), '.kloak');
+function getDefaultVaultDir() {
+    if (process.platform === 'win32') {
+        const appData = process.env.APPDATA || process.env.LOCALAPPDATA || os.homedir();
+        return path.join(appData, 'Kloak');
+    }
+    return path.join(os.homedir(), '.kloak');
+}
+exports.DEFAULT_VAULT_DIR = getDefaultVaultDir();
 exports.DEFAULT_VAULT_PATH = path.join(exports.DEFAULT_VAULT_DIR, 'vault.kloak');
 exports.DEFAULT_SETTINGS = {
     autoLockMinutes: 5,

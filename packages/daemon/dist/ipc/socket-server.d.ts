@@ -1,6 +1,7 @@
 /**
  * Kloak Daemon — IPC Socket Server
- * Provides Unix Domain Socket & TCP fallback server for Raycast, CLI, and apps.
+ * Provides Unix Domain Socket (macOS/Linux), Windows Named Pipe, and TCP fallback
+ * server for Raycast, CLI, and apps.
  */
 import { VaultManager } from '@kloak/core';
 export declare const SOCKET_PATH: string;

@@ -6,6 +6,7 @@
 import { VaultItem, VaultSettings, VaultStatus, VaultFolder } from '../models/vault.js';
 import { SupportedImportFormat } from '../parsers/index.js';
 import { ExportOptions, ExportResult } from '../parsers/export.js';
+export declare function getDefaultVaultDir(): string;
 export declare const DEFAULT_VAULT_DIR: string;
 export declare const DEFAULT_VAULT_PATH: string;
 export declare const DEFAULT_SETTINGS: VaultSettings;

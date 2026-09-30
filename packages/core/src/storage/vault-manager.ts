@@ -26,7 +26,14 @@ import {
 import { importFromContent, SupportedImportFormat } from '../parsers/index.js';
 import { exportVault, ExportOptions, ExportResult } from '../parsers/export.js';
 
-export const DEFAULT_VAULT_DIR = path.join(os.homedir(), '.kloak');
+export function getDefaultVaultDir(): string {
+  if (process.platform === 'win32') {
+    const appData = process.env.APPDATA || process.env.LOCALAPPDATA || os.homedir();
+    return path.join(appData, 'Kloak');
+  }
+  return path.join(os.homedir(), '.kloak');
+}
+export const DEFAULT_VAULT_DIR = getDefaultVaultDir();
 export const DEFAULT_VAULT_PATH = path.join(DEFAULT_VAULT_DIR, 'vault.kloak');
 
 export const DEFAULT_SETTINGS: VaultSettings = {
