@@ -542,10 +542,9 @@ app.on('ready', () => {
   createMainWindow();
 });
 
-app.on('window-all-closed', (e: ElectronEvent) => {
-  // On Windows, closing all windows would normally quit the app.
-  // We intercept this to keep Kloak alive in the system tray.
-  e.preventDefault();
+app.on('window-all-closed', () => {
+  // On Windows, closing all windows would normally quit the app if quit was called.
+  // By leaving this empty, we keep Kloak running in the system tray.
 });
 
 app.on('before-quit', () => {
