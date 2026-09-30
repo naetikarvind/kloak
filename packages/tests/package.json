@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "Kloak Automated Test Suite",
   "scripts": {
-    "test": "node --test dist/**/*.test.js"
+    "build": "tsc",
+    "pretest": "tsc",
+    "test": "tsc && node --test dist/crypto.test.js dist/generator.test.js dist/ipc.test.js dist/parsers.test.js dist/totp.test.js dist/vault-manager.test.js"
   },
   "dependencies": {
     "@kloak/core": "file:../core",

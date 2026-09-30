@@ -24,13 +24,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Test Suite
-        run: npm test
-
       - name: Build Core and Daemon
         run: |
           npm run build --workspace=packages/core
           npm run build --workspace=packages/daemon
+
+      - name: Run Test Suite
+        run: npm test
 
       - name: Build Windows Electron App
         run: npm run windows:build

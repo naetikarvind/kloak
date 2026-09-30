@@ -9,7 +9,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "build:icons": "./build-icons.sh",
-    "test": "npm run test --workspace=packages/tests",
+    "test": "npm run build --workspace=packages/core && npm run build --workspace=packages/daemon && npm test --workspace=packages/tests",
     "daemon": "npm run start --workspace=packages/daemon",
     "cli": "node packages/daemon/dist/cli/index.js",
     "website:dev": "npm run dev --workspace=packages/website",
