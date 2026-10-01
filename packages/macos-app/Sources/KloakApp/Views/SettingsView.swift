@@ -623,7 +623,7 @@ public struct SettingsView: View {
 
                 Divider().opacity(0.15)
 
-                HStack {
+                HStack(spacing: 10) {
                     Button(action: {
                         devManager.showSheet = true
                     }) {
@@ -633,6 +633,19 @@ public struct SettingsView: View {
                         }
                     }
                     .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                    if devManager.isUnlocked {
+                        Button(action: {
+                            devManager.lock()
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "lock.fill")
+                                Text("Deactivate")
+                            }
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                        .foregroundColor(LiquidGlassTheme.roseAccent)
+                    }
 
                     Spacer()
 

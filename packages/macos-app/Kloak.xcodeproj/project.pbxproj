@@ -39,6 +39,11 @@
 		EAA8B0DFA5FF499C9E1CAAF5 /* ThreatDetectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1AB264AF5554C94A3300B70 /* ThreatDetectorService.swift */; };
 		F4475198F0DE465192FAA864 /* OAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5765FC9C0F0147C994A8A43A /* OAuthManager.swift */; };
 		E49549F9BA724373B6F707BB /* DomainTreeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0E1488C8516449186F37999 /* DomainTreeService.swift */; };
+		B10000010000000000000001 /* DuplicateDetectorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000010000000000000001 /* DuplicateDetectorService.swift */; };
+		B10000020000000000000002 /* DevModeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000020000000000000002 /* DevModeManager.swift */; };
+		B10000030000000000000003 /* DuplicateManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000030000000000000003 /* DuplicateManagerView.swift */; };
+		B10000040000000000000004 /* DevModeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000040000000000000004 /* DevModeSheet.swift */; };
+		B10000050000000000000005 /* ImportDuplicateResolverSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000050000000000000005 /* ImportDuplicateResolverSheet.swift */; };
 		E33CDBCF22EE4C0A86F94A1E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
@@ -75,6 +80,11 @@
 		A1AB264AF5554C94A3300B70 /* ThreatDetectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/ThreatDetectorService.swift"; sourceTree = "<group>"; };
 		5765FC9C0F0147C994A8A43A /* OAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/OAuthManager.swift"; sourceTree = "<group>"; };
 		D0E1488C8516449186F37999 /* DomainTreeService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/DomainTreeService.swift"; sourceTree = "<group>"; };
+		A10000010000000000000001 /* DuplicateDetectorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/DuplicateDetectorService.swift"; sourceTree = "<group>"; };
+		A10000020000000000000002 /* DevModeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/DevModeManager.swift"; sourceTree = "<group>"; };
+		A10000030000000000000003 /* DuplicateManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/DuplicateManagerView.swift"; sourceTree = "<group>"; };
+		A10000040000000000000004 /* DevModeSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/DevModeSheet.swift"; sourceTree = "<group>"; };
+		A10000050000000000000005 /* ImportDuplicateResolverSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/ImportDuplicateResolverSheet.swift"; sourceTree = "<group>"; };
 		58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = "folder"; path = "AppIcon.icon"; sourceTree = "<group>"; };
 		8E2EDE0EB75F49198A06F3A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.xml"; path = "Info.plist"; sourceTree = "<group>"; };
 		96D7472670404CFB938AC830 /* Kloak.entitlements */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.entitlements"; path = "Kloak.entitlements"; sourceTree = "<group>"; };
@@ -127,6 +137,11 @@
 				A1AB264AF5554C94A3300B70 /* ThreatDetectorService.swift */,
 				5765FC9C0F0147C994A8A43A /* OAuthManager.swift */,
 				D0E1488C8516449186F37999 /* DomainTreeService.swift */,
+				A10000010000000000000001 /* DuplicateDetectorService.swift */,
+				A10000020000000000000002 /* DevModeManager.swift */,
+				A10000030000000000000003 /* DuplicateManagerView.swift */,
+				A10000040000000000000004 /* DevModeSheet.swift */,
+				A10000050000000000000005 /* ImportDuplicateResolverSheet.swift */,
 				58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */,
 				8E2EDE0EB75F49198A06F3A1 /* Info.plist */,
 				96D7472670404CFB938AC830 /* Kloak.entitlements */,
@@ -237,6 +252,11 @@
 				EAA8B0DFA5FF499C9E1CAAF5 /* ThreatDetectorService.swift in Sources */,
 				F4475198F0DE465192FAA864 /* OAuthManager.swift in Sources */,
 				E49549F9BA724373B6F707BB /* DomainTreeService.swift in Sources */,
+				B10000010000000000000001 /* DuplicateDetectorService.swift in Sources */,
+				B10000020000000000000002 /* DevModeManager.swift in Sources */,
+				B10000030000000000000003 /* DuplicateManagerView.swift in Sources */,
+				B10000040000000000000004 /* DevModeSheet.swift in Sources */,
+				B10000050000000000000005 /* ImportDuplicateResolverSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
