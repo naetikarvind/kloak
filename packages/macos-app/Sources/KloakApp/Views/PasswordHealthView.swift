@@ -6,19 +6,34 @@ public struct PasswordHealthView: View {
     var onDeleteItem: ((String) -> Void)?   // called with item ID to delete (soft-delete)
     var onSelectItem: ((String) -> Void)?
 
-    @State private var selectedFilter: Int = 0 // 0: All, 1: Reused, 2: Weak, 3: Missing 2FA
+    @ObservedObject private var vaultStore = VaultStore.shared
+
+    @State private var selectedFilter: Int = 0 // 0: All, 1: Reused, 2: Weak, 3: Missing 2FA, 4: Ignored
     @State private var searchText: String = ""
     @State private var revealedPasswordIds: Set<String> = []
     @State private var updatedItemId: String? = nil
     @State private var statusMessage: String? = nil
-    /// Group IDs the user has chosen to ignore from the audit
-    @State private var ignoredGroupIds: Set<String> = []
+    @State private var lastIgnoredGroupId: String? = nil
     /// Group currently pending merge confirmation
     @State private var groupToMerge: ReusedPasswordGroup? = nil
 
     private var reusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
-            .filter { !ignoredGroupIds.contains($0.id) }
+            .filter { !vaultStore.ignoredReusedGroupIds.contains($0.id) }
+        if searchText.isEmpty { return all }
+        let q = searchText.lowercased()
+        return all.filter { group in
+            group.items.contains {
+                $0.title.lowercased().contains(q) ||
+                ($0.username?.lowercased().contains(q) ?? false) ||
+                $0.urls.contains { $0.lowercased().contains(q) }
+            }
+        }
+    }
+
+    private var ignoredReusedGroups: [ReusedPasswordGroup] {
+        let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
+            .filter { vaultStore.ignoredReusedGroupIds.contains($0.id) }
         if searchText.isEmpty { return all }
         let q = searchText.lowercased()
         return all.filter { group in
@@ -53,7 +68,7 @@ public struct PasswordHealthView: View {
     }
 
     private var totalReusedLogins: Int {
-        DuplicateDetectorService.shared.findReusedPasswords(in: items).reduce(0) { $0 + $1.items.count }
+        reusedGroups.reduce(0) { $0 + $1.items.count }
     }
 
     public var body: some View {
@@ -73,6 +88,18 @@ public struct PasswordHealthView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.primary)
                         Spacer()
+                        if let lastId = lastIgnoredGroupId {
+                            Button("Undo") {
+                                _ = withAnimation(.easeOut(duration: 0.2)) {
+                                    vaultStore.unignoreReusedGroup(id: lastId)
+                                }
+                                lastIgnoredGroupId = nil
+                                statusMessage = "Restored group to active audit list."
+                            }
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(LiquidGlassTheme.primaryAccent)
+                            .buttonStyle(.plain)
+                        }
                         Button(action: { statusMessage = nil }) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 10, weight: .bold))
@@ -91,7 +118,8 @@ public struct PasswordHealthView: View {
                 }
 
                 // Main Content
-                if reusedGroups.isEmpty && weakPasswords.isEmpty && (selectedFilter == 3 ? missing2FA.isEmpty : true) {
+                let isListEmpty = (selectedFilter == 4) ? ignoredReusedGroups.isEmpty : (reusedGroups.isEmpty && weakPasswords.isEmpty && (selectedFilter == 3 ? missing2FA.isEmpty : true))
+                if isListEmpty {
                     emptyHealthStateView
                 } else {
                     healthIssuesContent
@@ -206,6 +234,9 @@ public struct PasswordHealthView: View {
                 Text("Reused (\(reusedGroups.count))").tag(1)
                 Text("Weak (\(weakPasswords.count))").tag(2)
                 Text("No 2FA (\(missing2FA.count))").tag(3)
+                if !vaultStore.ignoredReusedGroupIds.isEmpty {
+                    Text("Ignored (\(ignoredReusedGroups.count))").tag(4)
+                }
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: .infinity)
@@ -254,6 +285,11 @@ public struct PasswordHealthView: View {
             // Missing 2FA
             if (selectedFilter == 3) && !missing2FA.isEmpty {
                 missing2FASection
+            }
+
+            // Ignored Passwords
+            if (selectedFilter == 4) && !ignoredReusedGroups.isEmpty {
+                ignoredPasswordsSection
             }
         }
     }
@@ -334,10 +370,11 @@ public struct PasswordHealthView: View {
 
                 // ── Ignore button ──
                 Button(action: {
+                    lastIgnoredGroupId = group.id
                     _ = withAnimation(.easeOut(duration: 0.2)) {
-                        ignoredGroupIds.insert(group.id)
+                        vaultStore.ignoreReusedGroup(id: group.id)
                     }
-                    statusMessage = "Group ignored. It won't appear in future audits this session."
+                    statusMessage = "Group ignored. Moved to Ignored tab."
                 }) {
                     Label("Ignore", systemImage: "eye.slash")
                 }
@@ -593,6 +630,131 @@ public struct PasswordHealthView: View {
         .glassEffect(cornerRadius: 14)
     }
 
+    // MARK: - Ignored Passwords Section
+
+    private var ignoredPasswordsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Image(systemName: "eye.slash.fill")
+                    .foregroundColor(.secondary)
+                    .font(.system(size: 13))
+                Text("IGNORED REUSED PASSWORD GROUPS")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(ignoredReusedGroups) { group in
+                ignoredGroupCard(group)
+            }
+        }
+    }
+
+    private func ignoredGroupCard(_ group: ReusedPasswordGroup) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.slash.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+
+                    Text("Shared across \(group.items.count) Logins (Ignored)")
+                        .font(.system(size: 13, weight: .bold))
+                }
+
+                Spacer()
+
+                // Password reveal pill
+                HStack(spacing: 6) {
+                    if revealedPasswordIds.contains(group.id) {
+                        Text(group.password)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    } else {
+                        Text("••••••••••••")
+                            .font(.system(size: 11, design: .monospaced))
+                    }
+
+                    Button(action: {
+                        if revealedPasswordIds.contains(group.id) {
+                            revealedPasswordIds.remove(group.id)
+                        } else {
+                            revealedPasswordIds.insert(group.id)
+                        }
+                    }) {
+                        Image(systemName: revealedPasswordIds.contains(group.id) ? "eye.slash" : "eye")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.black.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                // ── Unignore button ──
+                Button(action: {
+                    _ = withAnimation(.easeOut(duration: 0.2)) {
+                        vaultStore.unignoreReusedGroup(id: group.id)
+                    }
+                    statusMessage = "Restored group to active audit list."
+                }) {
+                    Label("Unignore", systemImage: "eye")
+                }
+                .buttonStyle(GlassCapsuleButton(isPrimary: true))
+
+                // ── Merge button ──
+                Button(action: {
+                    groupToMerge = group
+                }) {
+                    Label("Merge", systemImage: "arrow.triangle.merge")
+                }
+                .buttonStyle(GlassCapsuleButton(isPrimary: false))
+            }
+
+            Divider().opacity(0.1)
+
+            // Item rows
+            VStack(spacing: 8) {
+                ForEach(group.items) { item in
+                    HStack(spacing: 12) {
+                        FaviconView(
+                            urls: item.urls,
+                            title: item.title,
+                            itemType: item.type,
+                            size: 26
+                        )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(.system(size: 12, weight: .semibold))
+
+                            HStack(spacing: 6) {
+                                if let user = item.username, !user.isEmpty {
+                                    Text(user)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                if let url = item.urls.first, !url.isEmpty {
+                                    Text("• \(url)")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary.opacity(0.7))
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(Color.black.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+        .padding(16)
+        .glassEffect(cornerRadius: 14)
+    }
+
     // MARK: - Actions
 
     private func handleGenerateNewPassword(for item: VaultItem) {
@@ -645,7 +807,7 @@ public struct PasswordHealthView: View {
 
         // 3. Mark this group as ignored/handled in local state
         _ = withAnimation(.easeOut(duration: 0.25)) {
-            ignoredGroupIds.insert(group.id)
+            vaultStore.ignoreReusedGroup(id: group.id)
         }
 
         statusMessage = "Merged \(group.items.count) logins into \"\(merged.title)\". Combined: \(merged.urls.count) URLs · \(merged.tags.count) tags. Duplicates moved to Trash."
@@ -653,18 +815,31 @@ public struct PasswordHealthView: View {
 
     private var emptyHealthStateView: some View {
         VStack(spacing: 12) {
-            Image(systemName: "checkmark.shield.fill")
-                .font(.system(size: 42))
-                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+            if selectedFilter == 4 {
+                Image(systemName: "eye.fill")
+                    .font(.system(size: 42))
+                    .foregroundColor(.secondary)
 
-            Text("Your Vault is in Great Health!")
-                .font(.system(size: 16, weight: .bold))
+                Text("No Ignored Groups")
+                    .font(.system(size: 16, weight: .bold))
 
-            Text("No reused or weak passwords detected. All your accounts use strong, unique credentials.")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 400)
+                Text("You haven't ignored any reused password groups.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            } else {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.system(size: 42))
+                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+
+                Text("Your Vault is in Great Health!")
+                    .font(.system(size: 16, weight: .bold))
+
+                Text("No reused or weak passwords detected. All your accounts use strong, unique credentials.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 400)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 48)

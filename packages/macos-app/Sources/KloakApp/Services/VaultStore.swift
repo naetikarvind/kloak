@@ -14,6 +14,15 @@ public final class VaultStore: ObservableObject {
     @Published public var folders: [VaultFolder] = []
     @Published public var settings: VaultSettings = .default
     @Published public var lastError: String? = nil
+    @Published public var ignoredReusedGroupIds: Set<String> = []
+
+    public func ignoreReusedGroup(id: String) {
+        ignoredReusedGroupIds.insert(id)
+    }
+
+    public func unignoreReusedGroup(id: String) {
+        ignoredReusedGroupIds.remove(id)
+    }
 
     // MARK: - Private State
     private var vaultKey: SymmetricKey? = nil

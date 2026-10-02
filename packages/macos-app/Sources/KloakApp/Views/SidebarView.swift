@@ -137,7 +137,9 @@ public struct SidebarView: View {
 
                 Section(header: sectionHeader("Security")) {
                     let dupCount = DuplicateDetectorService.shared.findDuplicateAccounts(in: items).count
-                    let reusedCount = DuplicateDetectorService.shared.findReusedPasswords(in: items).count
+                    let reusedCount = DuplicateDetectorService.shared.findReusedPasswords(in: items)
+                        .filter { !VaultStore.shared.ignoredReusedGroupIds.contains($0.id) }
+                        .count
                     let weakCount = DuplicateDetectorService.shared.findWeakPasswords(in: items).count
                     let totalHealthIssues = reusedCount + weakCount
 
