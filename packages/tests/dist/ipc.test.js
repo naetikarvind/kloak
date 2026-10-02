@@ -115,4 +115,47 @@ const socket_server_js_1 = require("../../daemon/dist/ipc/socket-server.js");
         });
         assert.strictEqual(totpRes.result.token.length, 6);
     });
+    (0, node_test_1.it)('handles vault.lock and vault.unlock with master password', async () => {
+        // 1. Lock vault
+        const lockRes = await server.dispatch({
+            jsonrpc: '2.0',
+            id: 7,
+            method: 'vault.lock'
+        });
+        assert.strictEqual(lockRes.result.success, true);
+        assert.strictEqual(lockRes.result.status.isUnlocked, false);
+        // 2. Status reflects locked
+        const statusRes = await server.dispatch({
+            jsonrpc: '2.0',
+            id: 8,
+            method: 'vault.status'
+        });
+        assert.strictEqual(statusRes.result.isUnlocked, false);
+        // 3. Unlock with wrong password fails
+        const failRes = await server.dispatch({
+            jsonrpc: '2.0',
+            id: 9,
+            method: 'vault.unlock',
+            params: { masterPassword: 'WrongPassword999!' }
+        });
+        assert.ok(failRes.error);
+        assert.match(failRes.error.message, /master password incorrect/i);
+        // 4. Unlock with correct master password succeeds
+        const unlockRes = await server.dispatch({
+            jsonrpc: '2.0',
+            id: 10,
+            method: 'vault.unlock',
+            params: { masterPassword: 'IpcTestPassword123!' }
+        });
+        assert.strictEqual(unlockRes.result.success, true);
+        assert.strictEqual(unlockRes.result.status.isUnlocked, true);
+        // 5. Items are accessible again
+        const itemsRes = await server.dispatch({
+            jsonrpc: '2.0',
+            id: 11,
+            method: 'vault.getItems'
+        });
+        assert.ok(Array.isArray(itemsRes.result));
+        assert.ok(itemsRes.result.some((i) => i.title === 'Slack'));
+    });
 });

@@ -554,6 +554,28 @@ public final class IPCServer: ObservableObject {
             store.deleteItem(id: id)
             reply(.dictionary(["success": .bool(true)]))
 
+        case "vault.unlock":
+            let password = params?["masterPassword"]?.stringValue ?? params?["password"]?.stringValue ?? ""
+            guard !password.isEmpty else {
+                replyError(-32602, "Master password required")
+                return
+            }
+            Task { @MainActor in
+                let success = await store.unlock(password: password)
+                if success {
+                    reply(.dictionary([
+                        "success": .bool(true),
+                        "status": .dictionary([
+                            "isInitialized": .bool(store.hasVault),
+                            "isUnlocked": .bool(store.isUnlocked),
+                            "itemCount": .int(store.items.filter { !$0.trashed }.count)
+                        ])
+                    ]))
+                } else {
+                    replyError(-32002, store.lastError ?? "Incorrect master password")
+                }
+            }
+
         case "vault.lock":
             store.lock()
             reply(.dictionary(["success": .bool(true)]))

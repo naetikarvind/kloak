@@ -215,6 +215,8 @@
     setupAddDropdown();
     setupSortDropdown();
     setupFilters();
+    setupUnlockView();
+    setupLockBtn();
     const urlParams = new URLSearchParams(window.location.search);
     const requestedTab = urlParams.get("tab");
     const stored = await chrome.storage?.local?.get(["defaultTab"]);
@@ -1581,44 +1583,194 @@ ${notes}`;
       return null;
     }
   }
+  async function unlockVaultDirect(password) {
+    try {
+      const res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.unlock",
+          params: { masterPassword: password }
+        })
+      });
+      if (!res.ok) return { success: false, error: "HTTP error " + res.status };
+      const data = await res.json();
+      if (data.error) {
+        return { success: false, error: data.error.message || "Incorrect master password" };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message || "Connection failed" };
+    }
+  }
+  async function lockVaultDirect() {
+    try {
+      const res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.lock"
+        })
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+  function showUnlockView(statusMessage) {
+    const unlockView = document.getElementById("unlock-view");
+    if (unlockView) {
+      unlockView.style.display = "flex";
+    }
+    const pwdInput = document.getElementById("unlock-password");
+    if (pwdInput) {
+      pwdInput.value = "";
+      setTimeout(() => pwdInput.focus(), 60);
+    }
+    const errorEl = document.getElementById("unlock-error");
+    if (errorEl) errorEl.style.display = "none";
+    const statusEl = document.getElementById("unlock-daemon-status");
+    if (statusEl) {
+      statusEl.textContent = statusMessage || "Connected to local Kloak daemon";
+    }
+  }
+  function hideUnlockView() {
+    const unlockView = document.getElementById("unlock-view");
+    if (unlockView) {
+      unlockView.style.display = "none";
+    }
+  }
+  function setupUnlockView() {
+    const form = document.getElementById("unlock-form");
+    const pwdInput = document.getElementById("unlock-password");
+    const toggleBtn = document.getElementById("btn-toggle-unlock-pwd");
+    const eyeIcon = document.getElementById("eye-icon-unlock");
+    const errorEl = document.getElementById("unlock-error");
+    const submitBtn = document.getElementById("btn-submit-unlock");
+    const btnText = document.getElementById("unlock-btn-text");
+    const spinner = document.getElementById("unlock-spinner");
+    if (toggleBtn && pwdInput) {
+      toggleBtn.addEventListener("click", () => {
+        const isPassword = pwdInput.type === "password";
+        pwdInput.type = isPassword ? "text" : "password";
+        if (eyeIcon) {
+          eyeIcon.innerHTML = isPassword ? '<path d="M12 7c2.76 0 5 2.24 5 5 0 .65-.13 1.26-.36 1.83l2.92 2.92c1.51-1.26 2.7-2.89 3.44-4.75-1.73-4.39-6-7.5-11-7.5-1.4 0-2.74.25-3.98.7l2.16 2.16C10.74 7.13 11.35 7 12 7zM2 4.27l2.28 2.28.46.46C3.08 8.3 1.78 10.02 1 12c1.73 4.39 6 7.5 11 7.5 1.55 0 3.03-.3 4.38-.84l.42.42L19.73 22 21 20.73 3.27 3 2 4.27zM7.53 9.8l1.55 1.55c-.05.21-.08.43-.08.65 0 1.66 1.34 3 3 3 .22 0 .44-.03.65-.08l1.55 1.55c-.67.33-1.41.53-2.2.53-2.76 0-5-2.24-5-5 0-.79.2-1.53.53-2.2zm4.31-.78l3.15 3.15.02-.16c0-1.66-1.34-3-3-3l-.17.01z"/>' : '<path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>';
+        }
+      });
+    }
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const password = pwdInput?.value || "";
+        if (!password) {
+          if (errorEl) {
+            errorEl.textContent = "Please enter your master password.";
+            errorEl.style.display = "block";
+          }
+          return;
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        if (btnText) btnText.textContent = "Unlocking...";
+        if (spinner) spinner.style.display = "inline-block";
+        if (errorEl) errorEl.style.display = "none";
+        try {
+          let unlockSuccess = false;
+          let errorMessage = "";
+          const directRes = await unlockVaultDirect(password);
+          if (directRes.success) {
+            unlockSuccess = true;
+          } else {
+            errorMessage = directRes.error || "";
+            const bgRes = await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ type: "UNLOCK_VAULT", password }, (response) => {
+                resolve(response);
+              });
+            });
+            if (bgRes && bgRes.success) {
+              unlockSuccess = true;
+            } else if (bgRes && bgRes.error) {
+              errorMessage = bgRes.error;
+            }
+          }
+          if (unlockSuccess) {
+            hideUnlockView();
+            if (pwdInput) pwdInput.value = "";
+            await loadLogins();
+          } else {
+            if (errorEl) {
+              errorEl.textContent = errorMessage || "Incorrect master password. Please try again.";
+              errorEl.style.display = "block";
+            }
+            if (pwdInput) {
+              pwdInput.select();
+              pwdInput.focus();
+            }
+          }
+        } catch (err) {
+          if (errorEl) {
+            errorEl.textContent = err.message || "Unlock failed. Ensure Kloak is running.";
+            errorEl.style.display = "block";
+          }
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+          if (btnText) btnText.textContent = "Unlock Vault";
+          if (spinner) spinner.style.display = "none";
+        }
+      });
+    }
+  }
+  function setupLockBtn() {
+    const lockBtn = document.getElementById("btn-lock");
+    if (lockBtn) {
+      lockBtn.addEventListener("click", async () => {
+        await lockVaultDirect();
+        chrome.runtime.sendMessage({ type: "LOCK_VAULT" }).catch(() => null);
+        allItems = [];
+        activeItem = null;
+        const sidebarList = document.getElementById("sidebar-list");
+        if (sidebarList) sidebarList.innerHTML = "";
+        const detailPane = document.getElementById("detail-pane");
+        if (detailPane) detailPane.innerHTML = '<div class="detail-empty">Vault locked</div>';
+        showUnlockView();
+      });
+    }
+  }
   async function loadLogins(retryCount = 0) {
     const direct = await fetchVaultItemsDirect();
     if (direct) {
-      if (direct.isUnlocked && direct.items.length > 0) {
+      if (direct.isUnlocked) {
+        hideUnlockView();
         allItems = direct.items;
         renderSmartSuggestions(allItems);
         applyFilterAndSort();
         const sorted = sortItems(allItems);
         if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
         return;
-      } else if (!direct.isUnlocked) {
-        const container = document.getElementById("sidebar-list");
-        if (container) {
-          container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">Vault is locked.<br>Open the macOS app to unlock.</div>';
-        }
+      } else {
+        showUnlockView();
         return;
       }
     }
     chrome.runtime.sendMessage({ type: "SEARCH_VAULT", query: "" }, (searchRes) => {
-      if (searchRes && searchRes.isUnlocked && Array.isArray(searchRes.items) && searchRes.items.length > 0) {
-        allItems = searchRes.items;
+      if (searchRes && searchRes.isUnlocked) {
+        hideUnlockView();
+        allItems = searchRes.items || [];
         renderSmartSuggestions(allItems);
         applyFilterAndSort();
         const sorted = sortItems(allItems);
         if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
-      } else if (searchRes && searchRes.isUnlocked) {
-        allItems = searchRes.items || [];
-        renderSmartSuggestions(allItems);
-        applyFilterAndSort();
       } else {
         chrome.runtime.sendMessage({ type: "GET_STATUS" }, (statusRes) => {
           if (statusRes && statusRes.isUnlocked && retryCount < 2) {
             setTimeout(() => loadLogins(retryCount + 1), 300);
-          } else if (!statusRes || !statusRes.isUnlocked) {
-            const container = document.getElementById("sidebar-list");
-            if (container) {
-              container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">Vault is locked.<br>Open the macOS app to unlock.</div>';
-            }
+          } else if (statusRes && !statusRes.isUnlocked) {
+            showUnlockView();
+          } else {
+            showUnlockView("Cannot connect to Kloak Desktop App or Daemon.");
           }
         });
       }

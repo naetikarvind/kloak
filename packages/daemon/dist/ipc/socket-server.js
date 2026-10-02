@@ -121,7 +121,58 @@ class IpcSocketServer {
         let buffer = '';
         socket.on('data', async (chunk) => {
             buffer += chunk.toString('utf-8');
-            // Process newline-delimited JSON-RPC messages
+            // Check for HTTP pre-flight OPTIONS request
+            if (buffer.startsWith('OPTIONS ')) {
+                const corsResponse = 'HTTP/1.1 204 No Content\r\n' +
+                    'Access-Control-Allow-Origin: *\r\n' +
+                    'Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n' +
+                    'Access-Control-Allow-Headers: *\r\n' +
+                    'Connection: close\r\n\r\n';
+                socket.write(corsResponse, () => socket.end());
+                buffer = '';
+                return;
+            }
+            // Check for HTTP POST request (e.g. from browser extension direct fetch to /rpc)
+            if (buffer.startsWith('POST ')) {
+                const headerEnd = buffer.indexOf('\r\n\r\n');
+                if (headerEnd === -1)
+                    return; // Wait for complete HTTP headers
+                const headers = buffer.slice(0, headerEnd);
+                const match = headers.match(/content-length:\s*(\d+)/i);
+                const contentLength = match ? parseInt(match[1], 10) : 0;
+                const bodyStart = headerEnd + 4;
+                if (buffer.length < bodyStart + contentLength)
+                    return; // Wait for complete body
+                const body = buffer.slice(bodyStart, bodyStart + contentLength);
+                buffer = buffer.slice(bodyStart + contentLength);
+                try {
+                    const request = JSON.parse(body);
+                    const response = await this.dispatch(request);
+                    const respStr = JSON.stringify(response);
+                    const httpResp = 'HTTP/1.1 200 OK\r\n' +
+                        'Content-Type: application/json\r\n' +
+                        'Access-Control-Allow-Origin: *\r\n' +
+                        'Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n' +
+                        'Access-Control-Allow-Headers: *\r\n' +
+                        `Content-Length: ${Buffer.byteLength(respStr, 'utf-8')}\r\n` +
+                        'Connection: close\r\n\r\n' +
+                        respStr;
+                    socket.write(httpResp, () => socket.end());
+                }
+                catch (err) {
+                    const errObj = { jsonrpc: '2.0', id: null, error: { code: -32700, message: err.message } };
+                    const errStr = JSON.stringify(errObj);
+                    const httpResp = 'HTTP/1.1 400 Bad Request\r\n' +
+                        'Content-Type: application/json\r\n' +
+                        'Access-Control-Allow-Origin: *\r\n' +
+                        `Content-Length: ${Buffer.byteLength(errStr, 'utf-8')}\r\n` +
+                        'Connection: close\r\n\r\n' +
+                        errStr;
+                    socket.write(httpResp, () => socket.end());
+                }
+                return;
+            }
+            // Process newline-delimited JSON-RPC messages (CLI, native host, apps)
             while (buffer.includes('\n')) {
                 const lineEnd = buffer.indexOf('\n');
                 const rawMessage = buffer.slice(0, lineEnd).trim();

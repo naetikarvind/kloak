@@ -475,6 +475,48 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'UNLOCK_VAULT': {
+        const masterPassword = message.password || message.masterPassword || '';
+        if (!masterPassword) {
+          sendResponse({ success: false, error: 'Master password is required' });
+          break;
+        }
+        try {
+          const res = await sendNativeRequest('vault.unlock', { masterPassword });
+          if (res && (res.success || res.isUnlocked || res.status?.isUnlocked)) {
+            isVaultUnlocked = true;
+            const itemsRes = await sendNativeRequest('vault.getItems');
+            if (Array.isArray(itemsRes)) {
+              cachedItems = itemsRes;
+            }
+            if (lastActiveTabId && lastActiveUrl) {
+              updateBadgeForTab(lastActiveTabId, lastActiveUrl);
+            }
+            sendResponse({ success: true, isUnlocked: true, items: cachedItems });
+          } else {
+            sendResponse({ success: false, error: 'Incorrect master password. Please try again.' });
+          }
+        } catch (err: any) {
+          sendResponse({ success: false, error: err.message || 'Unlock failed' });
+        }
+        break;
+      }
+
+      case 'LOCK_VAULT': {
+        try {
+          await sendNativeRequest('vault.lock');
+          isVaultUnlocked = false;
+          cachedItems = [];
+          if (lastActiveTabId) {
+            await chrome.action.setBadgeText({ tabId: lastActiveTabId, text: '' });
+          }
+          sendResponse({ success: true, isUnlocked: false });
+        } catch (err: any) {
+          sendResponse({ success: false, error: err.message || 'Lock failed' });
+        }
+        break;
+      }
+
       case 'AUTOFILL_CREDENTIALS': {
         if (sender.tab?.id) {
           await chrome.tabs.sendMessage(sender.tab.id, {

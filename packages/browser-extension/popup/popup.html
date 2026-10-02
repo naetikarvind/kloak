@@ -1284,10 +1284,252 @@
       background: rgba(0,0,0,0.4);
       color: #FFFFFF;
     }
+
+    /* ── UNLOCK / LOGIN VIEW ── */
+    .unlock-view {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 30%, rgba(109, 74, 255, 0.18) 0%, #16151D 70%);
+      z-index: 500;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: paneSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .unlock-card {
+      width: 100%;
+      max-width: 360px;
+      background: rgba(33, 31, 45, 0.95);
+      border: 1px solid rgba(109, 74, 255, 0.28);
+      border-radius: 16px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      padding: 26px 24px 20px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      backdrop-filter: blur(16px);
+    }
+    .unlock-shield-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(109, 74, 255, 0.3) 0%, rgba(109, 74, 255, 0.08) 100%);
+      border: 1px solid rgba(109, 74, 255, 0.4);
+      color: #6D4AFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      box-shadow: 0 0 20px rgba(109, 74, 255, 0.35);
+      animation: pulseRing 3.5s infinite ease-in-out;
+    }
+    .unlock-shield-icon svg {
+      width: 26px;
+      height: 26px;
+      fill: currentColor;
+    }
+    .unlock-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+      letter-spacing: -0.2px;
+    }
+    .unlock-subtitle {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      line-height: 1.45;
+    }
+    .unlock-form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .unlock-input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      transition: all 0.2s ease;
+    }
+    .unlock-input-wrapper:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(109, 74, 255, 0.25);
+    }
+    .unlock-input-icon {
+      position: absolute;
+      left: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+    }
+    .unlock-input-icon svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+    .unlock-input {
+      width: 100%;
+      height: 38px;
+      background: transparent;
+      border: none;
+      outline: none;
+      padding: 0 38px 0 34px;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .unlock-input::placeholder {
+      color: #6c687a;
+    }
+    .btn-unlock-eye {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .btn-unlock-eye:hover {
+      color: #FFFFFF;
+    }
+    .btn-unlock-eye svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+    .unlock-error {
+      background: rgba(245, 74, 74, 0.14);
+      border: 1px solid rgba(245, 74, 74, 0.35);
+      border-radius: 7px;
+      padding: 7px 10px;
+      color: #ff9191;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: left;
+      animation: dropdownPop 0.18s ease;
+    }
+    .btn-unlock-submit {
+      width: 100%;
+      height: 38px;
+      background: var(--accent);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 2px 10px rgba(109, 74, 255, 0.35);
+    }
+    .btn-unlock-submit:hover:not(:disabled) {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(109, 74, 255, 0.5);
+    }
+    .btn-unlock-submit:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    .btn-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #FFFFFF;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    .unlock-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: center;
+      margin-top: 14px;
+      font-size: 10.5px;
+      color: var(--text-subtle);
+    }
+    .unlock-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: #9E9AA8;
+    }
+    .unlock-daemon-status {
+      font-size: 10px;
+      color: var(--text-subtle);
+    }
   </style>
 </head>
 <body>
   
+  <!-- UNLOCK / LOGIN VIEW (displayed when vault is locked) -->
+  <div class="unlock-view" id="unlock-view" style="display: none;">
+    <div class="unlock-card">
+      <div class="unlock-shield-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 6c1.66 0 3 1.34 3 3v1h1c.55 0 1 .45 1 1v5c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1v-5c0-.55.45-1 1-1h1v-1c0-1.66 1.34-3 3-3zm0 2c-.55 0-1 .45-1 1v1h2v-1c0-.55-.45-1-1-1z"/>
+        </svg>
+      </div>
+
+      <h2 class="unlock-title">Unlock Kloak Vault</h2>
+      <p class="unlock-subtitle">Enter your master password to access your credentials</p>
+
+      <form id="unlock-form" class="unlock-form">
+        <div class="unlock-input-wrapper">
+          <div class="unlock-input-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          </div>
+          <input 
+            type="password" 
+            id="unlock-password" 
+            class="unlock-input" 
+            placeholder="Master Password" 
+            autocomplete="current-password" 
+            required
+          >
+          <button type="button" id="btn-toggle-unlock-pwd" class="btn-unlock-eye" title="Show / Hide Password">
+            <svg viewBox="0 0 24 24" id="eye-icon-unlock">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+            </svg>
+          </button>
+        </div>
+
+        <div id="unlock-error" class="unlock-error" style="display: none;"></div>
+
+        <button type="submit" id="btn-submit-unlock" class="btn-unlock-submit">
+          <span class="btn-spinner" id="unlock-spinner" style="display: none;"></span>
+          <span id="unlock-btn-text">Unlock Vault</span>
+        </button>
+      </form>
+
+      <div class="unlock-footer">
+        <span class="unlock-badge">🔒 End-to-End Encrypted</span>
+        <span class="unlock-daemon-status" id="unlock-daemon-status">Connected to local Kloak daemon</span>
+      </div>
+    </div>
+  </div>
+
   <!-- HEADER -->
   <div class="header">
     <div class="search-wrapper">
@@ -1296,6 +1538,9 @@
     </div>
     
     <div class="header-right">
+      <button class="btn-icon" id="btn-lock" title="Lock Vault">
+        <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      </button>
       <button class="btn-icon" id="btn-header-gen" title="Password Generator">
         <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
       </button>
