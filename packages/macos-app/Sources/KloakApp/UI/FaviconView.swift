@@ -38,24 +38,28 @@ public struct FaviconView: View {
         ZStack {
             if let img = loadedImage {
                 ZStack {
-                    // Subtle neutral glass backing plate for transparent logos
+                    // Solid white background — ensures favicons always look crisp
+                    // regardless of row highlight/selection state. Also handles logos
+                    // with transparent backgrounds (e.g. Autodesk, LinkedIn dark variants).
                     RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(Color.white)
 
                     Image(nsImage: img)
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: size, height: size)
+                        // Inset to 78% — logos that don't bleed to the edge
+                        // sit on a clean white plate instead of showing dark transparency.
+                        .frame(width: size * 0.78, height: size * 0.78)
                 }
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 0.75)
+                        .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
                 )
-                .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
                 .transition(.opacity)
             } else {
                 fallbackAvatar

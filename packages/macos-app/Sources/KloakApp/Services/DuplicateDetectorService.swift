@@ -469,10 +469,28 @@ public struct DuplicateDetectorService: Sendable {
     }
 
     public func findMissing2FA(in items: [VaultItem]) -> [Missing2FAItem] {
+        let dir = TwoFADirectoryService.shared
         let validItems = items.filter { !$0.trashed && $0.type == .login }
-        return validItems
-            .filter { ($0.totpSecret == nil || $0.totpSecret?.isEmpty == true) && $0.oauth == nil }
-            .map { Missing2FAItem(item: $0) }
+
+        var results: [Missing2FAItem] = []
+        for item in validItems {
+            // Skip items that already have TOTP or OAuth
+            guard (item.totpSecret == nil || item.totpSecret?.isEmpty == true) && item.oauth == nil else {
+                continue
+            }
+            // Only include if the service is known to support TOTP
+            guard let (matchedDomain, serviceEntry) = dir.firstSupported(urls: item.urls, title: item.title) else {
+                continue
+            }
+            results.append(Missing2FAItem(
+                item: item,
+                matchedDomain: matchedDomain,
+                serviceName: serviceEntry.displayName,
+                supportType: serviceEntry.supportType,
+                setupUrl: serviceEntry.setupUrl
+            ))
+        }
+        return results
     }
 }
 
@@ -489,10 +507,29 @@ public struct WeakPasswordItem: Identifiable, Sendable {
 
 public struct Missing2FAItem: Identifiable, Sendable {
     public let item: VaultItem
+    /// The domain that matched the 2FA directory
+    public let matchedDomain: String
+    /// Human-readable service name from the directory
+    public let serviceName: String
+    /// What type of 2FA the service supports
+    public let supportType: TwoFADirectoryService.Support2FAType
+    /// Optional direct link to the service's 2FA setup page
+    public let setupUrl: String?
+
     public var id: String { item.id }
 
-    public init(item: VaultItem) {
+    public init(
+        item: VaultItem,
+        matchedDomain: String,
+        serviceName: String,
+        supportType: TwoFADirectoryService.Support2FAType,
+        setupUrl: String?
+    ) {
         self.item = item
+        self.matchedDomain = matchedDomain
+        self.serviceName = serviceName
+        self.supportType = supportType
+        self.setupUrl = setupUrl
     }
 }
 

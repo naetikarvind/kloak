@@ -133,6 +133,7 @@ public struct VaultMainView: View {
             PasswordHealthView(
                 items: $items,
                 onSaveItem: onSaveItem,
+                onDeleteItem: { id in handleMoveToTrash(id) },
                 onSelectItem: { id in
                     selectedItemId = id
                     selection = .allItems

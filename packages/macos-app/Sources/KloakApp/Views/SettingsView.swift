@@ -649,7 +649,7 @@ public struct SettingsView: View {
 
                     Spacer()
 
-                    Text("Shortcut: ⌥⌘D")
+                    Text("Shortcut: ⌥⌘K")
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(.secondary)
                 }

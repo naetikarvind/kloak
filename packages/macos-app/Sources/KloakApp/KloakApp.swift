@@ -136,7 +136,7 @@ public struct KloakApp: App {
                 Button("Developer Mode...") {
                     devModeManager.showSheet = true
                 }
-                .keyboardShortcut("d", modifiers: [.command, .option])
+                .keyboardShortcut("k", modifiers: [.command, .option])
             }
             CommandGroup(after: .windowSize) {
                 Button("Auto-Fit Window Size") {
