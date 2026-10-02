@@ -13,8 +13,8 @@ public struct PasswordHealthView: View {
     @State private var statusMessage: String? = nil
     /// Group IDs the user has chosen to ignore from the audit
     @State private var ignoredGroupIds: Set<String> = []
-    /// Group ID currently pending merge confirmation
-    @State private var mergeConfirmGroupId: String? = nil
+    /// Group currently pending merge confirmation
+    @State private var groupToMerge: ReusedPasswordGroup? = nil
 
     private var reusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
@@ -98,6 +98,27 @@ public struct PasswordHealthView: View {
                 }
             }
             .padding(24)
+        }
+        .alert(
+            "Merge \(groupToMerge?.items.count ?? 0) Logins?",
+            isPresented: Binding(
+                get: { groupToMerge != nil },
+                set: { if !$0 { groupToMerge = nil } }
+            )
+        ) {
+            Button("Cancel", role: .cancel) {
+                groupToMerge = nil
+            }
+            Button("Merge Logins", role: .destructive) {
+                if let g = groupToMerge {
+                    groupToMerge = nil
+                    handleMergeGroup(g)
+                }
+            }
+        } message: {
+            if let group = groupToMerge {
+                Text("Consolidate \(group.items.count) logins sharing this password into a single complete item (\"\(group.items.first?.title ?? "")\").\n\n• Same fields: preserved\n• Different URLs, tags, and notes: combined\n• Redundant duplicate items: moved to Trash")
+            }
         }
     }
 
@@ -324,26 +345,11 @@ public struct PasswordHealthView: View {
 
                 // ── Merge button ──
                 Button(action: {
-                    mergeConfirmGroupId = group.id
+                    groupToMerge = group
                 }) {
                     Label("Merge", systemImage: "arrow.triangle.merge")
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: true))
-                .alert(
-                    "Merge \(group.items.count) Logins?",
-                    isPresented: Binding(
-                        get: { mergeConfirmGroupId == group.id },
-                        set: { if !$0 { mergeConfirmGroupId = nil } }
-                    )
-                ) {
-                    Button("Cancel", role: .cancel) { mergeConfirmGroupId = nil }
-                    Button("Merge", role: .destructive) {
-                        mergeConfirmGroupId = nil
-                        handleMergeGroup(group)
-                    }
-                } message: {
-                    Text("The first item will be kept and updated with combined data from all \(group.items.count) logins:\n\n• Same fields (password, title) stay unchanged\n• URLs, tags, and notes from all logins will be combined\n• Duplicate logins will be moved to Trash\n\nThis cannot be undone from this view.")
-                }
             }
 
             Divider().opacity(0.1)
@@ -613,67 +619,36 @@ public struct PasswordHealthView: View {
     private func handleMergeGroup(_ group: ReusedPasswordGroup) {
         guard group.items.count >= 2 else { return }
 
-        var primary = group.items[0]
-        let others = group.items.dropFirst()
+        // Use the smartMerge engine to combine common fields and consolidate differing ones
+        let (merged, trashedIds) = DuplicateDetectorService.shared.smartMerge(items: group.items)
 
-        // Merge URLs — union, deduped, order preserved
-        var mergedUrls = primary.urls
-        for other in others {
-            for url in other.urls where !url.isEmpty && !mergedUrls.contains(url) {
-                mergedUrls.append(url)
+        // 1. Immediately update the in-memory items binding so UI updates without delay
+        if let idx = items.firstIndex(where: { $0.id == merged.id }) {
+            items[idx] = merged
+        } else {
+            items.append(merged)
+        }
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        for id in trashedIds {
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].trashed = true
+                items[idx].updatedAt = now
             }
         }
-        primary.urls = mergedUrls
 
-        // Merge tags — union, deduped
-        var mergedTags = primary.tags
-        for other in others {
-            for tag in other.tags where !tag.isEmpty && !mergedTags.contains(tag) {
-                mergedTags.append(tag)
-            }
-        }
-        primary.tags = mergedTags
-
-        // Merge notes — concatenate if different
-        var noteParts: [String] = []
-        if let n = primary.notes, !n.isEmpty { noteParts.append(n) }
-        for other in others {
-            if let n = other.notes, !n.isEmpty, !noteParts.contains(n) {
-                noteParts.append(n)
-            }
-        }
-        primary.notes = noteParts.isEmpty ? nil : noteParts.joined(separator: "\n\n---\n\n")
-
-        // Merge usernames — if different, append others as notes
-        var extraUsernames: [String] = []
-        for other in others {
-            if let u = other.username, !u.isEmpty, u != primary.username {
-                extraUsernames.append("\(other.title): \(u)")
-            }
-        }
-        if !extraUsernames.isEmpty {
-            let usernameNote = "Also known as:\n" + extraUsernames.joined(separator: "\n")
-            primary.notes = (primary.notes.map { $0 + "\n\n---\n\n" + usernameNote }) ?? usernameNote
+        // 2. Persist changes to disk via VaultStore
+        VaultStore.shared.saveItem(merged)
+        for id in trashedIds {
+            VaultStore.shared.moveToTrash(id: id)
         }
 
-        primary.updatedAt = ISO8601DateFormatter().string(from: Date())
-
-        // Save the merged primary item
-        onSaveItem?(primary)
-
-        // Move all duplicates to trash
-        for other in others {
-            onDeleteItem?(other.id)
-        }
-
-        // Ignore this group from future audit display this session
+        // 3. Mark this group as ignored/handled in local state
         _ = withAnimation(.easeOut(duration: 0.25)) {
             ignoredGroupIds.insert(group.id)
         }
 
-        let names = group.items.map { $0.title }.joined(separator: ", ")
-        statusMessage = "Merged \(group.items.count) logins into \"\(primary.title)\". Combined: \(mergedUrls.count) URLs · \(mergedTags.count) tags. Duplicates moved to Trash."
-        _ = names // suppress unused warning
+        statusMessage = "Merged \(group.items.count) logins into \"\(merged.title)\". Combined: \(merged.urls.count) URLs · \(merged.tags.count) tags. Duplicates moved to Trash."
     }
 
     private var emptyHealthStateView: some View {

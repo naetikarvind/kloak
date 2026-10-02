@@ -141,10 +141,12 @@ public struct DuplicateDetectorService: Sendable {
 
         var results: [ReusedPasswordGroup] = []
         for (pass, groupItems) in grouped where groupItems.count > 1 {
+            let sorted = groupItems.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            let stableId = "reused_" + (pass.data(using: .utf8)?.base64EncodedString() ?? "\(pass.hashValue)")
             results.append(ReusedPasswordGroup(
-                id: UUID().uuidString,
+                id: stableId,
                 password: pass,
-                items: groupItems.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                items: sorted
             ))
         }
 
