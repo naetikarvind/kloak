@@ -1,4 +1,4 @@
-# Kloak — Vault Login / Unlock from Browser Extension
+# Kloak — UI/UX Overhaul: Container Symmetry, Dedicated Security Sections, Full Trash Lifecycle & Advanced Squircle Favicon System
 
 **Date:** 2 October 2026  
 **Branch:** `dev`  
@@ -8,156 +8,100 @@
 
 ## Overview
 
-This change adds the ability to **unlock / login to the Kloak vault directly from the Chrome browser extension** — both the popup and the side panel — without requiring the user to switch to the macOS or Windows desktop application.
+This update delivers four major enhancements across the Kloak macOS application:
 
-Prior to this work, the popup displayed a static placeholder when the vault was locked. Users had to open the native macOS app to enter their master password, then return to the browser. Now the unlock flow is fully self-contained within the extension.
+1. **Equal Container Sizing & UI/UX Consistency**: Resolved container card size asymmetries where cards expanded unequally depending on text contents. Applied strict `.frame(maxWidth: .infinity)` across all multi-column stat rows and card containers.
+2. **Sidebar Reorganization**: Separated `Settings` and `Trash` out of `Tools` into a dedicated `Manage` section, and introduced a dedicated `Security` section.
+3. **Comprehensive Trash & Restore Lifecycle**: Fixed the trash system so items are properly soft-deleted to Trash, viewable in the Trash section, restorable with one click, and purgeable permanently with confirmation.
+4. **Separation of Duplicate Accounts and Password Health**: Split the combined duplicates view into two dedicated tools:
+   - **Duplicate Accounts**: Pure focus on detecting exact vs. conflicting credential duplicates with one-click smart merging.
+   - **Password Security & Health**: Complete password auditing for reused passwords, weak/short passwords, and accounts missing 2FA with instant secure password generation.
+5. **Advanced Apple Squircle Favicon System**: Replaced the boxy/rectangular favicons with true Apple continuous squircles (`size * 0.2237`, `.continuous`), full-bleed clipping, high-DPI Google S2 Favicon priority, and dynamic monogram brand avatars with rich deterministic gradients for accounts without web logos.
 
 ---
 
-## Feature: Vault Unlock & Lock from the Extension
+## Detailed Changes
 
-### User Flow
+### 1. Equal Container Sizing & UI/UX Consistency
+- **Stat Cards**: In both `DuplicateManagerView` and `PasswordHealthView`, stat cards in the header `HStack(spacing: 12)` now use `.frame(maxWidth: .infinity)`, ensuring strict 1/3 equal width regardless of label or count lengths.
+- **Card Styling**: Consistent glass backgrounds (`Color.white.opacity(0.04)`), rounded corners (12px), and hairline borders (`Color.white.opacity(0.08)`).
+- **Line Clamping**: Added `.lineLimit(1)` on card titles and subtitles to prevent multi-line vertical layout discrepancies.
 
-1. User clicks the Kloak extension icon (popup) or opens the side panel.
-2. If the vault is locked, a polished **Unlock Vault** card is displayed immediately:
-   - Kloak shield icon badge
-   - Master password input (auto-focused)
-   - Show / hide password toggle
-   - Inline error message on invalid credentials
-   - "Unlock Vault" submit button with spinner feedback (supports `Enter` key)
-3. On success, credentials load instantly and smart domain suggestions render.
-4. A **Lock** button in the header allows re-locking the vault at any time from the extension.
+### 2. Sidebar Navigation Restructure (`SidebarView.swift`)
+- **`VAULT`**: `All Items`, `Favorites`
+- **`CATEGORIES`**: `Login`, `Secure Note`, `Payment Card`, `Identity`, `Email Alias`, `Authenticator`
+- **`FOLDERS`**: Custom user folders + `Add Folder...`
+- **`SECURITY`**:
+  - `Duplicate Accounts` (`.duplicates`): Shows badge count of duplicate account groups.
+  - `Password Health` (`.passwordHealth`): Shows badge count of vulnerable logins (reused + weak passwords).
+- **`TOOLS`**:
+  - `Password Generator` (`.generator`)
+  - `Import & Export` (`.importExport`)
+- **`MANAGE`**:
+  - `Settings` (`.settings`)
+  - `Trash` (`.trash`): Shows badge count of soft-deleted items.
 
-### Dual IPC Connection Pipeline
+### 3. Full Trash Lifecycle System
+- **`VaultStore.swift`**:
+  - `deleteItem(id:permanent:)`: Soft-deletes to trash if not permanent, or permanently purges if requested or already trashed.
+  - `moveToTrash(id:)`: Sets `item.trashed = true` and updates timestamp.
+  - `restoreItem(id:)`: Sets `item.trashed = false` and updates timestamp.
+  - `emptyTrash()`: Permanently removes all items where `trashed == true`.
+  - `deletePermanently(id:)`: Immediately purges a specific item.
+- **`IPCServer.swift`**:
+  - Added support for `permanent: Bool` in `vault.deleteItem`.
+  - Added `vault.restoreItem` and `vault.emptyTrash` RPC handlers.
+- **`ItemListView.swift`**:
+  - When viewing `Trash`: Hides `+` (New Item) button; adds an **Empty Trash** button in the header with a confirmation dialog.
+  - Empty state displays specific trash messaging: "Trash is Empty — Deleted credentials will be kept here until permanently purged."
+  - Right-click row context menu displays: **Restore Credential** and **Delete Permanently**.
+- **`ItemDetailView.swift`**:
+  - Displays a prominent amber warning banner when an item is in the Trash: *"This item is in the Trash. It will not be suggested for autofill until restored."* with an inline **Restore Item** button.
+  - Replaces the generic delete button with **Restore Item** (emerald) and **Delete Permanently** (red, with confirmation alert).
 
-To maximise reliability across all browser / OS configurations, the unlock flow uses two fallback paths in order:
+### 4. Dedicated Password Health View (`PasswordHealthView.swift`)
+- **Header Stat Cards**:
+  - *Reused Passwords*: Number of password groups and affected logins (Red accent).
+  - *Weak Passwords*: Short or low-complexity passwords (Amber accent).
+  - *Missing 2FA*: Logins without attached TOTP authenticator (Purple accent).
+- **Filter Controls**: Segmented picker for *All Issues*, *Reused*, *Weak*, and *No 2FA*, with real-time search.
+- **Security Action Cards**:
+  - Warning banner detailing credential stuffing risks.
+  - Interactive credential cards with reveal password toggle.
+  - **Generate New Password** button: creates a cryptographically strong 22-character password, saves to vault, and provides visual confirmation feedback.
 
-| Priority | Method | Description |
+### 5. Advanced Apple Squircle Favicon System (`FaviconView.swift` & `LogoService.swift`)
+- **Geometry & Curvature**: Upgraded from simple corner radius to Apple continuous curvature squircle (`RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)`).
+- **Aspect Ratio & Clipping**: Eliminated sharp 90-degree corners by applying continuous squircle clipping directly to the image and outer frame (`.frame(width: size, height: size)`).
+- **List Row Sizing**: Increased list row favicon size to `32px` (matching Apple HIG table rows) and detail view to `48px`.
+- **High-DPI Fast Resolution**: Prioritized Google S2 High-DPI Favicon proxy (`sz=256` and `sz=128`) for sub-50ms reliable icon fetching.
+- **Dynamic Monogram Brand Avatars**: For logins without a web logo, computes clean 1–2 letter initials and generates a deterministic vibrant linear gradient background (from a 12-palette modern brand collection) based on domain hash.
+
+---
+
+## Files Modified & Created
+
+| File | Status | Description |
 |---|---|---|
-| 1 | **Direct HTTP RPC** | `POST http://127.0.0.1:53152/rpc` — instant, no setup required, works in all Chromium-based browsers |
-| 2 | **Native Messaging** | Chrome Native Messaging Host `app.kloak.native` via background service worker — used when the daemon's HTTP listener is unavailable |
-
-This mirrors the same dual-path design used throughout the rest of the extension for `vault.getItems`, `vault.matchByUrl`, etc.
-
----
-
-## Files Changed
-
-### `packages/browser-extension/popup/popup.html`
-
-- Added `#unlock-view` full-screen overlay modal:
-  - Kloak shield badge with purple glow
-  - `<form id="unlock-form">` with password `<input>`, show/hide eye toggle, error banner, and spinner submit button
-- Added `#btn-lock` icon button in `.header-right` to lock the vault from the header
-
-### `packages/browser-extension/src/popup.ts`
-
-- Added `unlockVaultDirect(password: string)` — sends `vault.unlock` JSON-RPC via `fetch()` to `127.0.0.1:53152/rpc`
-- Added `lockVaultDirect()` — sends `vault.lock` JSON-RPC via `fetch()`
-- Added `showUnlockView(statusMessage?)` — displays unlock modal, clears prior input, auto-focuses password field
-- Added `hideUnlockView()` — hides the unlock overlay
-- Added `setupUnlockView()` — wires form submission with dual IPC fallback, loading states, error handling
-- Added `setupLockBtn()` — wires the header lock button, clears cached items, re-shows unlock view
-- Updated `loadLogins()` to detect locked state from direct HTTP status and show the unlock view automatically
-
-### `packages/browser-extension/src/background.ts`
-
-- Added `case 'UNLOCK_VAULT'` message handler:
-  - Calls `sendNativeRequest('vault.unlock', { masterPassword })` via native messaging host
-  - On success: sets `isVaultUnlocked = true`, fetches fresh `cachedItems`, refreshes active tab badge count
-  - On failure: returns structured error for the popup to display
-- Added `case 'LOCK_VAULT'` message handler:
-  - Calls `sendNativeRequest('vault.lock')`
-  - Wipes `cachedItems = []`, sets `isVaultUnlocked = false`, clears tab badge
-
-### `packages/browser-extension/sidepanel/sidepanel.html`
-
-Fully redesigned from a minimal 75-line stub into a complete Kloak-styled side panel:
-
-- **Header** with Kloak shield SVG icon and a **Lock** button
-- **Unlock view** (`#side-unlock-view`): identical unlock card to the popup — password input, show/hide toggle, error banner, spinner submit
-- **Unlocked view** (`#side-unlocked-view`): search bar + scrollable credential card list
-- **Credential cards** featuring:
-  - Google Favicon Service site icons
-  - Item title and username
-  - **Fill** button — injects credentials into the active tab's focused fields
-  - **Copy User** / **Copy Pass** quick-action buttons
-
-### `packages/browser-extension/src/sidepanel.ts`
-
-Fully rewritten (39 lines → 280+ lines):
-
-- `checkDirectStatus()` — probes `vault.getItems` over direct HTTP to detect locked/unlocked state
-- `unlockVaultDirect(password)` — direct HTTP `vault.unlock` call with structured error return
-- `lockVaultDirect()` — direct HTTP `vault.lock` call
-- `showLocked()` / `showUnlocked(items)` — view state management
-- `renderItems(items)` — renders credential cards with favicon, Fill, Copy User, Copy Pass actions
-- `loadVault()` — dual IPC load with direct HTTP → background fallback
-- Unlock form submission with dual IPC fallback, spinner state, error display
-- Search filtering on cached item list
-
-### `packages/daemon/src/ipc/socket-server.ts`
-
-- Added HTTP `POST /rpc` request parsing inside `handleClient()`:
-  - Parses `Content-Length` and waits for complete HTTP body before dispatching
-  - Returns full JSON-RPC response wrapped in HTTP 200 with CORS headers
-  - Returns HTTP 400 on parse errors
-- Added `OPTIONS` CORS preflight handler (required for `fetch()` from extension content scripts)
-- `vault.unlock` dispatch case was already present in `handleMethod()`
-
-### `packages/macos-app/Sources/KloakApp/Services/IPCServer.swift`
-
-- Added `case "vault.unlock":` to the `IPCServer` JSON-RPC dispatcher:
-  ```swift
-  case "vault.unlock":
-      guard let password = params["masterPassword"] as? String else {
-          reply(["error": "masterPassword required"])
-          return
-      }
-      Task { @MainActor in
-          let success = await VaultStore.shared.unlock(password: password)
-          if success {
-              reply(["success": true, "status": ["isUnlocked": true]])
-          } else {
-              reply(["error": "Incorrect master password"])
-          }
-      }
-  ```
-
-### `packages/tests/src/ipc.test.ts`
-
-Added a new 5-step test case **"handles vault.lock and vault.unlock with master password"**:
-
-1. Locks the vault via `vault.lock` — asserts `success: true` and `isUnlocked: false`
-2. Checks `vault.status` — asserts `isUnlocked: false`
-3. Attempts `vault.unlock` with wrong password — asserts error response with message matching `/master password incorrect/i`
-4. Unlocks with correct master password — asserts `success: true` and `isUnlocked: true`
-5. Calls `vault.getItems` — asserts items array contains previously added item
+| `packages/macos-app/Sources/KloakApp/UI/FaviconView.swift` | Modified | True Apple squircle, continuous curvature, dynamic monogram avatar fallbacks |
+| `packages/macos-app/Sources/KloakApp/Services/LogoService.swift` | Modified | Prioritized Google S2 High-DPI Favicons (sz=256, 128) |
+| `packages/macos-app/Sources/KloakApp/Services/VaultStore.swift` | Modified | Added `moveToTrash`, `restoreItem`, `emptyTrash`, `deletePermanently` |
+| `packages/macos-app/Sources/KloakApp/Services/IPCServer.swift` | Modified | Added `vault.restoreItem`, `vault.emptyTrash`, permanent deletion flag |
+| `packages/macos-app/Sources/KloakApp/Services/DuplicateDetectorService.swift` | Modified | Added `findWeakPasswords(in:)` and `findMissing2FA(in:)` |
+| `packages/macos-app/Sources/KloakApp/Views/SidebarView.swift` | Modified | Separated `Security` and `Manage` sections, added `.passwordHealth` |
+| `packages/macos-app/Sources/KloakApp/Views/DuplicateManagerView.swift` | Modified | Refactored purely for duplicate accounts with equal-width stat cards |
+| `packages/macos-app/Sources/KloakApp/Views/PasswordHealthView.swift` | **Created** | Dedicated password auditing view with equal-width stat cards |
+| `packages/macos-app/Sources/KloakApp/Views/ItemListView.swift` | Modified | 32px favicons, Empty Trash button & alert, restore/delete context menu |
+| `packages/macos-app/Sources/KloakApp/Views/ItemDetailView.swift` | Modified | Trash warning banner, Restore Item, Delete Permanently, 48px favicon |
+| `packages/macos-app/Sources/KloakApp/Views/VaultMainView.swift` | Modified | Routed `.passwordHealth`, connected full trash lifecycle actions |
+| `packages/macos-app/Kloak.xcodeproj/project.pbxproj` | Modified | Registered `PasswordHealthView.swift` in Xcode target |
 
 ---
 
-## Test Results
+## Verification & Testing
 
-```
-▶ Kloak Crypto Engine                       7/7  ✔
-▶ Kloak Password & Passphrase Generator     5/5  ✔
-▶ Kloak IPC Daemon Protocol                 5/5  ✔  (was 4/4 before this change)
-▶ Kloak Import & Export Parsers             8/8  ✔
-▶ Kloak RFC 6238 TOTP Engine               6/6  ✔
-▶ Kloak Vault Manager & Session Controller  4/4  ✔
-
-ℹ tests     35   (was 34)
-ℹ pass      35
-ℹ fail       0
-ℹ duration  ~700ms
-```
-
-macOS Swift app: `swift build` → `Build complete! (0.63 sec)` ✅
-
----
-
-## Architecture Notes
-
-- **Zero cloud dependency maintained** — all IPC is purely local: loopback TCP `127.0.0.1:53152` and native messaging host `app.kloak.native`. No credentials ever leave the device.
-- **Chrome Manifest V3 compliant** — no inline scripts, all event listeners added via `addEventListener`, async/await throughout, proper message passing between contexts.
-- The side panel and popup share the same dual IPC architecture but are fully independent entry points, each managing their own UI state.
+- **Xcode Build (`./build-app.sh`)**:
+  - `** BUILD SUCCEEDED **` ✅
+  - AppIcon packaging and ad-hoc codesigning passed cleanly.
+- **Monorepo Test Suite (`npm test`)**:
+  - 35/35 tests passing across Crypto, Generators, IPC Daemon, Parsers, TOTP, and Vault Manager ✅

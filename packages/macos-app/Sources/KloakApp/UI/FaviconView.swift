@@ -2,8 +2,9 @@ import SwiftUI
 import AppKit
 
 /// Displays a high-resolution, vector/HD website brand logo or icon.
-/// Uses `LogoService` to query high-res Clearbit, Unavatar, Apple Touch Icons, and HD Favicons,
-/// falling back to a category-tinted SF Symbol.
+/// Uses `LogoService` to query high-res Favicons, Clearbit, and Apple Touch Icons.
+/// For logins without a logo, displays a beautiful deterministic monogram avatar with brand gradient.
+/// For non-login items, displays a modern glass-styled category squircle.
 public struct FaviconView: View {
     let urls: [String]
     let title: String
@@ -19,7 +20,7 @@ public struct FaviconView: View {
         title: String = "",
         oauthProvider: String? = nil,
         itemType: ItemType = .login,
-        size: CGFloat = 30
+        size: CGFloat = 32
     ) {
         self.urls = urls
         self.title = title
@@ -28,64 +29,159 @@ public struct FaviconView: View {
         self.size = size
     }
 
-    private var fallbackColor: Color {
-        switch itemType {
-        case .login: return LiquidGlassTheme.primaryAccent
-        case .secureNote: return LiquidGlassTheme.amberAccent
-        case .card: return LiquidGlassTheme.emeraldAccent
-        case .identity: return Color.cyan
-        case .emailAlias: return Color(red: 0.0, green: 0.82, blue: 0.71)
-        case .authenticator: return LiquidGlassTheme.emeraldAccent
-        }
+    private var squircleRadius: CGFloat {
+        // Standard Apple squircle curvature ratio: ~0.2237 * size
+        max(4.0, size * 0.2237)
     }
 
     public var body: some View {
         ZStack {
             if let img = loadedImage {
                 ZStack {
-                    // Subtle backdrop plate to give transparent logos great contrast
-                    RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                        .fill(Color.white.opacity(0.95))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                        )
+                    // Subtle neutral glass backing plate for transparent logos
+                    RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.08))
 
                     Image(nsImage: img)
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
                         .aspectRatio(contentMode: .fit)
-                        .padding(size * 0.12)
+                        .frame(width: size, height: size)
                 }
                 .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
-                .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 0.75)
+                )
+                .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .transition(.opacity)
             } else {
-                fallbackIcon
+                fallbackAvatar
             }
         }
+        .frame(width: size, height: size)
+        .aspectRatio(1, contentMode: .fit)
         .task(id: "\(title)_\(urls.joined())_\(oauthProvider ?? "")") {
             await loadLogo()
         }
     }
 
-    private var fallbackIcon: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                .fill(fallbackColor.opacity(0.15))
-                .frame(width: size, height: size)
-                .overlay(
-                    RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
-                        .stroke(fallbackColor.opacity(0.25), lineWidth: 0.5)
+    // MARK: - Advanced Fallback System
+
+    @ViewBuilder
+    private var fallbackAvatar: some View {
+        if itemType == .login {
+            // High-fidelity monogram avatar with deterministic brand gradient
+            let monogram = monogramLetters(from: title, urls: urls)
+            let (c1, c2) = brandGradientColors(for: title, urls: urls)
+
+            ZStack {
+                LinearGradient(
+                    colors: [c1, c2],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
 
-            Image(systemName: itemType.iconName)
-                .font(.system(size: size * 0.45, weight: .medium))
-                .foregroundColor(fallbackColor)
+                Text(monogram)
+                    .font(.system(size: max(9, size * 0.42), weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                    .shadow(color: Color.black.opacity(0.3), radius: 1, x: 0, y: 0.5)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 0.75)
+            )
+            .shadow(color: Color.black.opacity(0.15), radius: 2, x: 0, y: 1)
+        } else {
+            // Category-styled squircle
+            ZStack {
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .fill(categoryColor.opacity(0.16))
+
+                Image(systemName: itemType.iconName)
+                    .font(.system(size: size * 0.44, weight: .semibold))
+                    .foregroundColor(categoryColor)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(categoryColor.opacity(0.3), lineWidth: 0.75)
+            )
         }
     }
+
+    private var categoryColor: Color {
+        switch itemType {
+        case .login: return LiquidGlassTheme.primaryAccent
+        case .secureNote: return LiquidGlassTheme.amberAccent
+        case .card: return LiquidGlassTheme.emeraldAccent
+        case .identity: return Color.cyan
+        case .emailAlias: return Color(red: 0.0, green: 0.82, blue: 0.71)
+        case .authenticator: return Color.purple
+        }
+    }
+
+    // MARK: - Monogram & Gradient Math
+
+    private func monogramLetters(from title: String, urls: [String]) -> String {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanTitle.isEmpty {
+            // If title contains domain (e.g. google.com), take service name
+            if cleanTitle.contains(".") {
+                let parts = cleanTitle.split(separator: ".")
+                if let first = parts.first, !first.isEmpty {
+                    return String(first.prefix(2)).uppercased()
+                }
+            }
+            let words = cleanTitle.split(separator: " ").filter { !$0.isEmpty }
+            if words.count >= 2 {
+                let f = words[0].prefix(1)
+                let s = words[1].prefix(1)
+                return "\(f)\(s)".uppercased()
+            }
+            return String(cleanTitle.prefix(min(2, cleanTitle.count))).uppercased()
+        }
+
+        if let firstUrl = urls.first, let host = URL(string: firstUrl)?.host ?? URL(string: "https://\(firstUrl)")?.host {
+            let clean = host.replacingOccurrences(of: "www.", with: "")
+            let parts = clean.split(separator: ".")
+            if let first = parts.first, !first.isEmpty {
+                return String(first.prefix(2)).uppercased()
+            }
+        }
+
+        return "K"
+    }
+
+    private func brandGradientColors(for title: String, urls: [String]) -> (Color, Color) {
+        let key = (urls.first ?? title).lowercased()
+        let hash = abs(key.hashValue)
+
+        let palette: [(Color, Color)] = [
+            (Color(red: 0.26, green: 0.22, blue: 0.79), Color(red: 0.49, green: 0.23, blue: 0.93)), // Indigo -> Violet
+            (Color(red: 0.02, green: 0.59, blue: 0.41), Color(red: 0.06, green: 0.73, blue: 0.51)), // Emerald -> Teal
+            (Color(red: 0.01, green: 0.52, blue: 0.78), Color(red: 0.22, green: 0.74, blue: 0.97)), // Ocean -> Sky
+            (Color(red: 0.75, green: 0.07, blue: 0.24), Color(red: 0.96, green: 0.25, blue: 0.37)), // Crimson -> Rose
+            (Color(red: 0.85, green: 0.47, blue: 0.02), Color(red: 0.96, green: 0.62, blue: 0.11)), // Amber -> Tangerine
+            (Color(red: 0.43, green: 0.16, blue: 0.85), Color(red: 0.75, green: 0.15, blue: 0.83)), // Violet -> Fuchsia
+            (Color(red: 0.05, green: 0.58, blue: 0.53), Color(red: 0.02, green: 0.71, blue: 0.83)), // Teal -> Cyan
+            (Color(red: 0.11, green: 0.31, blue: 0.85), Color(red: 0.39, green: 0.40, blue: 0.95)), // Royal -> Indigo
+            (Color(red: 0.92, green: 0.35, blue: 0.05), Color(red: 0.98, green: 0.57, blue: 0.24)), // Orange -> Coral
+            (Color(red: 0.86, green: 0.15, blue: 0.47), Color(red: 0.98, green: 0.44, blue: 0.52)), // Pink -> Rose
+            (Color(red: 0.08, green: 0.50, blue: 0.24), Color(red: 0.20, green: 0.83, blue: 0.60)), // Forest -> Emerald
+            (Color(red: 0.20, green: 0.25, blue: 0.33), Color(red: 0.39, green: 0.45, blue: 0.55))  // Slate -> Zinc
+        ]
+
+        let index = hash % palette.count
+        return palette[index]
+    }
+
+    // MARK: - Logo Loading
 
     private func loadLogo() async {
         let domains = LogoService.shared.resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
@@ -104,7 +200,6 @@ public struct FaviconView: View {
             return
         }
 
-        // Asynchronous multi-tier fetch
         let fetched = await LogoService.shared.fetchLogo(
             urls: urls,
             title: title,

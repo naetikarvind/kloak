@@ -453,7 +453,44 @@ public final class VaultStore: ObservableObject {
         saveVault()
     }
 
-    public func deleteItem(id: String) {
+    public func deleteItem(id: String, permanent: Bool = false) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            if permanent || items[idx].trashed {
+                items.remove(at: idx)
+            } else {
+                items[idx].trashed = true
+                items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+            }
+            recordUserActivity()
+            saveVault()
+        }
+    }
+
+    public func moveToTrash(id: String) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].trashed = true
+            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+            recordUserActivity()
+            saveVault()
+        }
+    }
+
+    public func restoreItem(id: String) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].trashed = false
+            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+            recordUserActivity()
+            saveVault()
+        }
+    }
+
+    public func emptyTrash() {
+        items.removeAll { $0.trashed }
+        recordUserActivity()
+        saveVault()
+    }
+
+    public func deletePermanently(id: String) {
         items.removeAll { $0.id == id }
         recordUserActivity()
         saveVault()

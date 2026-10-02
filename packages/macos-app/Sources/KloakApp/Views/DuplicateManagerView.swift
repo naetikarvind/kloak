@@ -7,11 +7,9 @@ public struct DuplicateManagerView: View {
     var onMergeGroup: ((DuplicateAccountGroup) -> Void)?
     var onAutoMergeAll: (() -> Int)?
 
-    @State private var selectedTab: Int = 0 // 0: Duplicate Accounts, 1: Reused Passwords
     @State private var searchText: String = ""
     @State private var revealedPasswordIds: Set<String> = []
     @State private var copiedItemId: String? = nil
-    @State private var updatedItemId: String? = nil
     @State private var statusMessage: String? = nil
 
     private var duplicateGroups: [DuplicateAccountGroup] {
@@ -25,19 +23,6 @@ public struct DuplicateManagerView: View {
         }
     }
 
-    private var reusedGroups: [ReusedPasswordGroup] {
-        let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
-        return all.filter { group in
-            group.items.contains {
-                $0.title.lowercased().contains(q) ||
-                ($0.username?.lowercased().contains(q) ?? false) ||
-                $0.urls.contains { $0.lowercased().contains(q) }
-            }
-        }
-    }
-
     private var exactDuplicatesCount: Int {
         DuplicateDetectorService.shared.findDuplicateAccounts(in: items).filter { $0.isExactMatch }.count
     }
@@ -46,13 +31,17 @@ public struct DuplicateManagerView: View {
         DuplicateDetectorService.shared.findDuplicateAccounts(in: items).filter { !$0.isExactMatch }.count
     }
 
+    private var totalDuplicateItemsCount: Int {
+        DuplicateDetectorService.shared.findDuplicateAccounts(in: items).reduce(0) { $0 + $1.items.count }
+    }
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Header & Stats
+                // Header & Equal-Width Stats
                 headerSection
 
-                // Segmented Picker & Auto-Merge Button
+                // Controls: Search & Auto-Merge Button
                 controlsBar
 
                 if let status = statusMessage {
@@ -80,12 +69,8 @@ public struct DuplicateManagerView: View {
                     )
                 }
 
-                // Tab Content
-                if selectedTab == 0 {
-                    duplicateAccountsTab
-                } else {
-                    reusedPasswordsTab
-                }
+                // Duplicate Account Groups List
+                duplicateAccountsList
             }
             .padding(24)
         }
@@ -94,19 +79,16 @@ public struct DuplicateManagerView: View {
     // MARK: - Header Section
 
     private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Duplicate & Password Health")
-                        .font(.system(size: 20, weight: .bold))
-                    Text("Detect redundant accounts, resolve conflicting logins, and fix reused passwords.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Duplicate Accounts")
+                    .font(.system(size: 20, weight: .bold))
+                Text("Detect redundant accounts, resolve conflicting logins, and consolidate identical credentials.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
             }
 
-            // Quick Stats Row
+            // Quick Stats Row (Strictly Equal-Width Containers)
             HStack(spacing: 12) {
                 statCard(
                     title: "Exact Duplicates",
@@ -124,13 +106,12 @@ public struct DuplicateManagerView: View {
                     icon: "exclamationmark.triangle.fill"
                 )
 
-                let totalReusedLogins = reusedGroups.reduce(0) { $0 + $1.items.count }
                 statCard(
-                    title: "Reused Passwords",
-                    value: "\(reusedGroups.count) groups",
-                    subtitle: "\(totalReusedLogins) affected logins",
-                    color: Color.red.opacity(0.85),
-                    icon: "shield.slash.fill"
+                    title: "Total Duplicate Items",
+                    value: "\(totalDuplicateItemsCount)",
+                    subtitle: "Redundant vault records",
+                    color: LiquidGlassTheme.primaryAccent,
+                    icon: "tray.full.fill"
                 )
             }
         }
@@ -151,12 +132,15 @@ public struct DuplicateManagerView: View {
                 Text(title)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
+                    .lineLimit(1)
                 Text(subtitle)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary.opacity(0.7))
+                    .lineLimit(1)
             }
             Spacer()
         }
+        .frame(maxWidth: .infinity)
         .padding(12)
         .background(Color.white.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -170,29 +154,31 @@ public struct DuplicateManagerView: View {
 
     private var controlsBar: some View {
         HStack(spacing: 14) {
-            Picker("", selection: $selectedTab) {
-                Text("Duplicate Accounts (\(duplicateGroups.count))").tag(0)
-                Text("Reused Passwords (\(reusedGroups.count))").tag(1)
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 320)
-
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
                     .font(.system(size: 11))
-                TextField("Search duplicates...", text: $searchText)
+                TextField("Search duplicate accounts...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
+
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
+            .padding(.vertical, 7)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             Spacer()
 
-            if selectedTab == 0 && exactDuplicatesCount > 0 {
+            if exactDuplicatesCount > 0 {
                 Button(action: handleAutoMergeAll) {
                     Label("Auto-Merge All Identical (\(exactDuplicatesCount))", systemImage: "sparkles")
                 }
@@ -201,10 +187,10 @@ public struct DuplicateManagerView: View {
         }
     }
 
-    // MARK: - Duplicate Accounts Tab
+    // MARK: - Duplicate Accounts List
 
     @ViewBuilder
-    private var duplicateAccountsTab: some View {
+    private var duplicateAccountsList: some View {
         if duplicateGroups.isEmpty {
             emptyStateView(
                 title: "No Duplicate Accounts Found",
@@ -225,9 +211,12 @@ public struct DuplicateManagerView: View {
             // Group Top Bar
             HStack(alignment: .center) {
                 HStack(spacing: 8) {
-                    Image(systemName: "key.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                    FaviconView(
+                        urls: group.items.flatMap { $0.urls },
+                        title: group.title,
+                        itemType: .login,
+                        size: 26
+                    )
 
                     Text(group.title)
                         .font(.system(size: 14, weight: .bold))
@@ -384,149 +373,11 @@ public struct DuplicateManagerView: View {
                     .foregroundColor(.secondary)
             }
             .buttonStyle(.plain)
-            .help("Trash this duplicate copy")
+            .help("Move this duplicate copy to trash")
         }
         .padding(10)
         .background(Color.black.opacity(0.2))
         .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    // MARK: - Reused Passwords Tab
-
-    @ViewBuilder
-    private var reusedPasswordsTab: some View {
-        if reusedGroups.isEmpty {
-            emptyStateView(
-                title: "No Reused Passwords",
-                subtitle: "Great job! All your accounts have unique credentials.",
-                icon: "lock.shield.fill"
-            )
-        } else {
-            VStack(alignment: .leading, spacing: 16) {
-                // Warning Banner
-                HStack(spacing: 12) {
-                    Image(systemName: "exclamationmark.shield.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(Color.red.opacity(0.85))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("High Security Risk: Reused Passwords")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("If one website suffers a data breach, attackers will attempt using this same password on your other services. Generate unique passwords for each account below.")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(14)
-                .background(Color.red.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.red.opacity(0.25), lineWidth: 1)
-                )
-
-                ForEach(reusedGroups) { group in
-                    reusedGroupCard(group)
-                }
-            }
-        }
-    }
-
-    private func reusedGroupCard(_ group: ReusedPasswordGroup) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(LiquidGlassTheme.amberAccent)
-
-                    Text("Reused on \(group.items.count) Accounts")
-                        .font(.system(size: 13, weight: .bold))
-                }
-
-                Spacer()
-
-                HStack(spacing: 6) {
-                    if revealedPasswordIds.contains(group.id) {
-                        Text(group.password)
-                            .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    } else {
-                        Text("••••••••••••")
-                            .font(.system(size: 11, design: .monospaced))
-                    }
-
-                    Button(action: {
-                        if revealedPasswordIds.contains(group.id) {
-                            revealedPasswordIds.remove(group.id)
-                        } else {
-                            revealedPasswordIds.insert(group.id)
-                        }
-                    }) {
-                        Image(systemName: revealedPasswordIds.contains(group.id) ? "eye.slash" : "eye")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.black.opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-
-            Divider().opacity(0.1)
-
-            // Accounts sharing this password
-            VStack(spacing: 8) {
-                ForEach(group.items) { item in
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.title)
-                                .font(.system(size: 12, weight: .semibold))
-
-                            HStack(spacing: 6) {
-                                if let user = item.username, !user.isEmpty {
-                                    Text(user)
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.secondary)
-                                }
-                                if let url = item.urls.first, !url.isEmpty {
-                                    Text("• \(url)")
-                                        .font(.system(size: 10))
-                                        .foregroundColor(.secondary.opacity(0.7))
-                                        .lineLimit(1)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
-                        if updatedItemId == item.id {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Updated!")
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                        } else {
-                            Button(action: {
-                                handleGenerateNewPassword(for: item)
-                            }) {
-                                Label("Generate New Password", systemImage: "sparkles")
-                            }
-                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
-                        }
-                    }
-                    .padding(10)
-                    .background(Color.black.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-            }
-        }
-        .padding(16)
-        .glassEffect(cornerRadius: 14)
     }
 
     // MARK: - Actions
@@ -534,23 +385,6 @@ public struct DuplicateManagerView: View {
     private func handleAutoMergeAll() {
         if let count = onAutoMergeAll?(), count > 0 {
             statusMessage = "Successfully auto-merged \(count) identical duplicate account groups!"
-        }
-    }
-
-    private func handleGenerateNewPassword(for item: VaultItem) {
-        var updated = item
-        let newPass = DuplicateDetectorService.shared.generateSecurePassword(length: 20)
-        updated.password = newPass
-        updated.updatedAt = ISO8601DateFormatter().string(from: Date())
-        onSaveItem?(updated)
-
-        updatedItemId = item.id
-        statusMessage = "Generated strong unique password for \"\(item.title)\"!"
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            if updatedItemId == item.id {
-                updatedItemId = nil
-            }
         }
     }
 

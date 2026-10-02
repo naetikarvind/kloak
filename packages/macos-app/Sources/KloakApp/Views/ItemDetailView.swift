@@ -6,6 +6,8 @@ public struct ItemDetailView: View {
     var currentSection: NavigationSection = .allItems
     var onSave: (VaultItem) -> Void
     var onDelete: (String) -> Void
+    var onRestore: ((String) -> Void)? = nil
+    var onDeletePermanently: ((String) -> Void)? = nil
 
     private var shouldShowTypeBadge: Bool {
         if case .category(let selectedCategory) = currentSection {
@@ -24,6 +26,7 @@ public struct ItemDetailView: View {
     @State private var revealTotpSecret: Bool = false
     @State private var copiedField: String?
     @State private var isShowingDeleteConfirm: Bool = false
+    @State private var isShowingPermanentDeleteConfirm: Bool = false
 
     // Edit Mode States
     @State private var isEditing: Bool = false
@@ -73,6 +76,39 @@ public struct ItemDetailView: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                // Trash Warning Banner
+                if item.trashed || currentSection == .trash {
+                    HStack(spacing: 12) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(LiquidGlassTheme.amberAccent)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("This item is in the Trash")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("It will not be suggested for autofill until restored.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button(action: {
+                            onRestore?(item.id)
+                        }) {
+                            Label("Restore Item", systemImage: "arrow.uturn.backward")
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                    }
+                    .padding(14)
+                    .background(LiquidGlassTheme.amberAccent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(LiquidGlassTheme.amberAccent.opacity(0.25), lineWidth: 1)
+                    )
+                }
+
                 // Header Card
                 HStack(alignment: .center, spacing: 12) {
                     FaviconView(
@@ -80,7 +116,7 @@ public struct ItemDetailView: View {
                         title: isEditing ? editTitle : item.title,
                         oauthProvider: item.oauth?.provider,
                         itemType: item.type,
-                        size: 46
+                        size: 48
                     )
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -406,32 +442,80 @@ public struct ItemDetailView: View {
                     .padding(16)
                     .glassEffect(cornerRadius: 14)
 
-                    // Danger Zone / Delete
-                    HStack {
+                    // Actions / Trash / Delete Zone
+                    HStack(spacing: 12) {
                         Spacer()
-                        Button(action: { isShowingDeleteConfirm = true }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "trash")
-                                Text("Delete Item")
-                            }
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(LiquidGlassTheme.roseAccent)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(LiquidGlassTheme.roseAccent.opacity(0.12))
-                            .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .confirmationDialog("Delete this item?", isPresented: $isShowingDeleteConfirm, titleVisibility: .visible) {
-                            Button("Delete Item", role: .destructive) {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                    onDelete(item.id)
+
+                        if item.trashed || currentSection == .trash {
+                            Button(action: { onRestore?(item.id) }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.uturn.backward")
+                                    Text("Restore Item")
                                 }
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().stroke(LiquidGlassTheme.emeraldAccent.opacity(0.3), lineWidth: 1)
+                                )
                             }
-                            Button("Cancel", role: .cancel) {}
-                        } message: {
-                            Text("This item will be moved to trash and permanently deleted according to vault policy.")
+                            .buttonStyle(.plain)
+
+                            Button(action: { isShowingPermanentDeleteConfirm = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "trash.slash.fill")
+                                    Text("Delete Permanently")
+                                }
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(LiquidGlassTheme.roseAccent)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(LiquidGlassTheme.roseAccent.opacity(0.12))
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().stroke(LiquidGlassTheme.roseAccent.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog("Delete Permanently?", isPresented: $isShowingPermanentDeleteConfirm, titleVisibility: .visible) {
+                                Button("Delete Permanently", role: .destructive) {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        onDeletePermanently?(item.id)
+                                    }
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This item will be permanently removed from your vault. This action cannot be undone.")
+                            }
+                        } else {
+                            Button(action: { isShowingDeleteConfirm = true }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "trash")
+                                    Text("Move to Trash")
+                                }
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(LiquidGlassTheme.roseAccent)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(LiquidGlassTheme.roseAccent.opacity(0.12))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog("Move to Trash?", isPresented: $isShowingDeleteConfirm, titleVisibility: .visible) {
+                                Button("Move to Trash", role: .destructive) {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        onDelete(item.id)
+                                    }
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This item will be moved to the Trash. You can restore it at any time.")
+                            }
                         }
+
                         Spacer()
                     }
                     .padding(.top, 8)

@@ -437,5 +437,62 @@ public struct DuplicateDetectorService: Sendable {
         }
         return result
     }
+
+    // MARK: - Password Health Auditing
+
+    public func findWeakPasswords(in items: [VaultItem]) -> [WeakPasswordItem] {
+        let validItems = items.filter { !$0.trashed && $0.type == .login }
+        var results: [WeakPasswordItem] = []
+        for item in validItems {
+            guard let pass = item.password, !pass.isEmpty else {
+                results.append(WeakPasswordItem(item: item, reason: "Missing password"))
+                continue
+            }
+            if pass.count < 8 {
+                results.append(WeakPasswordItem(item: item, reason: "Very short (\(pass.count) chars)"))
+            } else if pass.count < 11 {
+                var score = 0
+                if pass.rangeOfCharacter(from: .uppercaseLetters) != nil { score += 1 }
+                if pass.rangeOfCharacter(from: .lowercaseLetters) != nil { score += 1 }
+                if pass.rangeOfCharacter(from: .decimalDigits) != nil { score += 1 }
+                if pass.rangeOfCharacter(from: .punctuationCharacters.union(.symbols)) != nil { score += 1 }
+                if score < 3 {
+                    results.append(WeakPasswordItem(item: item, reason: "Low complexity (\(pass.count) chars)"))
+                }
+            } else if pass.allSatisfy({ $0.isNumber }) {
+                results.append(WeakPasswordItem(item: item, reason: "Numbers only"))
+            } else if pass.allSatisfy({ $0.isLetter }) {
+                results.append(WeakPasswordItem(item: item, reason: "Letters only"))
+            }
+        }
+        return results
+    }
+
+    public func findMissing2FA(in items: [VaultItem]) -> [Missing2FAItem] {
+        let validItems = items.filter { !$0.trashed && $0.type == .login }
+        return validItems
+            .filter { ($0.totpSecret == nil || $0.totpSecret?.isEmpty == true) && $0.oauth == nil }
+            .map { Missing2FAItem(item: $0) }
+    }
+}
+
+public struct WeakPasswordItem: Identifiable, Sendable {
+    public let item: VaultItem
+    public let reason: String
+    public var id: String { item.id }
+
+    public init(item: VaultItem, reason: String) {
+        self.item = item
+        self.reason = reason
+    }
+}
+
+public struct Missing2FAItem: Identifiable, Sendable {
+    public let item: VaultItem
+    public var id: String { item.id }
+
+    public init(item: VaultItem) {
+        self.item = item
+    }
 }
 

@@ -5,11 +5,12 @@ public enum NavigationSection: Hashable {
     case favorites
     case category(ItemType)
     case folder(String)
-    case trash
     case duplicates
+    case passwordHealth
     case generator
     case importExport
     case settings
+    case trash
 }
 
 public struct SidebarView: View {
@@ -134,21 +135,34 @@ public struct SidebarView: View {
                     .buttonStyle(.plain)
                 }
 
-                Section(header: sectionHeader("Tools")) {
+                Section(header: sectionHeader("Security")) {
                     let dupCount = DuplicateDetectorService.shared.findDuplicateAccounts(in: items).count
                     let reusedCount = DuplicateDetectorService.shared.findReusedPasswords(in: items).count
-                    let totalHealthIssues = dupCount + reusedCount
+                    let weakCount = DuplicateDetectorService.shared.findWeakPasswords(in: items).count
+                    let totalHealthIssues = reusedCount + weakCount
 
                     NavigationLink(value: NavigationSection.duplicates) {
                         Label {
-                            Text("Duplicates")
+                            Text("Duplicate Accounts")
                         } icon: {
                             Image(systemName: "doc.on.doc.fill")
-                                .foregroundColor(totalHealthIssues > 0 ? LiquidGlassTheme.amberAccent : .secondary)
+                                .foregroundColor(dupCount > 0 ? LiquidGlassTheme.amberAccent : .secondary)
+                        }
+                        .badge(dupCount)
+                    }
+
+                    NavigationLink(value: NavigationSection.passwordHealth) {
+                        Label {
+                            Text("Password Health")
+                        } icon: {
+                            Image(systemName: "shield.lefthalf.filled")
+                                .foregroundColor(totalHealthIssues > 0 ? Color.red.opacity(0.85) : LiquidGlassTheme.emeraldAccent)
                         }
                         .badge(totalHealthIssues)
                     }
+                }
 
+                Section(header: sectionHeader("Tools")) {
                     NavigationLink(value: NavigationSection.generator) {
                         Label("Password Generator", systemImage: "dice.fill")
                     }
@@ -156,7 +170,9 @@ public struct SidebarView: View {
                     NavigationLink(value: NavigationSection.importExport) {
                         Label("Import & Export", systemImage: "arrow.triangle.2.circlepath")
                     }
+                }
 
+                Section(header: sectionHeader("Manage")) {
                     NavigationLink(value: NavigationSection.settings) {
                         Label("Settings", systemImage: "gearshape.fill")
                     }

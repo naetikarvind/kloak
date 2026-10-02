@@ -11,17 +11,22 @@ public struct ItemListView: View {
     var onAddItem: (() -> Void)? = nil
     var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
     var onDeleteItem: ((String) -> Void)? = nil
+    var onRestoreItem: ((String) -> Void)? = nil
+    var onDeletePermanently: ((String) -> Void)? = nil
+    var onEmptyTrash: (() -> Void)? = nil
+
+    @State private var isShowingEmptyTrashConfirm: Bool = false
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Search field & Add button
+            // Search field & Actions bar
             HStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
                         .font(.system(size: 12))
 
-                    TextField("Search credentials, logins, URLs...", text: $searchText)
+                    TextField(currentSection == .trash ? "Search trash..." : "Search credentials, logins, URLs...", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 12))
 
@@ -44,7 +49,37 @@ public struct ItemListView: View {
                         )
                 )
 
-                if let onAdd = onAddItem {
+                if currentSection == .trash {
+                    if !items.isEmpty {
+                        Button(action: { isShowingEmptyTrashConfirm = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash.slash.fill")
+                                    .font(.system(size: 11))
+                                Text("Empty")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(LiquidGlassTheme.roseAccent)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(LiquidGlassTheme.roseAccent.opacity(0.12))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(LiquidGlassTheme.roseAccent.opacity(0.25), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .help("Empty All Trash Permanently")
+                        .confirmationDialog("Empty Trash?", isPresented: $isShowingEmptyTrashConfirm, titleVisibility: .visible) {
+                            Button("Empty Trash Permanently", role: .destructive) {
+                                onEmptyTrash?()
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("All \(items.count) items in the Trash will be permanently deleted. This cannot be undone.")
+                        }
+                    }
+                } else if let onAdd = onAddItem {
                     Button(action: onAdd) {
                         Image(systemName: "plus")
                             .font(.system(size: 12, weight: .bold))
@@ -66,12 +101,24 @@ public struct ItemListView: View {
             if items.isEmpty {
                 VStack(spacing: 12) {
                     Spacer()
-                    Image(systemName: "lock.slash")
+                    Image(systemName: currentSection == .trash ? "trash" : "lock.slash")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary.opacity(0.5))
-                    Text(searchText.isEmpty ? "No items in this section" : "No matches for \"\(searchText)\"")
+
+                    Text(currentSection == .trash
+                         ? (searchText.isEmpty ? "Trash is Empty" : "No trash matches for \"\(searchText)\"")
+                         : (searchText.isEmpty ? "No items in this section" : "No matches for \"\(searchText)\""))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
+
+                    if currentSection == .trash && searchText.isEmpty {
+                        Text("Deleted credentials will be kept here until permanently purged.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                    }
+
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -89,7 +136,9 @@ public struct ItemListView: View {
                                 }
                             },
                             onMoveToFolder: onMoveToFolder,
-                            onDeleteItem: onDeleteItem
+                            onDeleteItem: onDeleteItem,
+                            onRestoreItem: onRestoreItem,
+                            onDeletePermanently: onDeletePermanently
                         )
                         .tag(item.id)
                     }
@@ -110,6 +159,8 @@ public struct ItemRowView: View {
     var onToggleFavorite: () -> Void
     var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
     var onDeleteItem: ((String) -> Void)? = nil
+    var onRestoreItem: ((String) -> Void)? = nil
+    var onDeletePermanently: ((String) -> Void)? = nil
 
     private var currentFolder: VaultFolder? {
         folders.first(where: { f in
@@ -126,13 +177,6 @@ public struct ItemRowView: View {
         if p.rangeOfCharacter(from: .decimalDigits) != nil { score += 1 }
         if p.rangeOfCharacter(from: .punctuationCharacters.union(.symbols)) != nil { score += 1 }
         return score <= 1
-    }
-
-    private var hasNoUsername: Bool {
-        guard item.type == .login else { return false }
-        let u = item.username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let e = item.oauth?.accountEmail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return u.isEmpty && e.isEmpty
     }
 
     private var subtitleText: String {
@@ -181,26 +225,26 @@ public struct ItemRowView: View {
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
-            // High-resolution logo or fallback icon
+        HStack(spacing: 11) {
+            // Advanced high-fidelity Apple squircle favicon (32px)
             FaviconView(
                 urls: item.urls,
                 title: displayTitle,
                 oauthProvider: item.oauth?.provider,
                 itemType: item.type,
-                size: 28
+                size: 32
             )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(displayTitle)
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(item.trashed ? .secondary : .primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
 
                 Text(subtitleText)
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.secondary.opacity(0.8))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -210,7 +254,7 @@ public struct ItemRowView: View {
             HStack(spacing: 6) {
                 if let totp = item.totpSecret, !totp.isEmpty {
                     MiniTOTPRowView(secret: totp)
-                } else if isWeakPassword {
+                } else if isWeakPassword && !item.trashed {
                     Text("weak")
                         .font(.system(size: 8, weight: .bold))
                         .lineLimit(1)
@@ -230,7 +274,7 @@ public struct ItemRowView: View {
                         .clipShape(Capsule())
                 }
 
-                if item.favorite {
+                if item.favorite && !item.trashed {
                     Image(systemName: "star.fill")
                         .font(.system(size: 10))
                         .foregroundColor(LiquidGlassTheme.amberAccent)
@@ -240,65 +284,77 @@ public struct ItemRowView: View {
         }
         .padding(.vertical, 3)
         .contextMenu {
-            if !folders.isEmpty {
-                Menu {
-                    Button(action: { onMoveToFolder?(item, nil) }) {
-                        HStack {
-                            Text("No Folder (General)")
-                            if currentFolder == nil {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
+            if item.trashed || currentSection == .trash {
+                Button(action: { onRestoreItem?(item.id) }) {
+                    Label("Restore Credential", systemImage: "arrow.uturn.backward")
+                }
 
-                    Divider()
+                Divider()
 
-                    ForEach(folders) { f in
-                        Button(action: { onMoveToFolder?(item, f) }) {
+                Button(role: .destructive, action: { onDeletePermanently?(item.id) }) {
+                    Label("Delete Permanently", systemImage: "trash.slash.fill")
+                }
+            } else {
+                if !folders.isEmpty {
+                    Menu {
+                        Button(action: { onMoveToFolder?(item, nil) }) {
                             HStack {
-                                Text(f.name)
-                                if currentFolder?.id == f.id {
+                                Text("No Folder (General)")
+                                if currentFolder == nil {
                                     Image(systemName: "checkmark")
                                 }
                             }
                         }
+
+                        Divider()
+
+                        ForEach(folders) { f in
+                            Button(action: { onMoveToFolder?(item, f) }) {
+                                HStack {
+                                    Text(f.name)
+                                    if currentFolder?.id == f.id {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Label("Move to Folder", systemImage: "folder")
                     }
-                } label: {
-                    Label("Move to Folder", systemImage: "folder")
+
+                    Divider()
+                }
+
+                if let user = item.username, !user.isEmpty {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(user, forType: .string)
+                    }) {
+                        Label("Copy Username", systemImage: "person")
+                    }
+                }
+
+                if let pass = item.password, !pass.isEmpty {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(pass, forType: .string)
+                    }) {
+                        Label("Copy Password", systemImage: "key")
+                    }
                 }
 
                 Divider()
-            }
 
-            if let user = item.username, !user.isEmpty {
-                Button(action: {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(user, forType: .string)
-                }) {
-                    Label("Copy Username", systemImage: "person")
+                Button(action: onToggleFavorite) {
+                    Label(item.favorite ? "Unfavorite" : "Favorite", systemImage: item.favorite ? "star.slash" : "star")
                 }
-            }
 
-            if let pass = item.password, !pass.isEmpty {
-                Button(action: {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(pass, forType: .string)
-                }) {
-                    Label("Copy Password", systemImage: "key")
-                }
-            }
+                if onDeleteItem != nil {
+                    Divider()
 
-            Divider()
-
-            Button(action: onToggleFavorite) {
-                Label(item.favorite ? "Unfavorite" : "Favorite", systemImage: item.favorite ? "star.slash" : "star")
-            }
-
-            if onDeleteItem != nil {
-                Divider()
-
-                Button(role: .destructive, action: { onDeleteItem?(item.id) }) {
-                    Label("Delete Credential", systemImage: "trash")
+                    Button(role: .destructive, action: { onDeleteItem?(item.id) }) {
+                        Label("Move to Trash", systemImage: "trash")
+                    }
                 }
             }
         }

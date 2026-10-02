@@ -82,13 +82,16 @@ public actor LogoService {
     private func buildCandidateUrls(for domain: String) -> [URL] {
         var urls: [URL] = []
 
-        // Tier 1: Clearbit High-Res Brand Logo (Vector / 256px+ PNG)
-        if let u = URL(string: "https://logo.clearbit.com/\(domain)?size=256") {
+        // Tier 1: Google High-DPI Favicon (Request sz=256 and sz=128 for largest available raster)
+        if let u = URL(string: "https://www.google.com/s2/favicons?domain=\(domain)&sz=256") {
+            urls.append(u)
+        }
+        if let u = URL(string: "https://www.google.com/s2/favicons?domain=\(domain)&sz=128") {
             urls.append(u)
         }
 
-        // Tier 2: Unavatar Multi-Service High-Res Aggregator
-        if let u = URL(string: "https://unavatar.io/\(domain)?fallback=false") {
+        // Tier 2: Clearbit High-Res Brand Logo (Vector / 256px+ PNG)
+        if let u = URL(string: "https://logo.clearbit.com/\(domain)?size=256") {
             urls.append(u)
         }
 
@@ -100,13 +103,13 @@ public actor LogoService {
             urls.append(u)
         }
 
-        // Tier 4: Google High-DPI Favicon (Request sz=256 for largest available raster)
-        if let u = URL(string: "https://www.google.com/s2/favicons?domain=\(domain)&sz=256") {
+        // Tier 4: DuckDuckGo Icon
+        if let u = URL(string: "https://icons.duckduckgo.com/ip3/\(domain).ico") {
             urls.append(u)
         }
 
-        // Tier 5: DuckDuckGo Icon
-        if let u = URL(string: "https://icons.duckduckgo.com/ip3/\(domain).ico") {
+        // Tier 5: Unavatar Multi-Service High-Res Aggregator
+        if let u = URL(string: "https://unavatar.io/\(domain)?fallback=false") {
             urls.append(u)
         }
 

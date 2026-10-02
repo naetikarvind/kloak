@@ -551,7 +551,27 @@ public final class IPCServer: ObservableObject {
             }
             store.recordUserActivity()
             let id = params?["id"]?.stringValue ?? ""
-            store.deleteItem(id: id)
+            let permanent = params?["permanent"]?.boolValue ?? false
+            store.deleteItem(id: id, permanent: permanent)
+            reply(.dictionary(["success": .bool(true)]))
+
+        case "vault.restoreItem":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            let id = params?["id"]?.stringValue ?? ""
+            store.restoreItem(id: id)
+            reply(.dictionary(["success": .bool(true)]))
+
+        case "vault.emptyTrash":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            store.emptyTrash()
             reply(.dictionary(["success": .bool(true)]))
 
         case "vault.unlock":

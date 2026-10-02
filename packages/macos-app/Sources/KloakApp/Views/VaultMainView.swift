@@ -47,7 +47,7 @@ public struct VaultMainView: View {
 
     private var isUtilitySection: Bool {
         switch selection {
-        case .generator, .importExport, .settings, .duplicates:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth:
             return true
         default:
             return false
@@ -90,7 +90,7 @@ public struct VaultMainView: View {
             }
         case .trash:
             base = items.filter { $0.trashed }
-        case .generator, .importExport, .settings, .duplicates:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth:
             base = []
         }
 
@@ -119,12 +119,23 @@ public struct VaultMainView: View {
             DuplicateManagerView(
                 items: $items,
                 onSaveItem: onSaveItem,
-                onDeleteItem: onDeleteItem,
+                onDeleteItem: { id in
+                    handleMoveToTrash(id)
+                },
                 onMergeGroup: { group in
                     VaultStore.shared.mergeDuplicateGroup(group)
                 },
                 onAutoMergeAll: {
                     VaultStore.shared.autoMergeAllIdenticalDuplicates()
+                }
+            )
+        case .passwordHealth:
+            PasswordHealthView(
+                items: $items,
+                onSaveItem: onSaveItem,
+                onSelectItem: { id in
+                    selectedItemId = id
+                    selection = .allItems
                 }
             )
         case .generator:
@@ -145,6 +156,42 @@ public struct VaultMainView: View {
         default:
             EmptyView()
         }
+    }
+
+    private func handleMoveToTrash(_ id: String) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].trashed = true
+            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+            VaultStore.shared.moveToTrash(id: id)
+            if selectedItemId == id {
+                selectedItemId = nil
+            }
+        }
+    }
+
+    private func handleRestoreItem(_ id: String) {
+        if let idx = items.firstIndex(where: { $0.id == id }) {
+            items[idx].trashed = false
+            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+            VaultStore.shared.restoreItem(id: id)
+            if selectedItemId == id {
+                selectedItemId = nil
+            }
+        }
+    }
+
+    private func handleDeletePermanently(_ id: String) {
+        items.removeAll { $0.id == id }
+        VaultStore.shared.deletePermanently(id: id)
+        if selectedItemId == id {
+            selectedItemId = nil
+        }
+    }
+
+    private func handleEmptyTrash() {
+        items.removeAll { $0.trashed }
+        VaultStore.shared.emptyTrash()
+        selectedItemId = nil
     }
 
     public var body: some View {
@@ -207,14 +254,16 @@ public struct VaultMainView: View {
                                 }
                             },
                             onDeleteItem: { id in
-                                if let idx = items.firstIndex(where: { $0.id == id }) {
-                                    items[idx].trashed = true
-                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-                                    onDeleteItem(id)
-                                    if selectedItemId == id {
-                                        selectedItemId = nil
-                                    }
-                                }
+                                handleMoveToTrash(id)
+                            },
+                            onRestoreItem: { id in
+                                handleRestoreItem(id)
+                            },
+                            onDeletePermanently: { id in
+                                handleDeletePermanently(id)
+                            },
+                            onEmptyTrash: {
+                                handleEmptyTrash()
                             }
                         )
                         .frame(minWidth: 260, idealWidth: 280, maxWidth: 320)
@@ -236,12 +285,13 @@ public struct VaultMainView: View {
                                         }
                                     },
                                     onDelete: { id in
-                                        if let idx = items.firstIndex(where: { $0.id == id }) {
-                                            items[idx].trashed = true
-                                            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-                                            onDeleteItem(id)
-                                            selectedItemId = nil
-                                        }
+                                        handleMoveToTrash(id)
+                                    },
+                                    onRestore: { id in
+                                        handleRestoreItem(id)
+                                    },
+                                    onDeletePermanently: { id in
+                                        handleDeletePermanently(id)
                                     }
                                 )
                                 .id(selId)
