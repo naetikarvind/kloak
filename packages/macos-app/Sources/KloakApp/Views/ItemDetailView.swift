@@ -25,6 +25,7 @@ public struct ItemDetailView: View {
     @State private var revealPassport: Bool = false
     @State private var revealTotpSecret: Bool = false
     @State private var copiedField: String?
+    @State private var revealedCustomFieldIds: Set<String> = []
     @State private var isShowingDeleteConfirm: Bool = false
     @State private var isShowingPermanentDeleteConfirm: Bool = false
 
@@ -632,6 +633,73 @@ public struct ItemDetailView: View {
                 .padding(10)
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+
+        // Custom Fields & Alternate Passwords
+        if let fields = item.customFields, !fields.isEmpty {
+            ForEach(fields) { field in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(field.name.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+
+                    HStack(alignment: .center, spacing: 8) {
+                        if field.type == "hidden" {
+                            if revealedCustomFieldIds.contains(field.id) {
+                                Text(field.value)
+                                    .font(.system(size: 13, design: .monospaced))
+                                    .textSelection(.enabled)
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 18)
+                            } else {
+                                Text(String(repeating: "•", count: min(16, field.value.count)))
+                                    .font(.system(size: 13, weight: .heavy))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 18)
+                            }
+
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if revealedCustomFieldIds.contains(field.id) {
+                                        revealedCustomFieldIds.remove(field.id)
+                                    } else {
+                                        revealedCustomFieldIds.insert(field.id)
+                                    }
+                                }
+                            }) {
+                                Image(systemName: revealedCustomFieldIds.contains(field.id) ? "eye.slash" : "eye")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                    .padding(6)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Text(field.value)
+                                .font(.system(size: 13))
+                                .textSelection(.enabled)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+
+                        Button(action: { copyToClipboard(field.value, field.id) }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: copiedField == field.id ? "checkmark" : "doc.on.doc")
+                                    .font(.system(size: 12))
+                                if copiedField == field.id {
+                                    Text("Copied").font(.system(size: 11, weight: .bold))
+                                }
+                            }
+                            .foregroundColor(copiedField == field.id ? LiquidGlassTheme.emeraldAccent : .secondary)
+                            .padding(6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(10)
+                    .background(Color.black.opacity(0.25))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
             }
         }
 

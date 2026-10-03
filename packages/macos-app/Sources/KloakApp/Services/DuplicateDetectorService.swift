@@ -198,9 +198,25 @@ public struct DuplicateDetectorService: Sendable {
                 allTags.append(tag)
             }
 
-            // Merge Password if primary didn't have one
+            // Merge Password if primary didn't have one, or preserve alternate password
             if (merged.password == nil || merged.password?.isEmpty == true), let p = item.password, !p.isEmpty {
                 merged.password = p
+            } else if let secPass = item.password, !secPass.isEmpty, secPass != merged.password {
+                // Secondary item had a DIFFERENT password: save as Alternate Password custom field
+                var fields = merged.customFields ?? []
+                let fieldName = "Alternate Password (\(item.title))"
+                if !fields.contains(where: { $0.name == fieldName }) {
+                    fields.append(CustomField(name: fieldName, value: secPass, type: "hidden"))
+                }
+                merged.customFields = fields
+
+                // Also log in notes for maximum visibility
+                let noteLine = "[Alternate Password from \(item.title)]: \(secPass)"
+                if combinedNotes.isEmpty {
+                    combinedNotes = noteLine
+                } else if !combinedNotes.contains(secPass) {
+                    combinedNotes += "\n\n" + noteLine
+                }
             }
 
             // Merge TOTP secret if primary didn't have one
