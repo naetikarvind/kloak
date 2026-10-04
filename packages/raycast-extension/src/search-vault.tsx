@@ -9,8 +9,10 @@ import {
   showToast,
   Toast,
   Clipboard,
+  closeMainWindow,
   getPreferenceValues
 } from "@raycast/api";
+import * as childProcess from "node:child_process";
 import { requestDaemon, KloakItem } from "./kloak-ipc.js";
 import { generateLocalTotp, evaluatePasswordStrength, TotpResult } from "./totp-helper.js";
 import { getItemIcon, extractDomain, cleanDomain } from "./logo-helper.js";
@@ -149,6 +151,83 @@ async function copyTotpCode(item: KloakItem, fallbackToken?: string) {
       }
     } catch (e: any) {
       showToast({ style: Toast.Style.Failure, title: `Failed to generate 2FA ${otpType}`, message: e.message });
+    }
+  }
+}
+
+async function handleAutofill(
+  item: KloakItem,
+  mode: "all" | "usernameOnly" | "passwordOnly" = "all"
+) {
+  try {
+    await closeMainWindow();
+    // Allow Raycast to hide and the target window to become frontmost
+    await new Promise((r) => setTimeout(r, 180));
+    await requestDaemon("vault.autofill", {
+      id: item.id,
+      username: item.username,
+      password: item.password,
+      mode
+    });
+  } catch (err: any) {
+    // If daemon or native IPC fails, fallback to AppleScript keystrokes directly on macOS
+    try {
+      if (mode === "all") {
+        if (item.username && item.password) {
+          const script = `
+            set the clipboard to ${JSON.stringify(item.username)}
+            tell application "System Events"
+              keystroke "v" using {command down}
+              delay 0.12
+              key code 48
+              delay 0.15
+            end tell
+            set the clipboard to ${JSON.stringify(item.password)}
+            tell application "System Events"
+              keystroke "v" using {command down}
+            end tell
+          `;
+          childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+        } else if (item.password) {
+          const script = `
+            set the clipboard to ${JSON.stringify(item.password)}
+            tell application "System Events"
+              keystroke "v" using {command down}
+            end tell
+          `;
+          childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+        } else if (item.username) {
+          const script = `
+            set the clipboard to ${JSON.stringify(item.username)}
+            tell application "System Events"
+              keystroke "v" using {command down}
+            end tell
+          `;
+          childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+        }
+      } else if (mode === "usernameOnly" && item.username) {
+        const script = `
+          set the clipboard to ${JSON.stringify(item.username)}
+          tell application "System Events"
+            keystroke "v" using {command down}
+          end tell
+        `;
+        childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+      } else if (mode === "passwordOnly" && item.password) {
+        const script = `
+          set the clipboard to ${JSON.stringify(item.password)}
+          tell application "System Events"
+            keystroke "v" using {command down}
+          end tell
+        `;
+        childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+      }
+    } catch {
+      showToast({
+        style: Toast.Style.Failure,
+        title: "Autofill failed",
+        message: err.message
+      });
     }
   }
 }
@@ -374,6 +453,31 @@ export function ItemDetailScreen({ item, onToggleFavorite, onReload }: ItemDetai
       }
       actions={
         <ActionPanel>
+          <ActionPanel.Section title="Autofill into Active App">
+            <Action
+              title="Autofill into Active App"
+              icon={Icon.Bolt}
+              shortcut={{ modifiers: ["cmd"], key: "return" }}
+              onAction={() => handleAutofill(item, "all")}
+            />
+            {item.username && (
+              <Action
+                title="Autofill Username Only"
+                icon={Icon.Person}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "u" }}
+                onAction={() => handleAutofill(item, "usernameOnly")}
+              />
+            )}
+            {item.password && (
+              <Action
+                title="Autofill Password Only"
+                icon={Icon.Key}
+                shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+                onAction={() => handleAutofill(item, "passwordOnly")}
+              />
+            )}
+          </ActionPanel.Section>
+
           <ActionPanel.Section title="Copy Credentials">
             {item.password && (
               <Action
@@ -1042,6 +1146,31 @@ export default function SearchVaultCommand() {
               }
               actions={
                 <ActionPanel>
+                  <ActionPanel.Section title="Autofill into Active App">
+                    <Action
+                      title="Autofill into Active App"
+                      icon={Icon.Bolt}
+                      shortcut={{ modifiers: ["cmd"], key: "return" }}
+                      onAction={() => handleAutofill(item, "all")}
+                    />
+                    {item.username && (
+                      <Action
+                        title="Autofill Username Only"
+                        icon={Icon.Person}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "u" }}
+                        onAction={() => handleAutofill(item, "usernameOnly")}
+                      />
+                    )}
+                    {item.password && (
+                      <Action
+                        title="Autofill Password Only"
+                        icon={Icon.Key}
+                        shortcut={{ modifiers: ["cmd", "shift"], key: "p" }}
+                        onAction={() => handleAutofill(item, "passwordOnly")}
+                      />
+                    )}
+                  </ActionPanel.Section>
+
                   {/* Primary Action on Enter: Toggle Show/Hide Details (Speedtest Style) */}
                   <Action
                     title={isShowingDetail ? "Hide Details" : "Show Details"}

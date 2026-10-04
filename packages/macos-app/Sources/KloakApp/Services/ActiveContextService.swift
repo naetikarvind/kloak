@@ -43,12 +43,14 @@ public final class ActiveContextService: @unchecked Sendable {
             $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
             $0.bundleIdentifier != "com.kloak.app" &&
             $0.bundleIdentifier != "app.kloak.macos" &&
+            $0.bundleIdentifier != "com.raycast.macos" &&
             $0.activationPolicy == .regular
         }
         return nonKloakApps.first ?? lastExternalApp ?? NSWorkspace.shared.runningApplications.first(where: {
             $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
             $0.bundleIdentifier != "com.kloak.app" &&
             $0.bundleIdentifier != "app.kloak.macos" &&
+            $0.bundleIdentifier != "com.raycast.macos" &&
             $0.activationPolicy == .regular
         })
     }
@@ -65,6 +67,7 @@ public final class ActiveContextService: @unchecked Sendable {
             if bundleId != Bundle.main.bundleIdentifier &&
                bundleId != "com.kloak.app" &&
                bundleId != "app.kloak.macos" &&
+               bundleId != "com.raycast.macos" &&
                app.activationPolicy == .regular {
                 self?.lastExternalApp = app
             }

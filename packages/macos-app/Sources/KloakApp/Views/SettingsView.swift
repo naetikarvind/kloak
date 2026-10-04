@@ -25,6 +25,11 @@ public struct SettingsView: View {
     @State private var copiedForwardingEmail: Bool = false
     @ObservedObject private var devManager = DevModeManager.shared
 
+    // Hotkey Definer State
+    @State private var isRecordingHotkey: Bool = false
+    @State private var recordingMonitor: Any? = nil
+    @State private var hotkeyFeedback: String? = nil
+
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -43,6 +48,9 @@ public struct SettingsView: View {
             inputEmail = settings.connectedAccountEmail ?? ""
             inputToken = settings.connectedAccountToken ?? ""
             inputCustomRelay = settings.customForwardingEmail ?? ""
+        }
+        .onDisappear {
+            stopRecordingMonitor()
         }
     }
 
@@ -601,30 +609,144 @@ public struct SettingsView: View {
                 Toggle("Enable System-Wide App Autofill", isOn: $settings.accessibilityAutofillEnabled)
                     .onChange(of: settings.accessibilityAutofillEnabled) { _, _ in onSaveSettings(settings) }
 
-                HStack(spacing: 10) {
-                    HStack(spacing: 5) {
-                        Text("Global Shortcut:")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
-                        Text("⌘\\  or  ⌥⌘\\")
-                            .font(.system(size: 11, weight: .bold, design: .monospaced))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.white.opacity(0.08))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
+                Divider().opacity(0.15)
 
-                    Spacer()
-
-                    Button(action: {
-                        AccessibilityAutofillService.shared.triggerAutofill()
-                    }) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "bolt.fill")
-                            Text("Test Autofill Overlay")
+                // Hotkey Definer Section
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Global Autofill Shortcut")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Trigger autofill popup in any native application or browser window.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
                         }
+
+                        Spacer()
+
+                        // Interactive Hotkey Display & Record Button
+                        Button(action: {
+                            if isRecordingHotkey {
+                                stopRecordingHotkey()
+                            } else {
+                                startRecordingHotkey()
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                if isRecordingHotkey {
+                                    Circle()
+                                        .fill(LiquidGlassTheme.amberAccent)
+                                        .frame(width: 8, height: 8)
+                                    Text("Press Shortcut Keys…")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(LiquidGlassTheme.amberAccent)
+                                } else {
+                                    Image(systemName: "keyboard")
+                                        .font(.system(size: 11))
+                                    Text(settings.autofillHotkeyDisplay)
+                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                isRecordingHotkey
+                                    ? LiquidGlassTheme.amberAccent.opacity(0.18)
+                                    : Color.white.opacity(0.08)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(
+                                        isRecordingHotkey
+                                            ? LiquidGlassTheme.amberAccent
+                                            : Color.white.opacity(0.15),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                    if isRecordingHotkey {
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.amberAccent)
+                            Text("Press any shortcut combination with ⌘, ⌥, ⌃, or ⇧. Press Esc to cancel.")
+                                .font(.system(size: 11))
+                                .foregroundColor(LiquidGlassTheme.amberAccent)
+                            Spacer()
+                            Button("Cancel") {
+                                stopRecordingHotkey()
+                            }
+                            .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                            .font(.system(size: 10))
+                        }
+                        .padding(8)
+                        .background(LiquidGlassTheme.amberAccent.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+
+                    // Shortcut Presets & Actions
+                    HStack(spacing: 8) {
+                        Text("PRESETS:")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
+
+                        // Preset 1: ⌘\ (Default)
+                        Button("⌘\\") {
+                            applyHotkeyPreset(name: "⌘\\", keyCode: 42, modifiers: 1048576)
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘\\"))
+                        .font(.system(size: 11, design: .monospaced))
+
+                        // Preset 2: ⌥⌘\
+                        Button("⌥⌘\\") {
+                            applyHotkeyPreset(name: "⌥⌘\\", keyCode: 42, modifiers: 1572864)
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌥⌘\\"))
+                        .font(.system(size: 11, design: .monospaced))
+
+                        // Preset 3: ⌃⌥Space
+                        Button("⌃⌥Space") {
+                            applyHotkeyPreset(name: "⌃⌥Space", keyCode: 49, modifiers: 786432)
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌃⌥Space"))
+                        .font(.system(size: 11, design: .monospaced))
+
+                        // Preset 4: ⌘⇧P
+                        Button("⌘⇧P") {
+                            applyHotkeyPreset(name: "⌘⇧P", keyCode: 35, modifiers: 1179648)
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘⇧P"))
+                        .font(.system(size: 11, design: .monospaced))
+
+                        Spacer()
+
+                        Button(action: {
+                            AccessibilityAutofillService.shared.triggerAutofill()
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "bolt.fill")
+                                Text("Test Overlay")
+                            }
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                    }
+
+                    if let feedback = hotkeyFeedback {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                            Text(feedback)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        }
+                        .padding(6)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
                 }
             }
             .padding(14)
@@ -878,6 +1000,141 @@ public struct SettingsView: View {
                 passChangeMessage = "Current password was incorrect."
                 isSuccess = false
             }
+        }
+    }
+
+    // MARK: - Hotkey Recorder Helpers
+    private func stringForKeyCode(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "A"
+        case 1: return "S"
+        case 2: return "D"
+        case 3: return "F"
+        case 4: return "H"
+        case 5: return "G"
+        case 6: return "Z"
+        case 7: return "X"
+        case 8: return "C"
+        case 9: return "V"
+        case 11: return "B"
+        case 12: return "Q"
+        case 13: return "W"
+        case 14: return "E"
+        case 15: return "R"
+        case 16: return "Y"
+        case 17: return "T"
+        case 18: return "1"
+        case 19: return "2"
+        case 20: return "3"
+        case 21: return "4"
+        case 22: return "6"
+        case 23: return "5"
+        case 24: return "="
+        case 25: return "9"
+        case 26: return "7"
+        case 27: return "-"
+        case 28: return "8"
+        case 29: return "0"
+        case 30: return "]"
+        case 31: return "O"
+        case 32: return "U"
+        case 33: return "["
+        case 34: return "I"
+        case 35: return "P"
+        case 36: return "Return"
+        case 37: return "L"
+        case 38: return "J"
+        case 39: return "'"
+        case 40: return "K"
+        case 41: return ";"
+        case 42: return "\\"
+        case 43: return ","
+        case 44: return "/"
+        case 45: return "N"
+        case 46: return "M"
+        case 47: return "."
+        case 48: return "Tab"
+        case 49: return "Space"
+        case 50: return "`"
+        case 51: return "Delete"
+        case 53: return "Esc"
+        case 123: return "←"
+        case 124: return "→"
+        case 125: return "↓"
+        case 126: return "↑"
+        default: return "Key(\(keyCode))"
+        }
+    }
+
+    private func formatHotkeyDisplay(modifiers: NSEvent.ModifierFlags, keyString: String) -> String {
+        var str = ""
+        if modifiers.contains(.control) { str += "⌃" }
+        if modifiers.contains(.option) { str += "⌥" }
+        if modifiers.contains(.shift) { str += "⇧" }
+        if modifiers.contains(.command) { str += "⌘" }
+        return str + keyString
+    }
+
+    private func startRecordingHotkey() {
+        isRecordingHotkey = true
+        hotkeyFeedback = nil
+        stopRecordingMonitor()
+
+        recordingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Esc cancels recording
+            if event.keyCode == 53 {
+                DispatchQueue.main.async {
+                    self.stopRecordingHotkey()
+                    self.hotkeyFeedback = "Recording cancelled"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        self.hotkeyFeedback = nil
+                    }
+                }
+                return nil
+            }
+
+            let relevantModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            if !relevantModifiers.isEmpty {
+                let keyStr = self.stringForKeyCode(event.keyCode)
+                let display = self.formatHotkeyDisplay(modifiers: relevantModifiers, keyString: keyStr)
+
+                DispatchQueue.main.async {
+                    self.settings.autofillHotkeyKeyCode = Int(event.keyCode)
+                    self.settings.autofillHotkeyModifiers = relevantModifiers.rawValue
+                    self.settings.autofillHotkeyDisplay = display
+                    self.onSaveSettings(self.settings)
+                    self.hotkeyFeedback = "Shortcut set to \(display)"
+                    self.stopRecordingHotkey()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        self.hotkeyFeedback = nil
+                    }
+                }
+                return nil
+            }
+            return event
+        }
+    }
+
+    private func stopRecordingHotkey() {
+        isRecordingHotkey = false
+        stopRecordingMonitor()
+    }
+
+    private func stopRecordingMonitor() {
+        if let monitor = recordingMonitor {
+            NSEvent.removeMonitor(monitor)
+            recordingMonitor = nil
+        }
+    }
+
+    private func applyHotkeyPreset(name: String, keyCode: Int, modifiers: UInt) {
+        settings.autofillHotkeyKeyCode = keyCode
+        settings.autofillHotkeyModifiers = modifiers
+        settings.autofillHotkeyDisplay = name
+        onSaveSettings(settings)
+        hotkeyFeedback = "Shortcut preset set to \(name)"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            hotkeyFeedback = nil
         }
     }
 }

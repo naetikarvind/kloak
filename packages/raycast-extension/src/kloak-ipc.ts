@@ -8,6 +8,8 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 
 const SOCKET_PATH = path.join(os.homedir(), '.kloak', 'kloak.sock');
+const TCP_PORT = 53152;
+const TCP_HOST = '127.0.0.1';
 
 export interface CardDetails {
   cardholderName?: string;
@@ -77,9 +79,11 @@ export interface KloakItem {
   updatedAt?: string;
 }
 
-export async function requestDaemon<T = any>(method: string, params: any = {}): Promise<T> {
+function tryConnect<T>(isTcp: boolean, method: string, params: any): Promise<T> {
   return new Promise((resolve, reject) => {
-    const client = net.createConnection(SOCKET_PATH);
+    const client = isTcp
+      ? net.createConnection({ host: TCP_HOST, port: TCP_PORT })
+      : net.createConnection(SOCKET_PATH);
     let buffer = '';
 
     client.on('connect', () => {
@@ -108,7 +112,37 @@ export async function requestDaemon<T = any>(method: string, params: any = {}): 
     });
 
     client.on('error', (err) => {
-      reject(new Error(`Could not connect to Kloak Daemon. Please make sure the Kloak app is running and unlocked. (${err.message})`));
+      client.destroy();
+      reject(err);
     });
+
+    client.setTimeout(3500, () => {
+      client.destroy();
+      reject(new Error('Connection timed out'));
+    });
+  });
+}
+
+export async function requestDaemon<T = any>(method: string, params: any = {}): Promise<T> {
+  try {
+    return await tryConnect<T>(false, method, params);
+  } catch (_socketErr) {
+    try {
+      return await tryConnect<T>(true, method, params);
+    } catch (_tcpErr: any) {
+      throw new Error(`Could not connect to Kloak Daemon. Please make sure the Kloak app is running and unlocked.`);
+    }
+  }
+}
+
+export async function autofillActiveApp(
+  item: KloakItem,
+  mode: 'all' | 'usernameOnly' | 'passwordOnly' = 'all'
+): Promise<{ success: boolean; message?: string }> {
+  return await requestDaemon('vault.autofill', {
+    id: item.id,
+    username: item.username,
+    password: item.password,
+    mode
   });
 }

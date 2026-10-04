@@ -268,6 +268,77 @@ class IpcSocketServer {
                 return this.vaultManager.matchByUrl(params.url || '');
             case 'vault.generateTotp':
                 return (0, core_2.generateTotp)(params.secret, params.options);
+            case 'vault.autofill': {
+                const { id, username, password, mode } = params || {};
+                let user = username;
+                let pass = password;
+                if (id) {
+                    const item = this.vaultManager.getItem(id);
+                    if (item) {
+                        user = user || item.username;
+                        pass = pass || item.password;
+                    }
+                }
+                if (process.platform === 'darwin') {
+                    const childProcess = await import('node:child_process');
+                    const fillMode = mode || 'all';
+                    if (fillMode === 'all') {
+                        if (user && pass) {
+                            const script = `
+                set the clipboard to ${JSON.stringify(user)}
+                tell application "System Events"
+                  keystroke "v" using {command down}
+                  delay 0.1
+                  key code 48
+                  delay 0.1
+                end tell
+                set the clipboard to ${JSON.stringify(pass)}
+                tell application "System Events"
+                  keystroke "v" using {command down}
+                end tell
+              `;
+                            childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+                        }
+                        else if (pass) {
+                            const script = `
+                set the clipboard to ${JSON.stringify(pass)}
+                tell application "System Events"
+                  keystroke "v" using {command down}
+                end tell
+              `;
+                            childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+                        }
+                        else if (user) {
+                            const script = `
+                set the clipboard to ${JSON.stringify(user)}
+                tell application "System Events"
+                  keystroke "v" using {command down}
+                end tell
+              `;
+                            childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+                        }
+                    }
+                    else if (fillMode === 'usernameOnly' && user) {
+                        const script = `
+              set the clipboard to ${JSON.stringify(user)}
+              tell application "System Events"
+                keystroke "v" using {command down}
+              end tell
+            `;
+                        childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+                    }
+                    else if (fillMode === 'passwordOnly' && pass) {
+                        const script = `
+              set the clipboard to ${JSON.stringify(pass)}
+              tell application "System Events"
+                keystroke "v" using {command down}
+              end tell
+            `;
+                        childProcess.exec(`osascript -e '${script.replace(/'/g, "'\\''")}'`);
+                    }
+                }
+                return { success: true };
+            }
             case 'vault.generatePassword': {
                 const password = (0, core_2.generatePassword)(params.options);
                 const strength = (0, core_2.evaluatePasswordStrength)(password);

@@ -31,6 +31,17 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     private var localEventMonitor: Any? = nil
     private var mouseClickMonitor: Any? = nil
 
+    // Cached hotkey settings to avoid cross-actor access during event monitoring
+    public private(set) var cachedHotkeyKeyCode: Int = 42
+    public private(set) var cachedHotkeyModifiers: UInt = 1048576
+    public private(set) var cachedAutofillEnabled: Bool = true
+
+    public func updateHotkeyConfig(keyCode: Int, modifiers: UInt, enabled: Bool) {
+        self.cachedHotkeyKeyCode = keyCode
+        self.cachedHotkeyModifiers = modifiers
+        self.cachedAutofillEnabled = enabled
+    }
+
     private init() {
         self.isAccessibilityTrusted = AXIsProcessTrusted()
     }
@@ -40,6 +51,14 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     public func start() {
         self.isAccessibilityTrusted = AXIsProcessTrusted()
         registerHotkeyMonitors()
+        Task { @MainActor in
+            let s = VaultStore.shared.settings
+            self.updateHotkeyConfig(
+                keyCode: s.autofillHotkeyKeyCode,
+                modifiers: s.autofillHotkeyModifiers,
+                enabled: s.accessibilityAutofillEnabled
+            )
+        }
     }
 
     public func stop() {
@@ -65,7 +84,6 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         DispatchQueue.main.async {
             self.isAccessibilityTrusted = trusted
         }
-
         if !trusted {
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
                 NSWorkspace.shared.open(url)
@@ -73,7 +91,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         }
     }
 
-    // MARK: - Hotkey Registration (⌘\ and ⌥⌘\)
+    // MARK: - Hotkey Registration
 
     private func registerHotkeyMonitors() {
         stop()
@@ -94,15 +112,16 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     }
 
     private func isHotkeyMatch(_ event: NSEvent) -> Bool {
-        // Backslash keycode is 42 (0x2A) on standard US/ANSI keyboards
-        guard event.keyCode == 42 else { return false }
+        guard cachedAutofillEnabled else { return false }
+        guard event.keyCode == UInt16(cachedHotkeyKeyCode) else { return false }
 
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        // Match ⌘\ or ⌥⌘\
-        if flags == .command || flags == [.command, .option] {
-            return true
+        let eventModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+        let targetModifiers = NSEvent.ModifierFlags(rawValue: cachedHotkeyModifiers).intersection([.command, .option, .control, .shift])
+
+        if targetModifiers.isEmpty {
+            return eventModifiers == .command
         }
-        return false
+        return eventModifiers == targetModifiers
     }
 
     private func handleKeyEvent(_ event: NSEvent) {
@@ -237,7 +256,21 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     // MARK: - Input Injection & Autofill Execution
 
     public func performAutofill(item: VaultItem, mode: AutofillMode) {
-        guard let targetApp = currentTargetApp ?? ActiveContextService.shared.lastExternalApp else {
+        let front = NSWorkspace.shared.frontmostApplication
+        let resolvedTarget: NSRunningApplication? = {
+            if let curr = currentTargetApp { return curr }
+            if let f = front,
+               let bid = f.bundleIdentifier,
+               bid != Bundle.main.bundleIdentifier,
+               bid != "com.kloak.app",
+               bid != "app.kloak.macos",
+               bid != "com.raycast.macos" {
+                return f
+            }
+            return ActiveContextService.shared.getTargetExternalApplication() ?? ActiveContextService.shared.lastExternalApp
+        }()
+
+        guard let targetApp = resolvedTarget else {
             showToast("No target application selected")
             hidePanel()
             return

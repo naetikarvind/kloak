@@ -104,7 +104,7 @@ public enum AnyCodableValue: Codable, Sendable {
 public final class IPCServer: ObservableObject {
     public static let shared = IPCServer()
 
-    public static let defaultPort: UInt16 = 53152
+    nonisolated public static let defaultPort: UInt16 = 53152
     private var tcpListener: NWListener?
     @Published public var isRunning: Bool = false
     @Published public var connectedClientsCount: Int = 0
@@ -410,6 +410,43 @@ public final class IPCServer: ObservableObject {
             } else {
                 replyError(-32000, "Invalid Base32 TOTP secret")
             }
+
+        case "vault.autofill":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            store.recordUserActivity()
+            let itemId = params?["id"]?.stringValue
+            let user = params?["username"]?.stringValue
+            let pass = params?["password"]?.stringValue
+            let modeStr = params?["mode"]?.stringValue ?? "all"
+
+            let targetItem: VaultItem? = {
+                if let id = itemId, let found = store.items.first(where: { $0.id == id }) {
+                    return found
+                }
+                if let u = user ?? pass {
+                    return VaultItem(type: .login, title: "Autofill", username: user, password: pass, urls: [])
+                }
+                return nil
+            }()
+
+            guard let item = targetItem else {
+                replyError(-32004, "No credential specified for autofill")
+                return
+            }
+
+            let mode: AutofillMode
+            switch modeStr {
+            case "usernameOnly": mode = .usernameOnly
+            case "passwordOnly": mode = .passwordOnly
+            case "totpOnly": mode = .totpOnly
+            default: mode = .all
+            }
+
+            AccessibilityAutofillService.shared.performAutofill(item: item, mode: mode)
+            reply(.dictionary(["success": .bool(true), "message": .string("Autofilled into active app")]))
 
         case "shield.inspectUrl":
             let url = params?["url"]?.stringValue ?? ""

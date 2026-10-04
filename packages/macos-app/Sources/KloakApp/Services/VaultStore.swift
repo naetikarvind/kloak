@@ -272,6 +272,11 @@ public final class VaultStore: ObservableObject {
             self.items = sanitizedItems
             self.folders = payload.folders
             self.settings = payload.settings
+            AccessibilityAutofillService.shared.updateHotkeyConfig(
+                keyCode: payload.settings.autofillHotkeyKeyCode,
+                modifiers: payload.settings.autofillHotkeyModifiers,
+                enabled: payload.settings.accessibilityAutofillEnabled
+            )
             self.isUnlocked = true
             self.lastError = nil
 
@@ -384,6 +389,11 @@ public final class VaultStore: ObservableObject {
                         self.items = sanitizedItems
                         self.folders = payload.folders
                         self.settings = payload.settings
+                        AccessibilityAutofillService.shared.updateHotkeyConfig(
+                            keyCode: payload.settings.autofillHotkeyKeyCode,
+                            modifiers: payload.settings.autofillHotkeyModifiers,
+                            enabled: payload.settings.accessibilityAutofillEnabled
+                        )
                         self.isUnlocked = true
                         self.lastError = nil
 
@@ -524,6 +534,11 @@ public final class VaultStore: ObservableObject {
 
     public func updateSettings(_ newSettings: VaultSettings) {
         self.settings = newSettings
+        AccessibilityAutofillService.shared.updateHotkeyConfig(
+            keyCode: newSettings.autofillHotkeyKeyCode,
+            modifiers: newSettings.autofillHotkeyModifiers,
+            enabled: newSettings.accessibilityAutofillEnabled
+        )
         if newSettings.biometricsEnabled && newSettings.keychainSyncEnabled {
             if let key = vaultKey {
                 _ = KeychainManager.shared.storeKey(keyData: CryptoEngine.shared.keyToData(key))

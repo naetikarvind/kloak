@@ -324,6 +324,9 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var threatSensitivity: String // "high", "balanced", "low"
     public var smartDomainTreeEnabled: Bool
     public var accessibilityAutofillEnabled: Bool
+    public var autofillHotkeyKeyCode: Int
+    public var autofillHotkeyModifiers: UInt
+    public var autofillHotkeyDisplay: String
 
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
@@ -340,7 +343,10 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         autoMaskUntrustedSites: true,
         threatSensitivity: "balanced",
         smartDomainTreeEnabled: true,
-        accessibilityAutofillEnabled: true
+        accessibilityAutofillEnabled: true,
+        autofillHotkeyKeyCode: 42,
+        autofillHotkeyModifiers: 1048576,
+        autofillHotkeyDisplay: "⌘\\"
     )
 
     public init(
@@ -358,7 +364,10 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         autoMaskUntrustedSites: Bool = true,
         threatSensitivity: String = "balanced",
         smartDomainTreeEnabled: Bool = true,
-        accessibilityAutofillEnabled: Bool = true
+        accessibilityAutofillEnabled: Bool = true,
+        autofillHotkeyKeyCode: Int = 42,
+        autofillHotkeyModifiers: UInt = 1048576,
+        autofillHotkeyDisplay: String = "⌘\\"
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -375,6 +384,9 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.threatSensitivity = threatSensitivity
         self.smartDomainTreeEnabled = smartDomainTreeEnabled
         self.accessibilityAutofillEnabled = accessibilityAutofillEnabled
+        self.autofillHotkeyKeyCode = autofillHotkeyKeyCode
+        self.autofillHotkeyModifiers = autofillHotkeyModifiers
+        self.autofillHotkeyDisplay = autofillHotkeyDisplay
     }
 
     public init(from decoder: Decoder) throws {
@@ -394,6 +406,9 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.threatSensitivity = try container.decodeIfPresent(String.self, forKey: .threatSensitivity) ?? "balanced"
         self.smartDomainTreeEnabled = try container.decodeIfPresent(Bool.self, forKey: .smartDomainTreeEnabled) ?? true
         self.accessibilityAutofillEnabled = try container.decodeIfPresent(Bool.self, forKey: .accessibilityAutofillEnabled) ?? true
+        self.autofillHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .autofillHotkeyKeyCode) ?? 42
+        self.autofillHotkeyModifiers = try container.decodeIfPresent(UInt.self, forKey: .autofillHotkeyModifiers) ?? 1048576
+        self.autofillHotkeyDisplay = try container.decodeIfPresent(String.self, forKey: .autofillHotkeyDisplay) ?? "⌘\\"
     }
 }
 
