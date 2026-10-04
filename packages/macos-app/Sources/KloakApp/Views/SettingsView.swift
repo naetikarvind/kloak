@@ -29,6 +29,7 @@ public struct SettingsView: View {
     @State private var isRecordingHotkey: Bool = false
     @State private var recordingMonitor: Any? = nil
     @State private var hotkeyFeedback: String? = nil
+    @ObservedObject private var autofillService = AccessibilityAutofillService.shared
 
     public var body: some View {
         ScrollView {
@@ -42,6 +43,12 @@ public struct SettingsView: View {
                 developerModeSection
             }
             .padding(16)
+        }
+        .onAppear {
+            autofillService.checkAccessibilityPermission()
+        }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            autofillService.checkAccessibilityPermission()
         }
         .onAppear {
             selectedTab = settings.connectedAccountProvider ?? "google"
@@ -583,18 +590,18 @@ public struct SettingsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(AXIsProcessTrusted() ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
+                        .fill(autofillService.isAccessibilityTrusted ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
                         .frame(width: 10, height: 10)
 
-                    Text(AXIsProcessTrusted() ? "macOS Accessibility Permission: Active" : "macOS Accessibility Permission: Not Granted")
+                    Text(autofillService.isAccessibilityTrusted ? "macOS Accessibility Permission: Active" : "macOS Accessibility Permission: Not Granted")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(AXIsProcessTrusted() ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
+                        .foregroundColor(autofillService.isAccessibilityTrusted ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
 
                     Spacer()
 
-                    if !AXIsProcessTrusted() {
+                    if !autofillService.isAccessibilityTrusted {
                         Button("Grant in Settings") {
-                            AccessibilityAutofillService.shared.requestAccessibilityPermission()
+                            autofillService.requestAccessibilityPermission()
                         }
                         .buttonStyle(GlassCapsuleButton(isPrimary: true))
                     }

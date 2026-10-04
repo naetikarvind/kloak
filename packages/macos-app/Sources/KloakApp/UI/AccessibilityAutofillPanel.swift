@@ -31,6 +31,9 @@ public final class AccessibilityAutofillPanel: NSPanel {
 
     public override func cancelOperation(_ sender: Any?) {
         AccessibilityAutofillService.shared.hidePanel()
+        if let target = AccessibilityAutofillService.shared.currentTargetApp {
+            target.activate(options: [.activateIgnoringOtherApps])
+        }
     }
 }
 
@@ -65,8 +68,8 @@ public final class AccessibilityAutofillPanelManager {
         guard let p = panel else { return }
 
         p.setFrame(panelRect, display: true, animate: false)
-        p.orderFrontRegardless()
-        p.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
+        p.makeKeyAndOrderFront(nil)
     }
 
     public func hide() {
@@ -195,6 +198,15 @@ public struct AccessibilityAutofillPopupView: View {
                 .stroke(Color.white.opacity(0.14), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
+        .onExitCommand {
+            autofillService.hidePanel()
+            if let target = autofillService.currentTargetApp {
+                target.activate(options: [.activateIgnoringOtherApps])
+            }
+        }
+        .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            autofillService.checkAccessibilityPermission()
+        }
     }
 
     // MARK: - Header Bar
@@ -270,6 +282,11 @@ public struct AccessibilityAutofillPopupView: View {
                     .font(.system(size: 12))
                     .foregroundColor(.white)
                     .focused($isSearchFocused)
+                    .onSubmit {
+                        if let first = (!displayedSuggestions.isEmpty ? displayedSuggestions.first : filteredItems.first) {
+                            autofillService.performAutofill(item: first, mode: .all)
+                        }
+                    }
 
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {

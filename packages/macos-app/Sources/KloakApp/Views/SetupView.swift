@@ -40,7 +40,7 @@ public struct SetupView: View {
 
     // Step 4: Integrations & Completion
     @State private var enableAccessibilityAutofill: Bool = true
-    @State private var isAccessibilityTrusted: Bool = AXIsProcessTrusted()
+    @State private var isAccessibilityTrusted: Bool = AccessibilityAutofillService.isProcessTrusted()
     @State private var accessibilityCheckTimer: Timer? = nil
     @State private var seedSampleData: Bool = false
     @State private var isProcessing: Bool = false
@@ -1302,7 +1302,7 @@ public struct SetupView: View {
     // MARK: - Accessibility Helpers
 
     private func refreshAccessibilityStatus() {
-        isAccessibilityTrusted = AXIsProcessTrusted()
+        isAccessibilityTrusted = AccessibilityAutofillService.isProcessTrusted()
     }
 
     private func startAccessibilityCheckTimer() {

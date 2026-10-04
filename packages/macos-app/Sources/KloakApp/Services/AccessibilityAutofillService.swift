@@ -33,6 +33,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     // Carbon Global HotKey
     private var carbonHotKeyRef: EventHotKeyRef?
+    private var carbonHotKeyRefISO: EventHotKeyRef?
     private var carbonEventHandler: EventHandlerRef?
     private let hotKeySignature: OSType = 0x4B4C4F41 // 'KLOA'
     private let hotKeyIDNumber: UInt32 = 1
@@ -53,14 +54,19 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         }
     }
 
+    public static func isProcessTrusted() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
     private init() {
-        self.isAccessibilityTrusted = AXIsProcessTrusted()
+        self.isAccessibilityTrusted = Self.isProcessTrusted()
     }
 
     // MARK: - Service Lifecycle
 
     public func start() {
-        self.isAccessibilityTrusted = AXIsProcessTrusted()
+        self.isAccessibilityTrusted = Self.isProcessTrusted()
         registerHotkeyMonitors()
         registerCarbonHotKey()
         Task { @MainActor in
@@ -88,14 +94,23 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     @discardableResult
     public func checkAccessibilityPermission() -> Bool {
-        let trusted = AXIsProcessTrusted()
+        let trusted = Self.isProcessTrusted()
         DispatchQueue.main.async {
-            self.isAccessibilityTrusted = trusted
+            if self.isAccessibilityTrusted != trusted {
+                self.isAccessibilityTrusted = trusted
+            }
         }
         return trusted
     }
 
     public func requestAccessibilityPermission() {
+        // Reset any stale TCC cache for com.kloak.app to allow fresh authorization
+        let task = Process()
+        task.launchPath = "/usr/bin/tccutil"
+        task.arguments = ["reset", "Accessibility", "com.kloak.app"]
+        try? task.run()
+        task.waitUntilExit()
+
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         let trusted = AXIsProcessTrustedWithOptions(options)
         DispatchQueue.main.async {
@@ -119,7 +134,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         )
 
         let status = InstallEventHandler(
-            GetEventDispatcherTarget(),
+            GetApplicationEventTarget(),
             { (nextHandler: EventHandlerCallRef?, theEvent: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus in
                 guard let theEvent = theEvent else { return noErr }
                 var hkID = EventHotKeyID()
@@ -133,7 +148,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
                     &hkID
                 )
 
-                if err == noErr && hkID.signature == OSType(0x4B4C4F41) && hkID.id == 1 {
+                if err == noErr && hkID.signature == OSType(0x4B4C4F41) && (hkID.id == 1 || hkID.id == 2) {
                     DispatchQueue.main.async {
                         AccessibilityAutofillService.shared.toggleAutofill()
                     }
@@ -179,7 +194,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
             UInt32(cachedHotkeyKeyCode),
             carbonMods,
             hkID,
-            GetEventDispatcherTarget(),
+            GetApplicationEventTarget(),
             0,
             &carbonHotKeyRef
         )
@@ -189,12 +204,29 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         } else {
             NSLog("[Kloak] Successfully registered Carbon system-wide hotkey (code: %d, mods: %u)", cachedHotkeyKeyCode, carbonMods)
         }
+
+        // On ISO keyboard layouts (e.g. ABC-India / UK), register keycode 10 as alternate backslash
+        if cachedHotkeyKeyCode == 42 {
+            let hkID_ISO = EventHotKeyID(signature: hotKeySignature, id: 2)
+            _ = RegisterEventHotKey(
+                10,
+                carbonMods,
+                hkID_ISO,
+                GetApplicationEventTarget(),
+                0,
+                &carbonHotKeyRefISO
+            )
+        }
     }
 
     public func unregisterCarbonHotKey() {
         if let ref = carbonHotKeyRef {
             UnregisterEventHotKey(ref)
             carbonHotKeyRef = nil
+        }
+        if let refISO = carbonHotKeyRefISO {
+            UnregisterEventHotKey(refISO)
+            carbonHotKeyRefISO = nil
         }
     }
 
@@ -221,7 +253,17 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     private func isHotkeyMatch(_ event: NSEvent) -> Bool {
         guard cachedAutofillEnabled else { return false }
-        guard event.keyCode == UInt16(cachedHotkeyKeyCode) else { return false }
+
+        let keyMatches: Bool
+        if event.keyCode == UInt16(cachedHotkeyKeyCode) {
+            keyMatches = true
+        } else if cachedHotkeyKeyCode == 42 {
+            // Support ISO backslash key (10) and charactersIgnoringModifiers == "\"
+            keyMatches = (event.keyCode == 10 || event.charactersIgnoringModifiers == "\\")
+        } else {
+            keyMatches = false
+        }
+        guard keyMatches else { return false }
 
         let eventModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
         let targetModifiers = NSEvent.ModifierFlags(rawValue: cachedHotkeyModifiers).intersection([.command, .option, .control, .shift])
@@ -286,7 +328,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         var targetRect: NSRect? = nil
         var fieldRole: String? = nil
 
-        if let app = targetApp, AXIsProcessTrusted() {
+        if let app = targetApp, Self.isProcessTrusted() {
             let pid = app.processIdentifier
             let appElement = AXUIElementCreateApplication(pid)
 
