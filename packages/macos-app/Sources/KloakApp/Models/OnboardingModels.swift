@@ -27,7 +27,7 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
         case .cloudAccounts: return "Connect Google, Proton, or Microsoft"
         case .appleKeychain: return "Import from any password manager or Apple Keychain"
         case .vaultPassword: return "Initialize local vault encryption"
-        case .ecosystem: return "Browser & Raycast native bridges"
+        case .ecosystem: return "Accessibility Autofill, Browser & Raycast"
         case .complete: return "Your vault is ready"
         }
     }

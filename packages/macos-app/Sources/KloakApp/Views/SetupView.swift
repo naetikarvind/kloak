@@ -39,6 +39,9 @@ public struct SetupView: View {
     @State private var selectedProviderForSheet: CloudProvider? = nil
 
     // Step 4: Integrations & Completion
+    @State private var enableAccessibilityAutofill: Bool = true
+    @State private var isAccessibilityTrusted: Bool = AXIsProcessTrusted()
+    @State private var accessibilityCheckTimer: Timer? = nil
     @State private var seedSampleData: Bool = false
     @State private var isProcessing: Bool = false
     @State private var errorMessage: String? = nil
@@ -118,6 +121,9 @@ public struct SetupView: View {
         .onAppear {
             pulseGlow = true
             focusedField = .password
+        }
+        .onDisappear {
+            stopAccessibilityCheckTimer()
         }
     }
 
@@ -763,22 +769,109 @@ public struct SetupView: View {
     // MARK: - Step 4: Ecosystem & Integrations
 
     private var step4EcosystemView: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             VStack(spacing: 4) {
                 Text("Ecosystem & Integrations")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.primary)
 
-                Text("Kloak seamlessly integrates with your browser and Raycast for instant keyboard-driven workflow.")
+                Text("Kloak seamlessly integrates with macOS Accessibility, browsers, and Raycast for instant autofill across your entire system.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
+                    .frame(maxWidth: 480)
             }
-            .padding(.top, 6)
+            .padding(.top, 4)
 
             VStack(spacing: 12) {
-                // Browser Extension Card
+                // 1. macOS Accessibility & Desktop App Autofill Card
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .fill(isAccessibilityTrusted ? LiquidGlassTheme.emeraldAccent.opacity(0.18) : LiquidGlassTheme.amberAccent.opacity(0.18))
+                                .frame(width: 40, height: 40)
+                            Image(systemName: isAccessibilityTrusted ? "checkmark.shield.fill" : "lock.shield.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(isAccessibilityTrusted ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
+                        }
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 8) {
+                                Text("macOS Accessibility & App Autofill")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.primary)
+
+                                if isAccessibilityTrusted {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 10))
+                                        Text("Access Granted")
+                                            .font(.system(size: 10, weight: .semibold))
+                                    }
+                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                                    .clipShape(Capsule())
+                                } else {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 10))
+                                        Text("Permission Needed")
+                                            .font(.system(size: 10, weight: .semibold))
+                                    }
+                                    .foregroundColor(LiquidGlassTheme.amberAccent)
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(LiquidGlassTheme.amberAccent.opacity(0.15))
+                                    .clipShape(Capsule())
+                                }
+                            }
+
+                            Text("Allows Kloak to detect focused password inputs in third-party native apps (Slack, Discord, Zoom) and trigger ⌘\\ autofill.")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        if !isAccessibilityTrusted {
+                            Button(action: {
+                                AccessibilityAutofillService.shared.requestAccessibilityPermission()
+                                refreshAccessibilityStatus()
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "hand.raised.square.fill")
+                                    Text("Grant Access")
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                            }
+                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                        }
+                    }
+
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+
+                    Toggle(isOn: $enableAccessibilityAutofill) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Enable System-Wide Desktop Autofill (Default Hotkey: ⌘\\)")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.primary)
+                            Text("Hotkey and permissions can be adjusted anytime in Kloak Settings.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .toggleStyle(.checkbox)
+                }
+                .padding(12)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                // 2. Browser Extension Card
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
@@ -806,7 +899,7 @@ public struct SetupView: View {
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
-                // Raycast Extension Card
+                // 3. Raycast Extension Card
                 HStack(spacing: 12) {
                     ZStack {
                         Circle()
@@ -834,7 +927,7 @@ public struct SetupView: View {
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .padding(18)
+            .padding(16)
             .glassEffect(cornerRadius: 16)
 
             Spacer()
@@ -857,6 +950,16 @@ public struct SetupView: View {
                 }
                 .buttonStyle(GlassCapsuleButton(isPrimary: true))
             }
+        }
+        .onAppear {
+            refreshAccessibilityStatus()
+            startAccessibilityCheckTimer()
+        }
+        .onDisappear {
+            stopAccessibilityCheckTimer()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            refreshAccessibilityStatus()
         }
     }
 
@@ -906,6 +1009,24 @@ public struct SetupView: View {
                     Spacer()
                     Text(enableBiometrics ? "Enabled" : "Disabled")
                         .foregroundColor(enableBiometrics ? LiquidGlassTheme.emeraldAccent : .secondary)
+                }
+                .font(.system(size: 12))
+
+                HStack {
+                    Label("Desktop App Autofill", systemImage: "macwindow")
+                    Spacer()
+                    if enableAccessibilityAutofill {
+                        if isAccessibilityTrusted {
+                            Text("Active (⌘\\)")
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        } else {
+                            Text("Pending Permission (⌘\\)")
+                                .foregroundColor(LiquidGlassTheme.amberAccent)
+                        }
+                    } else {
+                        Text("Disabled")
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .font(.system(size: 12))
 
@@ -1166,7 +1287,8 @@ public struct SetupView: View {
                     seedSampleData: seedSampleData,
                     importedItems: combinedItems,
                     connectedAccounts: activeConnections,
-                    keychainSyncEnabled: enableKeychainSync
+                    keychainSyncEnabled: enableKeychainSync,
+                    accessibilityAutofillEnabled: enableAccessibilityAutofill
                 )
             } catch {
                 await MainActor.run {
@@ -1175,6 +1297,26 @@ public struct SetupView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Accessibility Helpers
+
+    private func refreshAccessibilityStatus() {
+        isAccessibilityTrusted = AXIsProcessTrusted()
+    }
+
+    private func startAccessibilityCheckTimer() {
+        stopAccessibilityCheckTimer()
+        accessibilityCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            DispatchQueue.main.async {
+                self.refreshAccessibilityStatus()
+            }
+        }
+    }
+
+    private func stopAccessibilityCheckTimer() {
+        accessibilityCheckTimer?.invalidate()
+        accessibilityCheckTimer = nil
     }
 
     private func evaluateStrength(_ pass: String) -> PasswordStrength {
