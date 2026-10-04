@@ -7,8 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present && node scripts/pack-extension.mjs",
     "build:icons": "./build-icons.sh",
+    "build:extension": "node scripts/pack-extension.mjs",
     "test": "npm run build --workspace=packages/core && npm run build --workspace=packages/daemon && npm test --workspace=packages/tests",
     "daemon": "npm run start --workspace=packages/daemon",
     "cli": "node packages/daemon/dist/cli/index.js",
