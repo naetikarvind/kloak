@@ -26,10 +26,17 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     @Published public var focusedFieldRole: String? = nil
     @Published public var toastMessage: String? = nil
 
-    // MARK: - Event Monitors
+    // MARK: - Event Monitors & Carbon HotKey
     private var globalEventMonitor: Any? = nil
     private var localEventMonitor: Any? = nil
     private var mouseClickMonitor: Any? = nil
+
+    // Carbon Global HotKey
+    private var carbonHotKeyRef: EventHotKeyRef?
+    private var carbonEventHandler: EventHandlerRef?
+    private let hotKeySignature: OSType = 0x4B4C4F41 // 'KLOA'
+    private let hotKeyIDNumber: UInt32 = 1
+    private var lastTriggerTime: Date = .distantPast
 
     // Cached hotkey settings to avoid cross-actor access during event monitoring
     public private(set) var cachedHotkeyKeyCode: Int = 42
@@ -40,6 +47,10 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         self.cachedHotkeyKeyCode = keyCode
         self.cachedHotkeyModifiers = modifiers
         self.cachedAutofillEnabled = enabled
+
+        DispatchQueue.main.async { [weak self] in
+            self?.registerCarbonHotKey()
+        }
     }
 
     private init() {
@@ -51,6 +62,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     public func start() {
         self.isAccessibilityTrusted = AXIsProcessTrusted()
         registerHotkeyMonitors()
+        registerCarbonHotKey()
         Task { @MainActor in
             let s = VaultStore.shared.settings
             self.updateHotkeyConfig(
@@ -62,6 +74,11 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     }
 
     public func stop() {
+        unregisterCarbonHotKey()
+        if let h = carbonEventHandler {
+            RemoveEventHandler(h)
+            carbonEventHandler = nil
+        }
         if let g = globalEventMonitor { NSEvent.removeMonitor(g); globalEventMonitor = nil }
         if let l = localEventMonitor { NSEvent.removeMonitor(l); localEventMonitor = nil }
         if let m = mouseClickMonitor { NSEvent.removeMonitor(m); mouseClickMonitor = nil }
@@ -91,12 +108,103 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         }
     }
 
-    // MARK: - Hotkey Registration
+    // MARK: - Carbon Global HotKey Registration
+
+    private func installCarbonEventHandlerIfNeeded() {
+        guard carbonEventHandler == nil else { return }
+
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+
+        let status = InstallEventHandler(
+            GetEventDispatcherTarget(),
+            { (nextHandler: EventHandlerCallRef?, theEvent: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus in
+                guard let theEvent = theEvent else { return noErr }
+                var hkID = EventHotKeyID()
+                let err = GetEventParameter(
+                    theEvent,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hkID
+                )
+
+                if err == noErr && hkID.signature == OSType(0x4B4C4F41) && hkID.id == 1 {
+                    DispatchQueue.main.async {
+                        AccessibilityAutofillService.shared.toggleAutofill()
+                    }
+                    return noErr
+                }
+                return CallNextEventHandler(nextHandler, theEvent)
+            },
+            1,
+            &eventType,
+            nil,
+            &carbonEventHandler
+        )
+
+        if status != noErr {
+            NSLog("[Kloak] Failed to install Carbon event handler: %d", status)
+        }
+    }
+
+    private func carbonModifiers(from cocoaModifiers: UInt) -> UInt32 {
+        let flags = NSEvent.ModifierFlags(rawValue: cocoaModifiers)
+        var carbonFlags: UInt32 = 0
+        if flags.contains(.command) { carbonFlags |= UInt32(cmdKey) }
+        if flags.contains(.option) { carbonFlags |= UInt32(optionKey) }
+        if flags.contains(.control) { carbonFlags |= UInt32(controlKey) }
+        if flags.contains(.shift) { carbonFlags |= UInt32(shiftKey) }
+        if carbonFlags == 0 {
+            carbonFlags = UInt32(cmdKey)
+        }
+        return carbonFlags
+    }
+
+    public func registerCarbonHotKey() {
+        unregisterCarbonHotKey()
+
+        guard cachedAutofillEnabled else { return }
+
+        installCarbonEventHandlerIfNeeded()
+
+        let carbonMods = carbonModifiers(from: cachedHotkeyModifiers)
+        let hkID = EventHotKeyID(signature: hotKeySignature, id: hotKeyIDNumber)
+
+        let regStatus = RegisterEventHotKey(
+            UInt32(cachedHotkeyKeyCode),
+            carbonMods,
+            hkID,
+            GetEventDispatcherTarget(),
+            0,
+            &carbonHotKeyRef
+        )
+
+        if regStatus != noErr {
+            NSLog("[Kloak] Failed to register Carbon hotkey (code: %d, mods: %u, status: %d)", cachedHotkeyKeyCode, carbonMods, regStatus)
+        } else {
+            NSLog("[Kloak] Successfully registered Carbon system-wide hotkey (code: %d, mods: %u)", cachedHotkeyKeyCode, carbonMods)
+        }
+    }
+
+    public func unregisterCarbonHotKey() {
+        if let ref = carbonHotKeyRef {
+            UnregisterEventHotKey(ref)
+            carbonHotKeyRef = nil
+        }
+    }
+
+    // MARK: - Hotkey Event Monitors (Local & Fallback)
 
     private func registerHotkeyMonitors() {
-        stop()
+        if let g = globalEventMonitor { NSEvent.removeMonitor(g); globalEventMonitor = nil }
+        if let l = localEventMonitor { NSEvent.removeMonitor(l); localEventMonitor = nil }
 
-        // Global monitor: receives events when another application is active
+        // Global monitor fallback: receives events when another application is active
         globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             self?.handleKeyEvent(event)
         }
@@ -135,6 +243,10 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     // MARK: - Trigger Autofill
 
     public func toggleAutofill() {
+        let now = Date()
+        guard now.timeIntervalSince(lastTriggerTime) > 0.25 else { return }
+        lastTriggerTime = now
+
         if isPanelVisible {
             hidePanel()
         } else {

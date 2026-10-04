@@ -65,7 +65,7 @@ public final class AccessibilityAutofillPanelManager {
         guard let p = panel else { return }
 
         p.setFrame(panelRect, display: true, animate: false)
-        p.orderFront(nil)
+        p.orderFrontRegardless()
         p.makeKey()
     }
 
@@ -132,6 +132,7 @@ public struct AccessibilityAutofillPopupView: View {
     @State private var unlockError: String? = nil
     @State private var isUnlocking: Bool = false
     @State private var copiedNotice: String? = nil
+    @FocusState private var isSearchFocused: Bool
 
     public init() {}
 
@@ -268,6 +269,7 @@ public struct AccessibilityAutofillPopupView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
                     .foregroundColor(.white)
+                    .focused($isSearchFocused)
 
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
@@ -339,6 +341,11 @@ public struct AccessibilityAutofillPopupView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
+            }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isSearchFocused = true
             }
         }
     }
