@@ -323,6 +323,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var autoMaskUntrustedSites: Bool
     public var threatSensitivity: String // "high", "balanced", "low"
     public var smartDomainTreeEnabled: Bool
+    public var accessibilityAutofillEnabled: Bool
 
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
@@ -338,7 +339,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         customForwardingEmail: nil,
         autoMaskUntrustedSites: true,
         threatSensitivity: "balanced",
-        smartDomainTreeEnabled: true
+        smartDomainTreeEnabled: true,
+        accessibilityAutofillEnabled: true
     )
 
     public init(
@@ -355,7 +357,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         customForwardingEmail: String? = nil,
         autoMaskUntrustedSites: Bool = true,
         threatSensitivity: String = "balanced",
-        smartDomainTreeEnabled: Bool = true
+        smartDomainTreeEnabled: Bool = true,
+        accessibilityAutofillEnabled: Bool = true
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -371,6 +374,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.autoMaskUntrustedSites = autoMaskUntrustedSites
         self.threatSensitivity = threatSensitivity
         self.smartDomainTreeEnabled = smartDomainTreeEnabled
+        self.accessibilityAutofillEnabled = accessibilityAutofillEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -389,6 +393,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.autoMaskUntrustedSites = try container.decodeIfPresent(Bool.self, forKey: .autoMaskUntrustedSites) ?? true
         self.threatSensitivity = try container.decodeIfPresent(String.self, forKey: .threatSensitivity) ?? "balanced"
         self.smartDomainTreeEnabled = try container.decodeIfPresent(Bool.self, forKey: .smartDomainTreeEnabled) ?? true
+        self.accessibilityAutofillEnabled = try container.decodeIfPresent(Bool.self, forKey: .accessibilityAutofillEnabled) ?? true
     }
 }
 

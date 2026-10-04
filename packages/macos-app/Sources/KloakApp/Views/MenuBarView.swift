@@ -150,6 +150,19 @@ public struct MenuBarView: View {
                     }
                     .buttonStyle(.plain)
                     .help("Lock Vault")
+
+                    Button(action: {
+                        AccessibilityAutofillService.shared.triggerAutofill()
+                    }) {
+                        Image(systemName: "bolt.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(LiquidGlassTheme.primaryAccent)
+                            .padding(6)
+                            .background(LiquidGlassTheme.primaryAccent.opacity(0.16))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Autofill in Frontmost App (⌘\\)")
                 }
 
                 Button(action: openMainWindow) {
@@ -865,6 +878,29 @@ public struct SuggestedHeroRow: View {
                 if let totp = item.totpSecret, !totp.isEmpty {
                     MiniTOTPRowView(secret: totp)
                 }
+
+                Button(action: {
+                    AccessibilityAutofillService.shared.performAutofill(item: item, mode: .all)
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "bolt.fill")
+                        Text("Fill")
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            colors: [LiquidGlassTheme.primaryAccent, Color.blue],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+                .help("Autofill Username & Password into active app")
 
                 if item.password != nil {
                     Button(action: onCopyPassword) {

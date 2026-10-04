@@ -29,7 +29,29 @@ public struct ActiveContext: Sendable {
 public final class ActiveContextService: @unchecked Sendable {
     public static let shared = ActiveContextService()
 
-    private var lastExternalApp: NSRunningApplication?
+    public private(set) var lastExternalApp: NSRunningApplication?
+
+    public var lastExternalRunningApp: NSRunningApplication? {
+        return lastExternalApp
+    }
+
+    /// Returns the target external application for autofill operations.
+    public func getTargetExternalApplication() -> NSRunningApplication? {
+        let runningApps = NSWorkspace.shared.runningApplications
+        let nonKloakApps = runningApps.filter {
+            $0.isActive &&
+            $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            $0.bundleIdentifier != "com.kloak.app" &&
+            $0.bundleIdentifier != "app.kloak.macos" &&
+            $0.activationPolicy == .regular
+        }
+        return nonKloakApps.first ?? lastExternalApp ?? NSWorkspace.shared.runningApplications.first(where: {
+            $0.bundleIdentifier != Bundle.main.bundleIdentifier &&
+            $0.bundleIdentifier != "com.kloak.app" &&
+            $0.bundleIdentifier != "app.kloak.macos" &&
+            $0.activationPolicy == .regular
+        })
+    }
 
     private init() {
         // Track the last active non-Kloak app so when MenuBarExtra opens, we know what app the user was just in

@@ -29,6 +29,7 @@ public struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 securitySection
+                accessibilityAutofillSection
                 connectedAccountsSection
                 offlineModeSection
                 ipcSection
@@ -555,6 +556,76 @@ public struct SettingsView: View {
                 Text("Automatically understands domain hierarchies and Single Sign-On ecosystems. For example, a single Google credential will seamlessly autofill on YouTube, Gmail, Google Drive, Chrome, and native Google apps.")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
+            }
+            .padding(14)
+            .background(Color.black.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(14)
+        .glassEffect(cornerRadius: 16)
+    }
+
+    // MARK: - Section: Accessibility & Native App Autofill
+    @ViewBuilder
+    private var accessibilityAutofillSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Accessibility & Native App Autofill", systemImage: "macwindow.and.cursorarrow")
+                .font(.system(size: 14, weight: .bold))
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(AXIsProcessTrusted() ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
+                        .frame(width: 10, height: 10)
+
+                    Text(AXIsProcessTrusted() ? "macOS Accessibility Permission: Active" : "macOS Accessibility Permission: Not Granted")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(AXIsProcessTrusted() ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
+
+                    Spacer()
+
+                    if !AXIsProcessTrusted() {
+                        Button("Grant in Settings") {
+                            AccessibilityAutofillService.shared.requestAccessibilityPermission()
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                    }
+                }
+
+                Text("Enables detection of focused input fields in native desktop apps (Slack, Spotify, Discord, Notion, Steam, Zoom, terminals) and non-extension browsers, displaying a floating overlay to autofill username and password.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Divider().opacity(0.15)
+
+                Toggle("Enable System-Wide App Autofill", isOn: $settings.accessibilityAutofillEnabled)
+                    .onChange(of: settings.accessibilityAutofillEnabled) { _, _ in onSaveSettings(settings) }
+
+                HStack(spacing: 10) {
+                    HStack(spacing: 5) {
+                        Text("Global Shortcut:")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                        Text("⌘\\  or  ⌥⌘\\")
+                            .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        AccessibilityAutofillService.shared.triggerAutofill()
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "bolt.fill")
+                            Text("Test Autofill Overlay")
+                        }
+                    }
+                    .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                }
             }
             .padding(14)
             .background(Color.black.opacity(0.2))

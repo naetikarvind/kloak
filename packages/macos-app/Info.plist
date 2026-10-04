@@ -32,6 +32,8 @@
     <string>public.app-category.productivity</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Kloak uses biometric authentication to securely unlock your password vault.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Kloak uses Apple Events to identify active browser tabs for context-aware credential suggestions.</string>
     <key>CFBundleURLTypes</key>
     <array>
         <dict>

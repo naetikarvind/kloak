@@ -12,6 +12,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.applicationIconImage = iconImg
         }
 
+        // Start system-wide accessibility autofill service & hotkey monitor (⌘\)
+        AccessibilityAutofillService.shared.start()
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             if let window = NSApp.windows.first {
                 window.makeKeyAndOrderFront(nil)
@@ -168,6 +171,13 @@ public struct KloakApp: App {
                     NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil)
                 }
                 .keyboardShortcut("a", modifiers: .command)
+
+                Divider()
+
+                Button("Autofill in Active App") {
+                    AccessibilityAutofillService.shared.triggerAutofill()
+                }
+                .keyboardShortcut("\\", modifiers: .command)
             }
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
