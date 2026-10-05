@@ -27,6 +27,13 @@ public struct FaviconView: View {
         self.oauthProvider = oauthProvider
         self.itemType = itemType
         self.size = size
+
+        let initial = LogoService.shared.cachedImageSync(
+            urls: urls,
+            title: title,
+            oauthProvider: oauthProvider
+        )
+        _loadedImage = State(initialValue: initial)
     }
 
     private var squircleRadius: CGFloat {
@@ -69,6 +76,13 @@ public struct FaviconView: View {
         .aspectRatio(1, contentMode: .fit)
         .task(id: "\(title)_\(urls.joined())_\(oauthProvider ?? "")") {
             await loadLogo()
+        }
+        .onAppear {
+            if loadedImage == nil {
+                Task { @MainActor in
+                    await loadLogo()
+                }
+            }
         }
     }
 
@@ -187,18 +201,20 @@ public struct FaviconView: View {
 
     // MARK: - Logo Loading
 
+    @MainActor
     private func loadLogo() async {
         let domains = LogoService.shared.resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
         guard !domains.isEmpty else {
-            withAnimation(.easeOut(duration: 0.15)) {
-                self.loadedImage = nil
+            if loadedImage != nil {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    self.loadedImage = nil
+                }
             }
             return
         }
 
-        let cacheKey = domains.joined(separator: "|")
-        if let cached = await LogoService.shared.cachedImage(forKey: cacheKey) {
-            withAnimation(.easeOut(duration: 0.15)) {
+        if let cached = LogoService.shared.cachedImageSync(urls: urls, title: title, oauthProvider: oauthProvider) {
+            if self.loadedImage !== cached {
                 self.loadedImage = cached
             }
             return
@@ -211,8 +227,10 @@ public struct FaviconView: View {
             itemType: itemType
         )
 
-        withAnimation(.easeOut(duration: 0.18)) {
-            self.loadedImage = fetched
+        if let fetched = fetched {
+            withAnimation(.easeOut(duration: 0.18)) {
+                self.loadedImage = fetched
+            }
         }
     }
 }

@@ -705,6 +705,9 @@ public struct MenuBarView: View {
         .background(.ultraThinMaterial)
         .onAppear {
             refreshContext()
+            if vaultStore.isUnlocked {
+                LogoService.shared.prefetchLogos(for: vaultStore.items)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .kloakBrowserUrlChanged)) { note in
             guard vaultStore.isUnlocked else { return }
@@ -749,6 +752,7 @@ public struct MenuBarView: View {
             if success {
                 unlockPassword = ""
                 refreshContext()
+                LogoService.shared.prefetchLogos(for: vaultStore.items)
             } else {
                 unlockErrorMessage = "Incorrect master password."
             }
@@ -760,6 +764,7 @@ public struct MenuBarView: View {
             let success = await vaultStore.unlockWithBiometrics()
             if success {
                 refreshContext()
+                LogoService.shared.prefetchLogos(for: vaultStore.items)
             } else if let err = vaultStore.lastError {
                 unlockErrorMessage = err
             }

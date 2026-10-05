@@ -194,6 +194,7 @@ public final class VaultStore: ObservableObject {
         self.hasVault = true
         self.isUnlocked = true
         self.lastError = nil
+        LogoService.shared.prefetchLogos(for: finalItems)
 
         startAutoLockTimer()
     }
@@ -279,6 +280,7 @@ public final class VaultStore: ObservableObject {
             self.items = sanitizedItems
             self.folders = payload.folders
             self.settings = payload.settings
+            LogoService.shared.prefetchLogos(for: sanitizedItems)
             AccessibilityAutofillService.shared.updateHotkeyConfig(
                 keyCode: payload.settings.autofillHotkeyKeyCode,
                 modifiers: payload.settings.autofillHotkeyModifiers,
@@ -396,6 +398,7 @@ public final class VaultStore: ObservableObject {
                         self.items = sanitizedItems
                         self.folders = payload.folders
                         self.settings = payload.settings
+                        LogoService.shared.prefetchLogos(for: sanitizedItems)
                         AccessibilityAutofillService.shared.updateHotkeyConfig(
                             keyCode: payload.settings.autofillHotkeyKeyCode,
                             modifiers: payload.settings.autofillHotkeyModifiers,
@@ -477,6 +480,7 @@ public final class VaultStore: ObservableObject {
         }
         recordUserActivity()
         saveVault()
+        LogoService.shared.prefetchLogos(for: [cleaned])
     }
 
     public func deleteItem(id: String, permanent: Bool = false) {
@@ -583,6 +587,7 @@ public final class VaultStore: ObservableObject {
         }
         recordUserActivity()
         saveVault()
+        LogoService.shared.prefetchLogos(for: self.items)
         return (addedCount, [])
     }
 

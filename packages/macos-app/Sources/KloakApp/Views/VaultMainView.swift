@@ -331,6 +331,7 @@ public struct VaultMainView: View {
         .animation(.easeInOut(duration: 0.18), value: selectedItemId)
         .onAppear {
             triggerWindowResize(for: selection, animated: false)
+            LogoService.shared.prefetchLogos(for: items)
         }
         .onChange(of: selection) { _, newSel in
             selectedItemId = nil
