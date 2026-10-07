@@ -951,6 +951,8 @@ public struct MenuBarItemRow: View {
     private var isUrlCopied: Bool { copiedFeedback == "url_\(item.id)" }
 
     public var body: some View {
+        // The header row and its expanded details live in ONE container so it is
+        // visually obvious the details belong to this specific credential.
         VStack(spacing: 0) {
             headerRow
                 .onTapGesture(perform: onSelect)
@@ -960,6 +962,15 @@ public struct MenuBarItemRow: View {
                 expandedDetailCard
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? Color.black.opacity(0.28) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isSelected ? LiquidGlassTheme.primaryAccent.opacity(0.45) : Color.clear, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private var headerRow: some View {
@@ -1037,8 +1048,8 @@ public struct MenuBarItemRow: View {
 
     private var expandedDetailCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Divider().opacity(0.12)
-                .padding(.vertical, 2)
+            Divider().opacity(0.2)
+                .padding(.bottom, 2)
 
             accountSection
             passwordSection
@@ -1057,14 +1068,8 @@ public struct MenuBarItemRow: View {
 
             openInAppFooter
         }
-        .padding(10)
-        .background(Color.black.opacity(0.28))
-        .clipShape(RoundedRectangle(cornerRadius: 9))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9)
-                .stroke(LiquidGlassTheme.primaryAccent.opacity(0.25), lineWidth: 1)
-        )
-        .padding(.top, 4)
+        .padding(.horizontal, 10)
+        .padding(.bottom, 10)
     }
 
     private var accountSection: some View {
@@ -1279,28 +1284,32 @@ public struct MenuBarItemRow: View {
     }
 
     private var openInAppFooter: some View {
-        HStack {
-            Spacer()
-            Button(action: { onOpenInApp?() }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 10))
-                    Text("Open in Kloak App")
-                        .font(.system(size: 10.5, weight: .medium))
-                }
-                .foregroundColor(LiquidGlassTheme.primaryAccent)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .stroke(LiquidGlassTheme.primaryAccent.opacity(0.3), lineWidth: 0.75)
-                )
+        Button(action: { onOpenInApp?() }) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.forward.app.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Open in Kloak App")
+                    .font(.system(size: 12, weight: .semibold))
             }
-            .buttonStyle(.plain)
-            .help("Open and edit this item in the main Kloak window")
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                LinearGradient(
+                    colors: [LiquidGlassTheme.primaryAccent, Color.blue],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.25), lineWidth: 0.75)
+            )
+            .shadow(color: LiquidGlassTheme.primaryAccent.opacity(0.4), radius: 4, y: 1)
         }
-        .padding(.top, 2)
+        .buttonStyle(.plain)
+        .help("Open and edit this item in the main Kloak window")
+        .padding(.top, 4)
     }
 }
