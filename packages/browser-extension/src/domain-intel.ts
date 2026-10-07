@@ -100,6 +100,14 @@ const ESTABLISHED_KNOWN_DOMAINS: { [domain: string]: Partial<DomainIntelInfo> } 
     registrarName: 'Google LLC',
     registrantOrg: 'Anthropic PBC',
     hostingProvider: 'Cloudflare, Inc. (AS13335)'
+  },
+  'opera.com': {
+    domainAgeDays: 10600,
+    domainAgeYears: 29,
+    registrationDate: '1997-02-14',
+    registrarName: 'MarkMonitor Inc.',
+    registrantOrg: 'Opera Norway AS',
+    hostingProvider: 'Cloudflare / Opera Software'
   }
 };
 

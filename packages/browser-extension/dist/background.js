@@ -40,7 +40,34 @@
     "gemini.com",
     "youtube.com",
     "gmail.com",
-    "kloak.app"
+    "kloak.app",
+    "opera.com",
+    "operasoftware.com",
+    "brave.com",
+    "firefox.com",
+    "mozilla.org",
+    "duckduckgo.com",
+    "reddit.com",
+    "linkedin.com",
+    "zoom.us",
+    "adobe.com",
+    "salesforce.com",
+    "wordpress.com",
+    "medium.com",
+    "cloudflare.com",
+    "gitlab.com",
+    "stripe.com",
+    "shopify.com",
+    "ebay.com",
+    "telegram.org",
+    "whatsapp.com",
+    "signal.org",
+    "tiktok.com",
+    "pinterest.com",
+    "twitch.tv",
+    "steamcommunity.com",
+    "steampowered.com",
+    "epicgames.com"
   ];
   var KNOWN_BRANDS = [
     { name: "google", legitDomains: ["google.com", "google.co.uk", "google.ca", "google.co.in", "google.co.jp", "googleapis.com", "gstatic.com", "youtube.com", "gmail.com", "googleusercontent.com", "deepmind.google"] },
@@ -61,7 +88,29 @@
     { name: "chase", legitDomains: ["chase.com"] },
     { name: "facebook", legitDomains: ["facebook.com", "fb.com", "meta.com"] },
     { name: "instagram", legitDomains: ["instagram.com"] },
-    { name: "discord", legitDomains: ["discord.com", "discord.gg"] }
+    { name: "discord", legitDomains: ["discord.com", "discord.gg"] },
+    { name: "opera", legitDomains: ["opera.com", "operasoftware.com"] },
+    { name: "brave", legitDomains: ["brave.com"] },
+    { name: "mozilla", legitDomains: ["mozilla.org", "firefox.com"] },
+    { name: "firefox", legitDomains: ["firefox.com", "mozilla.org"] },
+    { name: "duckduckgo", legitDomains: ["duckduckgo.com", "ddg.gg"] },
+    { name: "reddit", legitDomains: ["reddit.com", "redd.it"] },
+    { name: "linkedin", legitDomains: ["linkedin.com"] },
+    { name: "zoom", legitDomains: ["zoom.us", "zoom.com"] },
+    { name: "adobe", legitDomains: ["adobe.com"] },
+    { name: "cloudflare", legitDomains: ["cloudflare.com"] },
+    { name: "gitlab", legitDomains: ["gitlab.com"] },
+    { name: "stripe", legitDomains: ["stripe.com"] },
+    { name: "shopify", legitDomains: ["shopify.com"] },
+    { name: "ebay", legitDomains: ["ebay.com"] },
+    { name: "telegram", legitDomains: ["telegram.org", "t.me"] },
+    { name: "whatsapp", legitDomains: ["whatsapp.com"] },
+    { name: "signal", legitDomains: ["signal.org"] },
+    { name: "tiktok", legitDomains: ["tiktok.com"] },
+    { name: "pinterest", legitDomains: ["pinterest.com"] },
+    { name: "twitch", legitDomains: ["twitch.tv"] },
+    { name: "steam", legitDomains: ["steampowered.com", "steamcommunity.com"] },
+    { name: "epicgames", legitDomains: ["epicgames.com"] }
   ];
   var HIGH_RISK_TLDS = /* @__PURE__ */ new Set([
     "tk",
@@ -158,11 +207,42 @@
     const cleanTarget = targetDomain.replace(/^www\./, "").toLowerCase();
     return host === cleanTarget || host.endsWith("." + cleanTarget);
   }
-  function levenshtein(s1, s2) {
+  var QWERTY_NEIGHBORS = {
+    q: "wa12",
+    w: "qeas23",
+    e: "wrds34",
+    r: "etfd45",
+    t: "rygf56",
+    y: "tuhg67",
+    u: "yijh78",
+    i: "uojk89",
+    o: "ipkl90",
+    p: "ol0-",
+    a: "qwsz",
+    s: "awedxz",
+    d: "serfcx",
+    f: "drtgvc",
+    g: "ftyhbv",
+    h: "gyujnb",
+    j: "huikmn",
+    k: "jiolm",
+    l: "kop",
+    z: "asx",
+    x: "zsdc",
+    c: "xdfv",
+    v: "cfgb",
+    b: "vghn",
+    n: "bhjm",
+    m: "njk"
+  };
+  function normalizeLookalikes(str) {
+    return str.replace(/0/g, "o").replace(/1/g, "l").replace(/3/g, "e").replace(/4/g, "a").replace(/5/g, "s").replace(/8/g, "b").replace(/vv/g, "w").replace(/rn/g, "m").replace(/@/g, "a");
+  }
+  function damerauLevenshtein(s1, s2) {
     const m = s1.length;
     const n = s2.length;
-    const d = [];
-    for (let i = 0; i <= m; i++) d[i] = [i];
+    const d = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) d[i][0] = i;
     for (let j = 0; j <= n; j++) d[0][j] = j;
     for (let i = 1; i <= m; i++) {
       for (let j = 1; j <= n; j++) {
@@ -172,9 +252,60 @@
           d[i][j - 1] + 1,
           d[i - 1][j - 1] + cost
         );
+        if (i > 1 && j > 1 && s1[i - 1] === s2[j - 2] && s1[i - 2] === s2[j - 1]) {
+          d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+        }
       }
     }
     return d[m][n];
+  }
+  function isSingleSubstitutionTypo(s1, s2) {
+    if (s1.length !== s2.length) return false;
+    let diffCount = 0;
+    let c1 = "";
+    let c2 = "";
+    for (let i = 0; i < s1.length; i++) {
+      if (s1[i] !== s2[i]) {
+        diffCount++;
+        c1 = s1[i];
+        c2 = s2[i];
+      }
+    }
+    if (diffCount !== 1) return false;
+    if (QWERTY_NEIGHBORS[c2]?.includes(c1) || QWERTY_NEIGHBORS[c1]?.includes(c2)) {
+      return true;
+    }
+    return false;
+  }
+  function isTyposquatting(sld, brandSLD) {
+    if (sld === brandSLD) return false;
+    const normSLD = normalizeLookalikes(sld);
+    const normBrand = normalizeLookalikes(brandSLD);
+    if (normSLD === normBrand && sld !== brandSLD) return true;
+    const dist = damerauLevenshtein(sld, brandSLD);
+    if (dist === 0) return false;
+    if (dist === 1) {
+      if (Math.abs(sld.length - brandSLD.length) === 1) {
+        if (brandSLD.length <= 4) {
+          if (sld.startsWith(brandSLD) || brandSLD.startsWith(sld) || sld.endsWith(brandSLD)) return true;
+          return false;
+        }
+        return true;
+      }
+      let isTransposition = false;
+      for (let i = 0; i < sld.length - 1; i++) {
+        if (sld[i] === brandSLD[i + 1] && sld[i + 1] === brandSLD[i]) {
+          isTransposition = true;
+          break;
+        }
+      }
+      if (isTransposition) return true;
+      return isSingleSubstitutionTypo(sld, brandSLD);
+    }
+    if (brandSLD.length >= 8 && dist <= 2 && dist / brandSLD.length <= 0.25) {
+      return true;
+    }
+    return false;
   }
   function generateMaskedAlias(domain) {
     const clean = domain.replace(/^www\./, "").split(".")[0] || "site";
@@ -270,18 +401,15 @@
           }
         }
         const brandSLD = brand.name;
-        if (brandSLD.length >= 4) {
-          const dist = levenshtein(sld, brandSLD);
-          if (dist > 0 && dist <= 2 && Math.abs(sld.length - brandSLD.length) <= 2) {
-            riskScore += 65;
-            targetedLegitDomain = brand.legitDomains[0];
-            const msg = `Typosquatting detected: '${sld}' is a deceptive lookalike of '${brandSLD}' (${brand.legitDomains[0]})`;
-            if (!addedReasons.has(msg)) {
-              addedReasons.add(msg);
-              reasons.push(msg);
-            }
-            break;
+        if (brandSLD.length >= 4 && isTyposquatting(sld, brandSLD)) {
+          riskScore += 65;
+          targetedLegitDomain = brand.legitDomains[0];
+          const msg = `Typosquatting detected: '${sld}' is a deceptive lookalike of '${brandSLD}' (${brand.legitDomains[0]})`;
+          if (!addedReasons.has(msg)) {
+            addedReasons.add(msg);
+            reasons.push(msg);
           }
+          break;
         }
       }
     }
@@ -605,6 +733,14 @@
       registrarName: "Google LLC",
       registrantOrg: "Anthropic PBC",
       hostingProvider: "Cloudflare, Inc. (AS13335)"
+    },
+    "opera.com": {
+      domainAgeDays: 10600,
+      domainAgeYears: 29,
+      registrationDate: "1997-02-14",
+      registrarName: "MarkMonitor Inc.",
+      registrantOrg: "Opera Norway AS",
+      hostingProvider: "Cloudflare / Opera Software"
     }
   };
   async function fetchDomainIntel(hostname) {

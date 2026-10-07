@@ -31,7 +31,13 @@ public final class ThreatDetectorService: Sendable {
         "wellsfargo.com", "citi.com", "coinbase.com", "binance.com",
         "dropbox.com", "slack.com", "notion.so", "figma.com",
         "openai.com", "chatgpt.com", "anthropic.com", "claude.ai", "discord.com",
-        "gemini.com", "youtube.com", "gmail.com", "kloak.app"
+        "gemini.com", "youtube.com", "gmail.com", "kloak.app",
+        "opera.com", "operasoftware.com", "brave.com", "firefox.com", "mozilla.org",
+        "duckduckgo.com", "reddit.com", "linkedin.com", "zoom.us", "adobe.com",
+        "salesforce.com", "wordpress.com", "medium.com", "cloudflare.com",
+        "gitlab.com", "stripe.com", "shopify.com", "ebay.com", "telegram.org",
+        "whatsapp.com", "signal.org", "tiktok.com", "pinterest.com", "twitch.tv",
+        "steamcommunity.com", "steampowered.com", "epicgames.com"
     ]
 
     private let knownBrands: [KnownBrandItem] = [
@@ -53,7 +59,29 @@ public final class ThreatDetectorService: Sendable {
         KnownBrandItem(name: "chase", legitDomains: ["chase.com"]),
         KnownBrandItem(name: "facebook", legitDomains: ["facebook.com", "fb.com", "meta.com"]),
         KnownBrandItem(name: "instagram", legitDomains: ["instagram.com"]),
-        KnownBrandItem(name: "discord", legitDomains: ["discord.com", "discord.gg"])
+        KnownBrandItem(name: "discord", legitDomains: ["discord.com", "discord.gg"]),
+        KnownBrandItem(name: "opera", legitDomains: ["opera.com", "operasoftware.com"]),
+        KnownBrandItem(name: "brave", legitDomains: ["brave.com"]),
+        KnownBrandItem(name: "mozilla", legitDomains: ["mozilla.org", "firefox.com"]),
+        KnownBrandItem(name: "firefox", legitDomains: ["firefox.com", "mozilla.org"]),
+        KnownBrandItem(name: "duckduckgo", legitDomains: ["duckduckgo.com", "ddg.gg"]),
+        KnownBrandItem(name: "reddit", legitDomains: ["reddit.com", "redd.it"]),
+        KnownBrandItem(name: "linkedin", legitDomains: ["linkedin.com"]),
+        KnownBrandItem(name: "zoom", legitDomains: ["zoom.us", "zoom.com"]),
+        KnownBrandItem(name: "adobe", legitDomains: ["adobe.com"]),
+        KnownBrandItem(name: "cloudflare", legitDomains: ["cloudflare.com"]),
+        KnownBrandItem(name: "gitlab", legitDomains: ["gitlab.com"]),
+        KnownBrandItem(name: "stripe", legitDomains: ["stripe.com"]),
+        KnownBrandItem(name: "shopify", legitDomains: ["shopify.com"]),
+        KnownBrandItem(name: "ebay", legitDomains: ["ebay.com"]),
+        KnownBrandItem(name: "telegram", legitDomains: ["telegram.org", "t.me"]),
+        KnownBrandItem(name: "whatsapp", legitDomains: ["whatsapp.com"]),
+        KnownBrandItem(name: "signal", legitDomains: ["signal.org"]),
+        KnownBrandItem(name: "tiktok", legitDomains: ["tiktok.com"]),
+        KnownBrandItem(name: "pinterest", legitDomains: ["pinterest.com"]),
+        KnownBrandItem(name: "twitch", legitDomains: ["twitch.tv"]),
+        KnownBrandItem(name: "steam", legitDomains: ["steampowered.com", "steamcommunity.com"]),
+        KnownBrandItem(name: "epicgames", legitDomains: ["epicgames.com"])
     ]
 
     private let highRiskTLDs: Set<String> = [
@@ -204,18 +232,15 @@ public final class ThreatDetectorService: Sendable {
 
                 // Check C: Typosquatting on SLD
                 let brandSLD = brand.name
-                if brandSLD.count >= 4 {
-                    let distance = levenshteinDistance(sld, brandSLD)
-                    if distance > 0 && distance <= 2 && abs(sld.count - brandSLD.count) <= 2 {
-                        riskScore += 65
-                        targetedLegitDomain = brand.legitDomains.first
-                        let msg = "Typosquatting detected: '\(sld)' is a deceptive lookalike of '\(brandSLD)' (\(brand.legitDomains.first ?? brandSLD))"
-                        if !addedReasons.contains(msg) {
-                            addedReasons.insert(msg)
-                            reasons.append(msg)
-                        }
-                        break
+                if brandSLD.count >= 4 && isTyposquatting(sld: sld, brandSLD: brandSLD) {
+                    riskScore += 65
+                    targetedLegitDomain = brand.legitDomains.first
+                    let msg = "Typosquatting detected: '\(sld)' is a deceptive lookalike of '\(brandSLD)' (\(brand.legitDomains.first ?? brandSLD))"
+                    if !addedReasons.contains(msg) {
+                        addedReasons.insert(msg)
+                        reasons.append(msg)
                     }
+                    break
                 }
             }
         }
@@ -254,27 +279,130 @@ public final class ThreatDetectorService: Sendable {
         return parts.allSatisfy { Int($0) != nil && (0...255).contains(Int($0)!) }
     }
 
-    private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
+    private let qwertyNeighbors: [Character: String] = [
+        "q": "wa12", "w": "qeas23", "e": "wrds34", "r": "etfd45", "t": "rygf56",
+        "y": "tuhg67", "u": "yijh78", "i": "uojk89", "o": "ipkl90", "p": "ol0-",
+        "a": "qwsz", "s": "awedxz", "d": "serfcx", "f": "drtgvc", "g": "ftyhbv",
+        "h": "gyujnb", "j": "huikmn", "k": "jiolm", "l": "kop",
+        "z": "asx", "x": "zsdc", "c": "xdfv", "v": "cfgb", "b": "vghn",
+        "n": "bhjm", "m": "njk"
+    ]
+
+    private func normalizeLookalikes(_ str: String) -> String {
+        var result = str
+        result = result.replacingOccurrences(of: "0", with: "o")
+        result = result.replacingOccurrences(of: "1", with: "l")
+        result = result.replacingOccurrences(of: "3", with: "e")
+        result = result.replacingOccurrences(of: "4", with: "a")
+        result = result.replacingOccurrences(of: "5", with: "s")
+        result = result.replacingOccurrences(of: "8", with: "b")
+        result = result.replacingOccurrences(of: "vv", with: "w")
+        result = result.replacingOccurrences(of: "rn", with: "m")
+        result = result.replacingOccurrences(of: "@", with: "a")
+        return result
+    }
+
+    private func damerauLevenshteinDistance(_ s1: String, _ s2: String) -> Int {
         let a = Array(s1)
         let b = Array(s2)
-        var matrix = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+        let m = a.count
+        let n = b.count
+        var d = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
 
-        for i in 0...a.count { matrix[i][0] = i }
-        for j in 0...b.count { matrix[0][j] = j }
+        for i in 0...m { d[i][0] = i }
+        for j in 0...n { d[0][j] = j }
 
-        for i in 1...a.count {
-            for j in 1...b.count {
-                if a[i - 1] == b[j - 1] {
-                    matrix[i][j] = matrix[i - 1][j - 1]
-                } else {
-                    matrix[i][j] = min(
-                        matrix[i - 1][j] + 1,      // deletion
-                        matrix[i][j - 1] + 1,      // insertion
-                        matrix[i - 1][j - 1] + 1   // substitution
-                    )
+        if m == 0 { return n }
+        if n == 0 { return m }
+
+        for i in 1...m {
+            for j in 1...n {
+                let cost = a[i - 1] == b[j - 1] ? 0 : 1
+                d[i][j] = min(
+                    d[i - 1][j] + 1,       // deletion
+                    d[i][j - 1] + 1,       // insertion
+                    d[i - 1][j - 1] + cost // substitution
+                )
+                if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                    d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1) // transposition
                 }
             }
         }
-        return matrix[a.count][b.count]
+        return d[m][n]
+    }
+
+    private func isSingleSubstitutionTypo(_ s1: String, _ s2: String) -> Bool {
+        if s1.count != s2.count { return false }
+        let a = Array(s1)
+        let b = Array(s2)
+        var diffCount = 0
+        var c1: Character = " "
+        var c2: Character = " "
+
+        for i in 0..<a.count {
+            if a[i] != b[i] {
+                diffCount += 1
+                c1 = a[i]
+                c2 = b[i]
+            }
+        }
+
+        if diffCount != 1 { return false }
+        if let neighbors2 = qwertyNeighbors[c2], neighbors2.contains(c1) {
+            return true
+        }
+        if let neighbors1 = qwertyNeighbors[c1], neighbors1.contains(c2) {
+            return true
+        }
+        return false
+    }
+
+    public func isTyposquatting(sld: String, brandSLD: String) -> Bool {
+        if sld == brandSLD { return false }
+
+        // 1. Homoglyph check (e.g. 0penai, g00gle, paypa1, micros0ft)
+        let normSLD = normalizeLookalikes(sld)
+        let normBrand = normalizeLookalikes(brandSLD)
+        if normSLD == normBrand && sld != brandSLD { return true }
+
+        let dist = damerauLevenshteinDistance(sld, brandSLD)
+        if dist == 0 { return false }
+
+        // 2. Transposition or insertion/deletion (dist == 1)
+        if dist == 1 {
+            if abs(sld.count - brandSLD.count) == 1 {
+                if brandSLD.count <= 4 {
+                    if sld.hasPrefix(brandSLD) || brandSLD.hasPrefix(sld) || sld.hasSuffix(brandSLD) {
+                        return true
+                    }
+                    return false
+                }
+                return true
+            }
+
+            // Adjacent transposition (e.g. opeani, opneai, goolge, payapl)
+            let a = Array(sld)
+            let b = Array(brandSLD)
+            if a.count == b.count {
+                var isTransposition = false
+                for i in 0..<(a.count - 1) {
+                    if a[i] == b[i + 1] && a[i + 1] == b[i] {
+                        isTransposition = true
+                        break
+                    }
+                }
+                if isTransposition { return true }
+            }
+
+            // Single substitution typo (keyboard adjacent)
+            return isSingleSubstitutionTypo(sld, brandSLD)
+        }
+
+        // 3. For long brands (>= 8 chars), allow dist <= 2 if within 25% edit distance
+        if brandSLD.count >= 8 && dist <= 2 && (Double(dist) / Double(brandSLD.count) <= 0.25) {
+            return true
+        }
+
+        return false
     }
 }

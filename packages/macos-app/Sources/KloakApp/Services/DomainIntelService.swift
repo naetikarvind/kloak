@@ -27,7 +27,8 @@ public final class DomainIntelService: Sendable {
         "github.com": (18.0, "2007-10-09", "MarkMonitor Inc.", "GitHub, Inc."),
         "paypal.com": (26.0, "1999-07-15", "CSC Corporate Domains, Inc.", "PayPal, Inc."),
         "openai.com": (8.0, "2016-01-20", "MarkMonitor Inc.", "OpenAI OpCo, LLC"),
-        "anthropic.com": (4.0, "2021-02-04", "Google LLC", "Anthropic PBC")
+        "anthropic.com": (4.0, "2021-02-04", "Google LLC", "Anthropic PBC"),
+        "opera.com": (29.0, "1997-02-14", "MarkMonitor Inc.", "Opera Norway AS")
     ]
 
     private init() {}
