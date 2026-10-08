@@ -55,8 +55,8 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     }
 
     public static func isProcessTrusted() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        let options = ["AXTrustedCheckOptionPrompt": false] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options) || AXIsProcessTrusted()
     }
 
     private init() {
@@ -85,6 +85,10 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
             RemoveEventHandler(h)
             carbonEventHandler = nil
         }
+        if let d = carbonDispatcherHandler {
+            RemoveEventHandler(d)
+            carbonDispatcherHandler = nil
+        }
         if let g = globalEventMonitor { NSEvent.removeMonitor(g); globalEventMonitor = nil }
         if let l = localEventMonitor { NSEvent.removeMonitor(l); localEventMonitor = nil }
         if let m = mouseClickMonitor { NSEvent.removeMonitor(m); mouseClickMonitor = nil }
@@ -104,15 +108,8 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
     }
 
     public func requestAccessibilityPermission() {
-        // Reset any stale TCC cache for com.kloak.app to allow fresh authorization
-        let task = Process()
-        task.launchPath = "/usr/bin/tccutil"
-        task.arguments = ["reset", "Accessibility", "com.kloak.app"]
-        try? task.run()
-        task.waitUntilExit()
-
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        let trusted = AXIsProcessTrustedWithOptions(options) || AXIsProcessTrusted()
         DispatchQueue.main.async {
             self.isAccessibilityTrusted = trusted
         }
@@ -125,46 +122,57 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     // MARK: - Carbon Global HotKey Registration
 
+    private var carbonDispatcherHandler: EventHandlerRef?
+
     private func installCarbonEventHandlerIfNeeded() {
-        guard carbonEventHandler == nil else { return }
+        guard carbonEventHandler == nil && carbonDispatcherHandler == nil else { return }
 
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
 
-        let status = InstallEventHandler(
-            GetApplicationEventTarget(),
-            { (nextHandler: EventHandlerCallRef?, theEvent: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus in
-                guard let theEvent = theEvent else { return noErr }
-                var hkID = EventHotKeyID()
-                let err = GetEventParameter(
-                    theEvent,
-                    EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID),
-                    nil,
-                    MemoryLayout<EventHotKeyID>.size,
-                    nil,
-                    &hkID
-                )
+        let hotKeyCallback: EventHandlerUPP = { (nextHandler: EventHandlerCallRef?, theEvent: EventRef?, userData: UnsafeMutableRawPointer?) -> OSStatus in
+            guard let theEvent = theEvent else { return noErr }
+            var hkID = EventHotKeyID()
+            let err = GetEventParameter(
+                theEvent,
+                EventParamName(kEventParamDirectObject),
+                EventParamType(typeEventHotKeyID),
+                nil,
+                MemoryLayout<EventHotKeyID>.size,
+                nil,
+                &hkID
+            )
 
-                if err == noErr && hkID.signature == OSType(0x4B4C4F41) && (hkID.id == 1 || hkID.id == 2) {
-                    DispatchQueue.main.async {
-                        AccessibilityAutofillService.shared.toggleAutofill()
-                    }
-                    return noErr
+            if err == noErr && hkID.signature == OSType(0x4B4C4F41) && (hkID.id == 1 || hkID.id == 2) {
+                DispatchQueue.main.async {
+                    AccessibilityAutofillService.shared.toggleAutofill()
                 }
-                return CallNextEventHandler(nextHandler, theEvent)
-            },
+                return noErr
+            }
+            return CallNextEventHandler(nextHandler, theEvent)
+        }
+
+        // Install on Event Dispatcher Target (receives global hotkeys from system)
+        _ = InstallEventHandler(
+            GetEventDispatcherTarget(),
+            hotKeyCallback,
+            1,
+            &eventType,
+            nil,
+            &carbonDispatcherHandler
+        )
+
+        // Also install on Application Event Target as fallback
+        _ = InstallEventHandler(
+            GetApplicationEventTarget(),
+            hotKeyCallback,
             1,
             &eventType,
             nil,
             &carbonEventHandler
         )
-
-        if status != noErr {
-            NSLog("[Kloak] Failed to install Carbon event handler: %d", status)
-        }
     }
 
     private func carbonModifiers(from cocoaModifiers: UInt) -> UInt32 {
@@ -174,9 +182,6 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         if flags.contains(.option) { carbonFlags |= UInt32(optionKey) }
         if flags.contains(.control) { carbonFlags |= UInt32(controlKey) }
         if flags.contains(.shift) { carbonFlags |= UInt32(shiftKey) }
-        if carbonFlags == 0 {
-            carbonFlags = UInt32(cmdKey)
-        }
         return carbonFlags
     }
 
@@ -187,10 +192,16 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
         installCarbonEventHandlerIfNeeded()
 
-        let carbonMods = carbonModifiers(from: cachedHotkeyModifiers)
+        var carbonMods = carbonModifiers(from: cachedHotkeyModifiers)
+        // If no modifiers specified on letter/number key, require cmdKey to prevent hijacking typing
+        if carbonMods == 0 && cachedHotkeyKeyCode < 90 {
+            carbonMods = UInt32(cmdKey)
+        }
+
         let hkID = EventHotKeyID(signature: hotKeySignature, id: hotKeyIDNumber)
 
-        let regStatus = RegisterEventHotKey(
+        // Register with GetApplicationEventTarget as primary (Carbon standard for application hotkeys)
+        var regStatus = RegisterEventHotKey(
             UInt32(cachedHotkeyKeyCode),
             carbonMods,
             hkID,
@@ -200,9 +211,21 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         )
 
         if regStatus != noErr {
-            NSLog("[Kloak] Failed to register Carbon hotkey (code: %d, mods: %u, status: %d)", cachedHotkeyKeyCode, carbonMods, regStatus)
-        } else {
+            NSLog("[Kloak] RegisterEventHotKey on ApplicationEventTarget returned %d. Trying Dispatcher target...", regStatus)
+            regStatus = RegisterEventHotKey(
+                UInt32(cachedHotkeyKeyCode),
+                carbonMods,
+                hkID,
+                GetEventDispatcherTarget(),
+                0,
+                &carbonHotKeyRef
+            )
+        }
+
+        if regStatus == noErr {
             NSLog("[Kloak] Successfully registered Carbon system-wide hotkey (code: %d, mods: %u)", cachedHotkeyKeyCode, carbonMods)
+        } else {
+            NSLog("[Kloak] Warning: Carbon hotkey registration failed with status: %d", regStatus)
         }
 
         // On ISO keyboard layouts (e.g. ABC-India / UK), register keycode 10 as alternate backslash
@@ -430,11 +453,50 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
             return
         }
 
+        // Check if accessibility permission is trusted; if not, fallback to copying credentials to clipboard
+        if !Self.isProcessTrusted() {
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            var message = ""
+
+            switch mode {
+            case .all:
+                if let pass = item.password, !pass.isEmpty {
+                    pasteboard.setString(pass, forType: .string)
+                    message = "Password copied to clipboard (Enable Accessibility to auto-type)"
+                } else if let user = item.username, !user.isEmpty {
+                    pasteboard.setString(user, forType: .string)
+                    message = "Username copied to clipboard"
+                }
+            case .usernameOnly:
+                if let user = item.username, !user.isEmpty {
+                    pasteboard.setString(user, forType: .string)
+                    message = "Username copied to clipboard"
+                }
+            case .passwordOnly:
+                if let pass = item.password, !pass.isEmpty {
+                    pasteboard.setString(pass, forType: .string)
+                    message = "Password copied to clipboard"
+                }
+            case .totpOnly:
+                if let secret = item.totpSecret,
+                   let totp = TOTPEngine.shared.generate(secretBase32: secret) {
+                    pasteboard.setString(totp.token, forType: .string)
+                    message = "2FA code \(totp.token) copied to clipboard"
+                }
+            }
+
+            self.showToast(message)
+            hidePanel()
+            targetApp.activate()
+            return
+        }
+
         // Hide panel immediately to restore clear view of the target app
         hidePanel()
 
         // Reactivate target app
-        targetApp.activate(options: [.activateIgnoringOtherApps])
+        targetApp.activate()
 
         // Perform keyboard injection on interactive background thread
         DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.12) { [weak self] in

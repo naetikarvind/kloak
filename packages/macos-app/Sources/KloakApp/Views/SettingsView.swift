@@ -587,7 +587,7 @@ public struct SettingsView: View {
             Label("Accessibility & Native App Autofill", systemImage: "macwindow.and.cursorarrow")
                 .font(.system(size: 14, weight: .bold))
 
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 12) {
                     Circle()
                         .fill(autofillService.isAccessibilityTrusted ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
@@ -599,12 +599,38 @@ public struct SettingsView: View {
 
                     Spacer()
 
-                    if !autofillService.isAccessibilityTrusted {
-                        Button("Grant in Settings") {
-                            autofillService.requestAccessibilityPermission()
+                    HStack(spacing: 6) {
+                        if !autofillService.isAccessibilityTrusted {
+                            Button("Grant in Settings") {
+                                autofillService.requestAccessibilityPermission()
+                            }
+                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: true))
+
+                        Button(action: {
+                            autofillService.checkAccessibilityPermission()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Recheck")
+                            }
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     }
+                }
+
+                if !autofillService.isAccessibilityTrusted {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                            .foregroundColor(LiquidGlassTheme.amberAccent)
+                        Text("If Kloak is already enabled in System Settings > Privacy & Security > Accessibility, toggle it off and on once to refresh system trust, then click Recheck.")
+                            .font(.system(size: 10))
+                            .foregroundColor(LiquidGlassTheme.amberAccent)
+                    }
+                    .padding(8)
+                    .background(LiquidGlassTheme.amberAccent.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
 
                 Text("Enables detection of focused input fields in native desktop apps (Slack, Spotify, Discord, Notion, Steam, Zoom, terminals) and non-extension browsers, displaying a floating overlay to autofill username and password.")
@@ -618,20 +644,20 @@ public struct SettingsView: View {
 
                 Divider().opacity(0.15)
 
-                // Hotkey Definer Section
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
+                // Hotkey Definer Section: Any Key Group Customizer
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Global Autofill Shortcut")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 13, weight: .bold))
                             Text("Trigger autofill popup in any native application or browser window.")
-                                .font(.system(size: 10))
+                                .font(.system(size: 11))
                                 .foregroundColor(.secondary)
                         }
 
                         Spacer()
 
-                        // Interactive Hotkey Display & Record Button
+                        // Record Button
                         Button(action: {
                             if isRecordingHotkey {
                                 stopRecordingHotkey()
@@ -645,25 +671,25 @@ public struct SettingsView: View {
                                         .fill(LiquidGlassTheme.amberAccent)
                                         .frame(width: 8, height: 8)
                                     Text("Press Shortcut Keys…")
-                                        .font(.system(size: 12, weight: .bold))
+                                        .font(.system(size: 11, weight: .bold))
                                         .foregroundColor(LiquidGlassTheme.amberAccent)
                                 } else {
-                                    Image(systemName: "keyboard")
+                                    Image(systemName: "record.circle")
                                         .font(.system(size: 11))
-                                    Text(settings.autofillHotkeyDisplay)
-                                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                                    Text("Record Shortcut")
+                                        .font(.system(size: 11, weight: .semibold))
                                 }
                             }
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(
                                 isRecordingHotkey
-                                    ? LiquidGlassTheme.amberAccent.opacity(0.18)
+                                    ? LiquidGlassTheme.amberAccent.opacity(0.2)
                                     : Color.white.opacity(0.08)
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .clipShape(RoundedRectangle(cornerRadius: 7))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 6)
+                                RoundedRectangle(cornerRadius: 7)
                                     .stroke(
                                         isRecordingHotkey
                                             ? LiquidGlassTheme.amberAccent
@@ -673,14 +699,25 @@ public struct SettingsView: View {
                             )
                         }
                         .buttonStyle(.plain)
+
+                        Button(action: {
+                            AccessibilityAutofillService.shared.triggerAutofill()
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bolt.fill")
+                                Text("Test Overlay")
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     }
 
                     if isRecordingHotkey {
                         HStack(spacing: 8) {
-                            Image(systemName: "info.circle.fill")
-                                .font(.system(size: 11))
+                            Image(systemName: "keyboard.fill")
+                                .font(.system(size: 12))
                                 .foregroundColor(LiquidGlassTheme.amberAccent)
-                            Text("Press any shortcut combination with ⌘, ⌥, ⌃, or ⇧. Press Esc to cancel.")
+                            Text("Press any key combination on your keyboard (e.g. ⌥Space, ⌘\\, ⌃⌥Space, ⌘⇧P). Press Esc to cancel.")
                                 .font(.system(size: 11))
                                 .foregroundColor(LiquidGlassTheme.amberAccent)
                             Spacer()
@@ -690,56 +727,106 @@ public struct SettingsView: View {
                             .buttonStyle(GlassCapsuleButton(isPrimary: false))
                             .font(.system(size: 10))
                         }
-                        .padding(8)
-                        .background(LiquidGlassTheme.amberAccent.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(9)
+                        .background(LiquidGlassTheme.amberAccent.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
                     }
 
-                    // Shortcut Presets & Actions
-                    HStack(spacing: 8) {
-                        Text("PRESETS:")
+                    // Active Shortcut Showcase Card
+                    HStack(spacing: 10) {
+                        Text("ACTIVE SHORTCUT:")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 4) {
+                            if hasModifier(.control) { hotkeyBadge("⌃ Control") }
+                            if hasModifier(.option) { hotkeyBadge("⌥ Option") }
+                            if hasModifier(.shift) { hotkeyBadge("⇧ Shift") }
+                            if hasModifier(.command) { hotkeyBadge("⌘ Command") }
+                            hotkeyBadge(stringForKeyCode(UInt16(settings.autofillHotkeyKeyCode)), isKey: true)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(10)
+                    .background(Color.black.opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    // Step 1: Modifiers / Key Group Selection
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("MODIFIER KEY GROUP (CLICK TO TOGGLE)")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.secondary)
 
-                        // Preset 1: ⌘\ (Default)
-                        Button("⌘\\") {
-                            applyHotkeyPreset(name: "⌘\\", keyCode: 42, modifiers: 1048576)
+                        HStack(spacing: 8) {
+                            modifierPill(label: "Command", symbol: "⌘", flag: .command)
+                            modifierPill(label: "Option", symbol: "⌥", flag: .option)
+                            modifierPill(label: "Control", symbol: "⌃", flag: .control)
+                            modifierPill(label: "Shift", symbol: "⇧", flag: .shift)
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘\\"))
-                        .font(.system(size: 11, design: .monospaced))
+                    }
 
-                        // Preset 2: ⌥⌘\
-                        Button("⌥⌘\\") {
-                            applyHotkeyPreset(name: "⌥⌘\\", keyCode: 42, modifiers: 1572864)
+                    // Step 2: Trigger Key Menu
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("TRIGGER KEY")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 10) {
+                            triggerKeyMenu
+
+                            Text("Selected: \(stringForKeyCode(UInt16(settings.autofillHotkeyKeyCode)))")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌥⌘\\"))
-                        .font(.system(size: 11, design: .monospaced))
+                    }
 
-                        // Preset 3: ⌃⌥Space
-                        Button("⌃⌥Space") {
-                            applyHotkeyPreset(name: "⌃⌥Space", keyCode: 49, modifiers: 786432)
-                        }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌃⌥Space"))
-                        .font(.system(size: 11, design: .monospaced))
+                    // Presets
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("QUICK PRESETS")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary)
 
-                        // Preset 4: ⌘⇧P
-                        Button("⌘⇧P") {
-                            applyHotkeyPreset(name: "⌘⇧P", keyCode: 35, modifiers: 1179648)
-                        }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘⇧P"))
-                        .font(.system(size: 11, design: .monospaced))
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                Button("⌘\\") {
+                                    applyHotkeyPreset(name: "⌘\\", keyCode: 42, modifiers: 1048576)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘\\"))
+                                .font(.system(size: 11, design: .monospaced))
 
-                        Spacer()
+                                Button("⌥⌘\\") {
+                                    applyHotkeyPreset(name: "⌥⌘\\", keyCode: 42, modifiers: 1572864)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌥⌘\\"))
+                                .font(.system(size: 11, design: .monospaced))
 
-                        Button(action: {
-                            AccessibilityAutofillService.shared.triggerAutofill()
-                        }) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "bolt.fill")
-                                Text("Test Overlay")
+                                Button("⌃⌥Space") {
+                                    applyHotkeyPreset(name: "⌃⌥Space", keyCode: 49, modifiers: 786432)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌃⌥Space"))
+                                .font(.system(size: 11, design: .monospaced))
+
+                                Button("⌘⇧P") {
+                                    applyHotkeyPreset(name: "⌘⇧P", keyCode: 35, modifiers: 1179648)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌘⇧P"))
+                                .font(.system(size: 11, design: .monospaced))
+
+                                Button("⌃⌘K") {
+                                    applyHotkeyPreset(name: "⌃⌘K", keyCode: 40, modifiers: 1310720)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌃⌘K"))
+                                .font(.system(size: 11, design: .monospaced))
+
+                                Button("⌥Space") {
+                                    applyHotkeyPreset(name: "⌥Space", keyCode: 49, modifiers: 524288)
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: settings.autofillHotkeyDisplay == "⌥Space"))
+                                .font(.system(size: 11, design: .monospaced))
                             }
+                            .padding(.vertical, 2)
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     }
 
                     if let feedback = hotkeyFeedback {
@@ -750,8 +837,8 @@ public struct SettingsView: View {
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         }
-                        .padding(6)
-                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.1))
+                        .padding(7)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     }
                 }
@@ -1010,7 +1097,188 @@ public struct SettingsView: View {
         }
     }
 
-    // MARK: - Hotkey Recorder Helpers
+    // MARK: - Hotkey Recorder & Customizer Helpers
+
+    private var allKeyChoices: [(category: String, keys: [(name: String, code: Int)])] {
+        [
+            ("Common & Symbols", [
+                ("\\ (Backslash)", 42),
+                ("/ (Slash)", 44),
+                ("Space", 49),
+                ("Return", 36),
+                ("Tab", 48),
+                ("` (Backtick)", 50),
+                ("- (Minus)", 27),
+                ("= (Equal)", 24),
+                ("[ (Left Bracket)", 33),
+                ("] (Right Bracket)", 30),
+                ("; (Semicolon)", 41),
+                ("' (Quote)", 39),
+                (", (Comma)", 43),
+                (". (Period)", 47)
+            ]),
+            ("Letters", [
+                ("A", 0), ("B", 11), ("C", 8), ("D", 2), ("E", 14), ("F", 3),
+                ("G", 5), ("H", 4), ("I", 34), ("J", 38), ("K", 40), ("L", 37),
+                ("M", 46), ("N", 45), ("O", 31), ("P", 35), ("Q", 12), ("R", 15),
+                ("S", 1), ("T", 17), ("U", 32), ("V", 9), ("W", 13), ("X", 7),
+                ("Y", 16), ("Z", 6)
+            ]),
+            ("Numbers", [
+                ("0", 29), ("1", 18), ("2", 19), ("3", 20), ("4", 21),
+                ("5", 23), ("6", 22), ("7", 26), ("8", 28), ("9", 25)
+            ]),
+            ("Function Keys", [
+                ("F1", 122), ("F2", 120), ("F3", 99), ("F4", 118),
+                ("F5", 96), ("F6", 97), ("F7", 98), ("F8", 100),
+                ("F9", 101), ("F10", 109), ("F11", 103), ("F12", 111)
+            ]),
+            ("Arrow Keys", [
+                ("← Left", 123), ("→ Right", 124), ("↓ Down", 125), ("↑ Up", 126)
+            ])
+        ]
+    }
+
+    private func hasModifier(_ flag: NSEvent.ModifierFlags) -> Bool {
+        NSEvent.ModifierFlags(rawValue: settings.autofillHotkeyModifiers).contains(flag)
+    }
+
+    private func toggleModifier(_ flag: NSEvent.ModifierFlags) {
+        var current = NSEvent.ModifierFlags(rawValue: settings.autofillHotkeyModifiers)
+        if current.contains(flag) {
+            current.remove(flag)
+        } else {
+            current.insert(flag)
+        }
+        // If all modifiers removed and keyCode is letter/number/symbol, default back to Command to prevent hijack
+        if current.intersection([.command, .option, .control, .shift]).isEmpty && settings.autofillHotkeyKeyCode < 90 {
+            current.insert(.command)
+        }
+        settings.autofillHotkeyModifiers = current.rawValue
+        let keyStr = stringForKeyCode(UInt16(settings.autofillHotkeyKeyCode))
+        settings.autofillHotkeyDisplay = formatHotkeyDisplay(modifiers: current, keyString: keyStr)
+        onSaveSettings(settings)
+        hotkeyFeedback = "Shortcut updated to \(settings.autofillHotkeyDisplay)"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            hotkeyFeedback = nil
+        }
+    }
+
+    private func selectTriggerKey(keyCode: Int) {
+        settings.autofillHotkeyKeyCode = keyCode
+        var mods = NSEvent.ModifierFlags(rawValue: settings.autofillHotkeyModifiers)
+        if mods.intersection([.command, .option, .control, .shift]).isEmpty && keyCode < 90 {
+            mods.insert(.command)
+            settings.autofillHotkeyModifiers = mods.rawValue
+        }
+        let keyStr = stringForKeyCode(UInt16(keyCode))
+        settings.autofillHotkeyDisplay = formatHotkeyDisplay(modifiers: mods, keyString: keyStr)
+        onSaveSettings(settings)
+        hotkeyFeedback = "Shortcut updated to \(settings.autofillHotkeyDisplay)"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            hotkeyFeedback = nil
+        }
+    }
+
+    @ViewBuilder
+    private func hotkeyBadge(_ text: String, isKey: Bool = false) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .bold, design: .monospaced))
+            .foregroundColor(isKey ? LiquidGlassTheme.primaryAccent : .white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(isKey ? LiquidGlassTheme.primaryAccent.opacity(0.18) : Color.white.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+            .overlay(
+                RoundedRectangle(cornerRadius: 5)
+                    .stroke(isKey ? LiquidGlassTheme.primaryAccent.opacity(0.4) : Color.white.opacity(0.15), lineWidth: 0.75)
+            )
+    }
+
+    @ViewBuilder
+    private func modifierPill(label: String, symbol: String, flag: NSEvent.ModifierFlags) -> some View {
+        let isActive = hasModifier(flag)
+        Button(action: {
+            toggleModifier(flag)
+        }) {
+            HStack(spacing: 5) {
+                Text(symbol)
+                    .font(.system(size: 12, weight: .bold))
+                Text(label)
+                    .font(.system(size: 11, weight: .semibold))
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                isActive
+                    ? LiquidGlassTheme.primaryAccent.opacity(0.25)
+                    : Color.white.opacity(0.05)
+            )
+            .foregroundColor(
+                isActive
+                    ? LiquidGlassTheme.primaryAccent
+                    : Color.white.opacity(0.7)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isActive
+                            ? LiquidGlassTheme.primaryAccent.opacity(0.7)
+                            : Color.white.opacity(0.12),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var triggerKeyMenu: some View {
+        Menu {
+            ForEach(allKeyChoices, id: \.category) { section in
+                Section(header: Text(section.category)) {
+                    ForEach(section.keys, id: \.code) { key in
+                        Button(action: {
+                            selectTriggerKey(keyCode: key.code)
+                        }) {
+                            HStack {
+                                Text(key.name)
+                                if settings.autofillHotkeyKeyCode == key.code {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "keyboard")
+                    .font(.system(size: 11))
+                Text(stringForKeyCode(UInt16(settings.autofillHotkeyKeyCode)))
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.08))
+            .foregroundColor(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            )
+        }
+        .menuStyle(.borderlessButton)
+    }
+
     private func stringForKeyCode(_ keyCode: UInt16) -> String {
         switch keyCode {
         case 0: return "A"
@@ -1065,6 +1333,18 @@ public struct SettingsView: View {
         case 50: return "`"
         case 51: return "Delete"
         case 53: return "Esc"
+        case 96: return "F5"
+        case 97: return "F6"
+        case 98: return "F7"
+        case 99: return "F3"
+        case 100: return "F8"
+        case 101: return "F9"
+        case 103: return "F11"
+        case 109: return "F10"
+        case 111: return "F12"
+        case 118: return "F4"
+        case 120: return "F2"
+        case 122: return "F1"
         case 123: return "←"
         case 124: return "→"
         case 125: return "↓"
@@ -1079,7 +1359,7 @@ public struct SettingsView: View {
         if modifiers.contains(.option) { str += "⌥" }
         if modifiers.contains(.shift) { str += "⇧" }
         if modifiers.contains(.command) { str += "⌘" }
-        return str + keyString
+        return str.isEmpty ? keyString : (str + keyString)
     }
 
     private func startRecordingHotkey() {
@@ -1100,25 +1380,30 @@ public struct SettingsView: View {
                 return nil
             }
 
-            let relevantModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
-            if !relevantModifiers.isEmpty {
-                let keyStr = self.stringForKeyCode(event.keyCode)
-                let display = self.formatHotkeyDisplay(modifiers: relevantModifiers, keyString: keyStr)
-
-                DispatchQueue.main.async {
-                    self.settings.autofillHotkeyKeyCode = Int(event.keyCode)
-                    self.settings.autofillHotkeyModifiers = relevantModifiers.rawValue
-                    self.settings.autofillHotkeyDisplay = display
-                    self.onSaveSettings(self.settings)
-                    self.hotkeyFeedback = "Shortcut set to \(display)"
-                    self.stopRecordingHotkey()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        self.hotkeyFeedback = nil
-                    }
-                }
-                return nil
+            var relevantModifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            // If function key pressed without modifiers, allow it
+            if relevantModifiers.isEmpty && event.keyCode >= 96 && event.keyCode <= 126 {
+                // Function or arrow keys without modifiers are allowed
+            } else if relevantModifiers.isEmpty {
+                // Default to Command if user pressed a key without modifiers
+                relevantModifiers = [.command]
             }
-            return event
+
+            let keyStr = self.stringForKeyCode(event.keyCode)
+            let display = self.formatHotkeyDisplay(modifiers: relevantModifiers, keyString: keyStr)
+
+            DispatchQueue.main.async {
+                self.settings.autofillHotkeyKeyCode = Int(event.keyCode)
+                self.settings.autofillHotkeyModifiers = relevantModifiers.rawValue
+                self.settings.autofillHotkeyDisplay = display
+                self.onSaveSettings(self.settings)
+                self.hotkeyFeedback = "Shortcut set to \(display)"
+                self.stopRecordingHotkey()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    self.hotkeyFeedback = nil
+                }
+            }
+            return nil
         }
     }
 

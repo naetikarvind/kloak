@@ -32,7 +32,7 @@ public final class AccessibilityAutofillPanel: NSPanel {
     public override func cancelOperation(_ sender: Any?) {
         AccessibilityAutofillService.shared.hidePanel()
         if let target = AccessibilityAutofillService.shared.currentTargetApp {
-            target.activate(options: [.activateIgnoringOtherApps])
+            target.activate()
         }
     }
 }
@@ -70,6 +70,7 @@ public final class AccessibilityAutofillPanelManager {
         p.setFrame(panelRect, display: true, animate: false)
         NSApp.activate(ignoringOtherApps: true)
         p.makeKeyAndOrderFront(nil)
+        p.orderFrontRegardless()
     }
 
     public func hide() {
@@ -178,8 +179,6 @@ public struct AccessibilityAutofillPopupView: View {
 
             if !vaultStore.isUnlocked {
                 lockedVaultView
-            } else if !autofillService.isAccessibilityTrusted {
-                accessibilityPermissionView
             } else {
                 searchAndContentView
             }
@@ -201,7 +200,7 @@ public struct AccessibilityAutofillPopupView: View {
         .onExitCommand {
             autofillService.hidePanel()
             if let target = autofillService.currentTargetApp {
-                target.activate(options: [.activateIgnoringOtherApps])
+                target.activate()
             }
         }
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
@@ -307,6 +306,10 @@ public struct AccessibilityAutofillPopupView: View {
             )
             .padding(.horizontal, 12)
             .padding(.top, 8)
+
+            if !autofillService.isAccessibilityTrusted {
+                accessibilityNoticeBanner
+            }
 
             // Items List
             ScrollView {
@@ -505,62 +508,60 @@ public struct AccessibilityAutofillPopupView: View {
         .padding(.vertical, 20)
     }
 
-    // MARK: - Accessibility Permission Required View
+    // MARK: - Accessibility Notice Banner
 
-    private var accessibilityPermissionView: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(LiquidGlassTheme.amberAccent.opacity(0.18))
-                    .frame(width: 44, height: 44)
+    private var accessibilityNoticeBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(LiquidGlassTheme.amberAccent)
+                .font(.system(size: 13))
 
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(LiquidGlassTheme.amberAccent)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Accessibility not active")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                Text("Auto-typing disabled. Click any item to copy.")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
             }
-            .padding(.top, 14)
 
-            Text("Accessibility Permission Required")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(.white)
-
-            Text("To detect active inputs and autofill passwords in Slack, Spotify, Discord, Chrome, and native apps, Kloak requires macOS Accessibility permission.")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 14)
+            Spacer()
 
             Button(action: {
                 autofillService.requestAccessibilityPermission()
             }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: 11))
-                    Text("Grant in Privacy & Security")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(
-                    LinearGradient(
-                        colors: [LiquidGlassTheme.primaryAccent, Color.blue],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .foregroundColor(.white)
-                .clipShape(Capsule())
+                Text("Enable")
+                    .font(.system(size: 10, weight: .bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(LiquidGlassTheme.primaryAccent)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
 
-            Text("After granting, toggle this popup anytime using ⌘\\")
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.secondary.opacity(0.8))
-                .padding(.top, 4)
-
-            Spacer()
+            Button(action: {
+                autofillService.checkAccessibilityPermission()
+            }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.85))
+                    .padding(4)
+                    .background(Color.white.opacity(0.12))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .help("Recheck accessibility status")
         }
-        .padding(16)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(LiquidGlassTheme.amberAccent.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(LiquidGlassTheme.amberAccent.opacity(0.35), lineWidth: 0.8)
+        )
+        .padding(.horizontal, 12)
     }
 
     // MARK: - Locked Vault View
@@ -673,7 +674,7 @@ public struct AccessibilityAutofillPopupView: View {
                 }
                 .font(.system(size: 10, weight: .medium))
             } else {
-                Text("Shortcut: ⌘\\  •  Esc to cancel")
+                Text("Shortcut: \(vaultStore.settings.autofillHotkeyDisplay)  •  Esc to cancel")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(.secondary)
             }

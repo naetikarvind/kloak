@@ -64,10 +64,8 @@ echo ""
 echo "→ Code signing (stable designated requirement)..."
 xattr -cr "$APP_BUNDLE" 2>/dev/null || true
 codesign --force --deep --sign - --requirements '=designated => identifier "com.kloak.app"' "$APP_BUNDLE"
-echo "✓ Signed with stable identifier"
-
-# Clear stale TCC entry to ensure clean authorization
-/usr/bin/tccutil reset Accessibility com.kloak.app 2>/dev/null || true
+codesign --force --deep --sign - --requirements '=designated => identifier "com.kloak.app"' "$BUILT_APP" 2>/dev/null || true
+echo "✓ Signed with stable identifier (preserving macOS Accessibility permissions)"
 
 # ── 4. Verify & Register with LaunchServices ──────────────────────────────────
 echo ""
