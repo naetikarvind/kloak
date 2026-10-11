@@ -586,23 +586,110 @@ public final class KeychainManager: @unchecked Sendable {
     }
 
     public static func readFileContent(at url: URL) throws -> String {
-        let data = try Data(contentsOf: url)
-        if let str = String(data: data, encoding: .utf8) {
-            return stripBOM(str)
+        let isAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
         }
-        if let str = String(data: data, encoding: .isoLatin1) {
-            return stripBOM(str)
+
+        // 1. Read Data
+        let data: Data
+        do {
+            data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        } catch {
+            data = try Data(contentsOf: url)
         }
-        if let str = String(data: data, encoding: .windowsCP1252) {
-            return stripBOM(str)
+
+        // 2. Check for Zip Archive (.1pux, .zip, or PK\x03\x04 zip header)
+        let isZip = (data.count >= 4 && data[0] == 0x50 && data[1] == 0x4B && data[2] == 0x03 && data[3] == 0x04) ||
+                    url.pathExtension.lowercased() == "1pux" ||
+                    url.pathExtension.lowercased() == "zip"
+
+        if isZip {
+            if let unzipped = tryExtractZipContent(data: data) {
+                return stripBOM(unzipped)
+            }
         }
-        if let str = String(data: data, encoding: .macOSRoman) {
-            return stripBOM(str)
+
+        // 3. String Encodings fallback
+        let encodings: [String.Encoding] = [
+            .utf8,
+            .utf16,
+            .utf16LittleEndian,
+            .utf16BigEndian,
+            .windowsCP1252,
+            .isoLatin1,
+            .macOSRoman,
+            .ascii
+        ]
+
+        for enc in encodings {
+            if let str = String(data: data, encoding: enc) {
+                return stripBOM(str)
+            }
         }
-        if let str = String(data: data, encoding: .utf16) {
-            return stripBOM(str)
+
+        throw NSError(domain: "KloakVault", code: 2, userInfo: [
+            NSLocalizedDescriptionKey: "Unable to read password file. Unsupported text encoding or unreadable file format."
+        ])
+    }
+
+    private static func tryExtractZipContent(data: Data) -> String? {
+        let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+        let tempZip = tempDir.appendingPathComponent("kloak_import_\(UUID().uuidString).zip")
+        do {
+            try data.write(to: tempZip)
+        } catch {
+            return nil
         }
-        throw NSError(domain: "KloakVault", code: 2, userInfo: [NSLocalizedDescriptionKey: "Unable to read password file. Unsupported text encoding."])
+        defer {
+            try? FileManager.default.removeItem(at: tempZip)
+        }
+
+        // 1. Try extracting export.data (standard 1Password .1pux file)
+        if let exportData = runUnzip(args: ["-p", tempZip.path, "export.data"]) {
+            let trimmed = exportData.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
+        // 2. Try extracting first file in the archive
+        if let allContent = runUnzip(args: ["-p", tempZip.path]) {
+            let trimmed = allContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
+        return nil
+    }
+
+    private static func runUnzip(args: [String]) -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = args
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 && !outputData.isEmpty {
+                let encodings: [String.Encoding] = [.utf8, .utf16, .windowsCP1252, .isoLatin1]
+                for enc in encodings {
+                    if let str = String(data: outputData, encoding: enc) {
+                        return str
+                    }
+                }
+            }
+        } catch {
+            return nil
+        }
+        return nil
     }
 
     public static func stripBOM(_ str: String) -> String {
@@ -639,45 +726,122 @@ public final class KeychainManager: @unchecked Sendable {
     }
 
     private static func parseJSONExport(_ content: String, filename: String?, provider: CloudProvider?) -> (items: [VaultItem], providerName: String) {
-        guard let data = content.data(using: .utf8),
-              let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
-            return ([], "JSON")
-        }
-
-        var results: [VaultItem] = []
+        var itemDictionaries: [[String: Any]] = []
         var detectedProvider = "Password Manager (JSON)"
 
         let fn = filename?.lowercased() ?? ""
         if fn.contains("bitwarden") { detectedProvider = "Bitwarden" }
-        else if fn.contains("1password") { detectedProvider = "1Password" }
+        else if fn.contains("1password") || fn.contains("1pux") || fn.contains("1pif") { detectedProvider = "1Password" }
         else if fn.contains("proton") { detectedProvider = "Proton Pass" }
         else if let p = provider { detectedProvider = p.displayName }
 
-        var itemDictionaries: [[String: Any]] = []
+        // Attempt 1: Standard JSON Container (Object or Array)
+        if let data = content.data(using: .utf8),
+           let jsonObject = try? JSONSerialization.jsonObject(with: data) {
+            if let dict = jsonObject as? [String: Any] {
+                // 1Password 8: accounts -> vaults -> items
+                if let accounts = dict["accounts"] as? [[String: Any]] {
+                    detectedProvider = "1Password"
+                    for acc in accounts {
+                        if let vaults = acc["vaults"] as? [[String: Any]] {
+                            for v in vaults {
+                                if let vItems = v["items"] as? [[String: Any]] {
+                                    itemDictionaries.append(contentsOf: vItems)
+                                }
+                            }
+                        }
+                    }
+                    if itemDictionaries.isEmpty {
+                        itemDictionaries = accounts
+                    }
+                }
 
-        if let dict = jsonObject as? [String: Any] {
-            if let items = dict["items"] as? [[String: Any]] {
-                itemDictionaries = items
-                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
-            } else if let vaults = dict["vaults"] as? [[String: Any]] {
-                itemDictionaries = vaults
-                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
-            } else if let accounts = dict["accounts"] as? [[String: Any]] {
-                itemDictionaries = accounts
-                if detectedProvider == "Password Manager (JSON)" { detectedProvider = "1Password" }
+                // Bitwarden or 1Password vaults -> items
+                if itemDictionaries.isEmpty, let vaults = dict["vaults"] as? [[String: Any]] {
+                    for v in vaults {
+                        if let vItems = v["items"] as? [[String: Any]] {
+                            itemDictionaries.append(contentsOf: vItems)
+                        }
+                    }
+                    if itemDictionaries.isEmpty {
+                        itemDictionaries = vaults
+                    }
+                    if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
+                }
+
+                // Bitwarden root items
+                if itemDictionaries.isEmpty, let items = dict["items"] as? [[String: Any]] {
+                    itemDictionaries = items
+                    if detectedProvider == "Password Manager (JSON)" { detectedProvider = "Bitwarden" }
+                }
+
+                // Generic "data" array
+                if itemDictionaries.isEmpty, let dataArr = dict["data"] as? [[String: Any]] {
+                    itemDictionaries = dataArr
+                }
+            } else if let array = jsonObject as? [[String: Any]] {
+                itemDictionaries = array
             }
-        } else if let array = jsonObject as? [[String: Any]] {
-            itemDictionaries = array
         }
 
+        // Attempt 2: Newline-Delimited JSON (NDJSON / 1Password .1pif)
+        if itemDictionaries.isEmpty {
+            let lines = content.components(separatedBy: .newlines)
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty, trimmed.hasPrefix("{"), trimmed.hasSuffix("}"),
+                      let lineData = trimmed.data(using: .utf8),
+                      let lineDict = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else {
+                    continue
+                }
+                itemDictionaries.append(lineDict)
+                if lineDict["typeName"] != nil || lineDict["secureContents"] != nil {
+                    detectedProvider = "1Password"
+                }
+            }
+        }
+
+        guard !itemDictionaries.isEmpty else {
+            return ([], "JSON")
+        }
+
+        var results: [VaultItem] = []
+
         for entry in itemDictionaries {
-            let name = (entry["name"] as? String) ?? (entry["title"] as? String) ?? ""
+            // Title extraction: check entry, overview, or secureContents
+            let overview = entry["overview"] as? [String: Any]
+            let details = entry["details"] as? [String: Any]
+            let secureContents = entry["secureContents"] as? [String: Any]
+
+            let rawName = (entry["name"] as? String) ??
+                          (entry["title"] as? String) ??
+                          (overview?["title"] as? String) ??
+                          (secureContents?["title"] as? String) ?? ""
+
             var username = entry["username"] as? String ?? ""
             var password = entry["password"] as? String ?? ""
             var urls: [String] = []
             var totp: String? = (entry["totp"] as? String) ?? (entry["totpSecret"] as? String)
-            let notes = (entry["notes"] as? String) ?? (entry["description"] as? String)
-            let tags: [String] = [detectedProvider, "Imported"]
+            let notes = (entry["notes"] as? String) ??
+                        (entry["description"] as? String) ??
+                        (details?["notesPlain"] as? String) ??
+                        (secureContents?["notesPlain"] as? String)
+            var tags: [String] = [detectedProvider, "Imported"]
+
+            // URLs from overview or entry
+            if let singleUrl = (entry["url"] as? String) ?? (overview?["url"] as? String), !singleUrl.isEmpty {
+                urls.append(singleUrl)
+            }
+            if let urlList = entry["urls"] as? [String] {
+                urls.append(contentsOf: urlList.filter { !$0.isEmpty })
+            }
+            if let overviewUrls = (overview?["urls"] as? [[String: Any]]) ?? (secureContents?["URLs"] as? [[String: Any]]) {
+                for u in overviewUrls {
+                    if let urlStr = (u["u"] as? String) ?? (u["url"] as? String), !urlStr.isEmpty {
+                        urls.append(urlStr)
+                    }
+                }
+            }
 
             // Bitwarden login sub-object
             if let login = entry["login"] as? [String: Any] {
@@ -689,26 +853,44 @@ public final class KeychainManager: @unchecked Sendable {
                 }
             }
 
-            // 1Password fields array
-            if let fields = entry["fields"] as? [[String: Any]] {
-                for f in fields {
-                    let id = (f["id"] as? String)?.lowercased() ?? ""
-                    let designation = (f["designation"] as? String)?.lowercased() ?? ""
-                    let value = f["value"] as? String ?? ""
-                    if designation == "username" || id == "username" || id == "user" {
-                        if username.isEmpty { username = value }
-                    } else if designation == "password" || id == "password" {
-                        if password.isEmpty { password = value }
-                    } else if id.contains("totp") || id.contains("one-time") {
-                        if totp == nil || totp!.isEmpty { totp = value }
+            // Collect all fields from entry["fields"], details["fields"], secureContents["fields"], sections
+            var allFields: [[String: Any]] = []
+            if let f = entry["fields"] as? [[String: Any]] { allFields.append(contentsOf: f) }
+            if let f = details?["fields"] as? [[String: Any]] { allFields.append(contentsOf: f) }
+            if let f = secureContents?["fields"] as? [[String: Any]] { allFields.append(contentsOf: f) }
+            if let sections = details?["sections"] as? [[String: Any]] {
+                for sec in sections {
+                    if let sf = sec["fields"] as? [[String: Any]] {
+                        allFields.append(contentsOf: sf)
                     }
                 }
             }
 
-            if let singleUrl = entry["url"] as? String, !singleUrl.isEmpty {
-                urls.append(singleUrl)
+            for f in allFields {
+                let id = (f["id"] as? String)?.lowercased() ?? ""
+                let designation = (f["designation"] as? String)?.lowercased() ?? ""
+                let nameField = (f["name"] as? String)?.lowercased() ?? ""
+                let typeField = (f["type"] as? String)?.uppercased() ?? ""
+                let value = (f["value"] as? String) ?? ""
+
+                if designation == "username" || id == "username" || id == "user" || nameField == "username" || nameField == "user" {
+                    if username.isEmpty { username = value }
+                } else if designation == "password" || id == "password" || nameField == "password" {
+                    if password.isEmpty { password = value }
+                } else if id.contains("totp") || id.contains("one-time") || nameField.contains("totp") || typeField == "TOTP" || value.lowercased().hasPrefix("otpauth://") {
+                    if totp == nil || totp!.isEmpty { totp = value }
+                }
             }
 
+            // Extract tags
+            if let entryTags = (overview?["tags"] as? [String]) ?? (entry["tags"] as? [String]) {
+                for t in entryTags where !tags.contains(t) {
+                    tags.append(t)
+                }
+            }
+
+            // Type resolution
+            let category = (entry["category"] as? String)?.uppercased() ?? ""
             let itemType: ItemType
             if let typeStr = entry["type"] as? String {
                 itemType = typeStr == "note" || typeStr == "secureNote" ? .secureNote :
@@ -716,11 +898,17 @@ public final class KeychainManager: @unchecked Sendable {
                            typeStr == "alias" ? .emailAlias : .login
             } else if let typeNum = entry["type"] as? Int {
                 itemType = typeNum == 2 ? .secureNote : typeNum == 3 ? .card : .login
+            } else if category == "SECURE_NOTE" {
+                itemType = .secureNote
+            } else if category == "CREDIT_CARD" {
+                itemType = .card
+            } else if category == "IDENTITY" {
+                itemType = .identity
             } else {
                 itemType = .login
             }
 
-            let finalTitle = cleanTitle(name.isEmpty ? (username.isEmpty ? "Imported Credential" : username) : name)
+            let finalTitle = cleanTitle(rawName.isEmpty ? (username.isEmpty ? "Imported Credential" : username) : rawName)
             if !username.isEmpty || !password.isEmpty || !finalTitle.isEmpty {
                 results.append(VaultItem(
                     type: itemType,
@@ -897,7 +1085,24 @@ public final class KeychainManager: @unchecked Sendable {
         return r
     }
 
-    public static func parseRFC4180CSV(_ text: String) -> [[String]] {
+    public static func parseRFC4180CSV(_ text: String, customDelimiter: Character? = nil) -> [[String]] {
+        let delimiter: Character
+        if let custom = customDelimiter {
+            delimiter = custom
+        } else {
+            let firstLine = text.components(separatedBy: .newlines).first ?? ""
+            let commaCount = firstLine.filter { $0 == "," }.count
+            let tabCount = firstLine.filter { $0 == "\t" }.count
+            let semiCount = firstLine.filter { $0 == ";" }.count
+            if tabCount > commaCount && tabCount > semiCount {
+                delimiter = "\t"
+            } else if semiCount > commaCount && semiCount > tabCount {
+                delimiter = ";"
+            } else {
+                delimiter = ","
+            }
+        }
+
         var records: [[String]] = []
         var currentRecord: [String] = []
         var currentField = ""
@@ -929,7 +1134,7 @@ public final class KeychainManager: @unchecked Sendable {
                     inQuotes = true
                     i += 1
                     continue
-                } else if ch == "," {
+                } else if ch == delimiter {
                     currentRecord.append(currentField)
                     currentField = ""
                     i += 1

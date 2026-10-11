@@ -389,18 +389,41 @@ public struct OnboardingAccountConnectSheet: View {
     // MARK: - Handlers
 
     private func handleSelectPasswordFile() {
+        NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.title = "Select \(provider.displayName) Passwords Export"
         panel.prompt = "Import"
-        var allowedTypes: [UTType] = [.commaSeparatedText, .json, .plainText, .data]
-        if let csvType = UTType(filenameExtension: "csv") { allowedTypes.append(csvType) }
-        if let jsonType = UTType(filenameExtension: "json") { allowedTypes.append(jsonType) }
-        panel.allowedContentTypes = allowedTypes
-        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowsOtherFileTypes = true
+
+        var allowedTypes: [UTType] = [
+            .item,
+            .content,
+            .data,
+            .plainText,
+            .commaSeparatedText,
+            .tabSeparatedText,
+            .json,
+            .xml
+        ]
+        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "kloak", "kdbx"]
+        for ext in extensions {
+            if let ut = UTType(filenameExtension: ext) {
+                allowedTypes.append(ut)
+            }
+        }
+        panel.allowedContentTypes = allowedTypes
 
         if panel.runModal() == .OK, let url = panel.url {
+            let isAccessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if isAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
             do {
                 let content = try KeychainManager.readFileContent(at: url)
                 let items = KeychainManager.shared.importFromProviderContent(content, provider: provider)

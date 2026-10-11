@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 public struct ImportExportView: View {
     @Binding var items: [VaultItem]
@@ -169,6 +170,7 @@ public struct ImportExportView: View {
                         overrides: overrides
                     )
                     let resolvedCount = VaultStore.shared.bulkImportWithResolution(toAdd: toAdd, toUpdate: toUpdate)
+                    items = VaultStore.shared.items
                     importStatus = "Imported & resolved \(resolvedCount) items from \(comp.fileName ?? "file")!"
                     pendingComparison = nil
                 },
@@ -201,17 +203,46 @@ public struct ImportExportView: View {
     }
 
     private func selectAndImportFile() {
+        NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
+        panel.title = "Select Password Export File"
+        panel.prompt = "Import File"
+        panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.allowedContentTypes = [.json, .commaSeparatedText, .xml, .plainText]
+        panel.allowsMultipleSelection = false
+        panel.allowsOtherFileTypes = true
+
+        var allowedTypes: [UTType] = [
+            .item,
+            .content,
+            .data,
+            .plainText,
+            .commaSeparatedText,
+            .tabSeparatedText,
+            .json,
+            .xml
+        ]
+        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "kloak", "kdbx"]
+        for ext in extensions {
+            if let ut = UTType(filenameExtension: ext) {
+                allowedTypes.append(ut)
+            }
+        }
+        panel.allowedContentTypes = allowedTypes
 
         if panel.runModal() == .OK, let url = panel.url {
+            let isAccessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if isAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
             do {
                 var (parsedItems, _) = try KeychainManager.shared.importFromFile(url: url)
                 if parsedItems.isEmpty {
-                    let content = try String(contentsOf: url, encoding: .utf8)
+                    let content = try KeychainManager.readFileContent(at: url)
                     let (res, _) = KeychainManager.shared.importFromContent(content, filename: url.lastPathComponent, provider: nil)
                     parsedItems = res
                 }
@@ -234,6 +265,7 @@ public struct ImportExportView: View {
                 } else {
                     // Direct import as all items are new
                     let added = VaultStore.shared.bulkImportWithResolution(toAdd: parsedItems, toUpdate: [])
+                    items = VaultStore.shared.items
                     importStatus = "Successfully imported \(added) new items from \(url.lastPathComponent)!"
                 }
             } catch {

@@ -1146,33 +1146,52 @@ public struct SetupView: View {
     }
 
     private func handleSelectPasswordFile() {
+        NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
         panel.title = "Select Password Export File"
         panel.prompt = "Import File"
-        var allowedTypes: [UTType] = [
-            .commaSeparatedText,
-            .json,
-            .xml,
-            .plainText,
-            .data
-        ]
-        if let csvType = UTType(filenameExtension: "csv") { allowedTypes.append(csvType) }
-        if let jsonType = UTType(filenameExtension: "json") { allowedTypes.append(jsonType) }
-        if let xmlType = UTType(filenameExtension: "xml") { allowedTypes.append(xmlType) }
-        if let p1uxType = UTType(filenameExtension: "1pux") { allowedTypes.append(p1uxType) }
-        if let p1ifType = UTType(filenameExtension: "1pif") { allowedTypes.append(p1ifType) }
-
-        panel.allowedContentTypes = allowedTypes
-        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowsOtherFileTypes = true
+
+        var allowedTypes: [UTType] = [
+            .item,
+            .content,
+            .data,
+            .plainText,
+            .commaSeparatedText,
+            .tabSeparatedText,
+            .json,
+            .xml
+        ]
+        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "kloak", "kdbx"]
+        for ext in extensions {
+            if let ut = UTType(filenameExtension: ext) {
+                allowedTypes.append(ut)
+            }
+        }
+        panel.allowedContentTypes = allowedTypes
 
         if panel.runModal() == .OK, let url = panel.url {
+            let isAccessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if isAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
             handleImportPasswordFile(from: url)
         }
     }
 
     private func handleImportPasswordFile(from url: URL) {
+        let isAccessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if isAccessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
         isImportingFile = true
         defer { isImportingFile = false }
         do {
