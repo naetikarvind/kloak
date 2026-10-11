@@ -421,6 +421,10 @@ public struct PasswordHealthView: View {
                                 }
                             }
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSelectItem?(item.id)
+                        }
 
                         Spacer()
 
@@ -489,6 +493,10 @@ public struct PasswordHealthView: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(LiquidGlassTheme.amberAccent)
                             }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSelectItem?(weakItem.item.id)
                         }
 
                         Spacer()
@@ -599,6 +607,10 @@ public struct PasswordHealthView: View {
                             .padding(.vertical, 2)
                             .background(Color.purple.opacity(0.12))
                             .clipShape(Capsule())
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onSelectItem?(item2fa.item.id)
                         }
 
                         Spacer()

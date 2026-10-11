@@ -131,20 +131,67 @@ public struct VaultMainView: View {
                 }
             )
         case .passwordHealth:
-            PasswordHealthView(
-                items: $items,
-                onSaveItem: onSaveItem,
-                onDeleteItem: { id in handleMoveToTrash(id) },
-                onSelectItem: { id in
-                    selectedItemId = id
-                    selection = .allItems
-                },
-                onEnable2FA: { id in
-                    focus2FAOnItemId = id
-                    selectedItemId = id
-                    selection = .allItems
+            HStack(spacing: 0) {
+                PasswordHealthView(
+                    items: $items,
+                    onSaveItem: onSaveItem,
+                    onDeleteItem: { id in handleMoveToTrash(id) },
+                    onSelectItem: { id in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedItemId = id
+                        }
+                    },
+                    onEnable2FA: { id in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            focus2FAOnItemId = id
+                            selectedItemId = id
+                        }
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if let selId = selectedItemId, let itemBinding = binding(for: selId) {
+                    Divider()
+                        .opacity(0.18)
+
+                    ItemDetailView(
+                        item: itemBinding,
+                        folders: folders,
+                        currentSection: selection,
+                        onSave: { updated in
+                            if let idx = items.firstIndex(where: { $0.id == updated.id }) {
+                                items[idx] = updated
+                                onSaveItem(updated)
+                            }
+                        },
+                        onDelete: { id in
+                            handleMoveToTrash(id)
+                            selectedItemId = nil
+                        },
+                        onRestore: { id in
+                            handleRestoreItem(id)
+                        },
+                        onDeletePermanently: { id in
+                            handleDeletePermanently(id)
+                            selectedItemId = nil
+                        },
+                        onClose: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedItemId = nil
+                                focus2FAOnItemId = nil
+                            }
+                        },
+                        startIn2FAEdit: focus2FAOnItemId == selId,
+                        onDidFocus2FA: {
+                            focus2FAOnItemId = nil
+                        }
+                    )
+                    .id(selId)
+                    .frame(minWidth: 320, idealWidth: 360, maxWidth: 420)
+                    .background(Color.black.opacity(0.12))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
-            )
+            }
         case .generator:
             GeneratorView()
         case .importExport:
@@ -344,11 +391,8 @@ public struct VaultMainView: View {
             LogoService.shared.prefetchLogos(for: items)
         }
         .onChange(of: selection) { _, newSel in
-            if let focusId = focus2FAOnItemId {
-                selectedItemId = focusId
-            } else {
-                selectedItemId = nil
-            }
+            selectedItemId = nil
+            focus2FAOnItemId = nil
             searchText = ""
             triggerWindowResize(for: newSel, animated: true)
         }

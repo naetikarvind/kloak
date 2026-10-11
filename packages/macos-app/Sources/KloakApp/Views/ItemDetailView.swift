@@ -8,8 +8,33 @@ public struct ItemDetailView: View {
     var onDelete: (String) -> Void
     var onRestore: ((String) -> Void)? = nil
     var onDeletePermanently: ((String) -> Void)? = nil
+    var onClose: (() -> Void)? = nil
     var startIn2FAEdit: Bool = false
     var onDidFocus2FA: (() -> Void)? = nil
+
+    public init(
+        item: Binding<VaultItem>,
+        folders: [VaultFolder] = [],
+        currentSection: NavigationSection = .allItems,
+        onSave: @escaping (VaultItem) -> Void,
+        onDelete: @escaping (String) -> Void,
+        onRestore: ((String) -> Void)? = nil,
+        onDeletePermanently: ((String) -> Void)? = nil,
+        onClose: (() -> Void)? = nil,
+        startIn2FAEdit: Bool = false,
+        onDidFocus2FA: (() -> Void)? = nil
+    ) {
+        self._item = item
+        self.folders = folders
+        self.currentSection = currentSection
+        self.onSave = onSave
+        self.onDelete = onDelete
+        self.onRestore = onRestore
+        self.onDeletePermanently = onDeletePermanently
+        self.onClose = onClose
+        self.startIn2FAEdit = startIn2FAEdit
+        self.onDidFocus2FA = onDidFocus2FA
+    }
 
     private enum DetailFocusField: Hashable {
         case title
@@ -245,6 +270,19 @@ public struct ItemDetailView: View {
                                 .shadow(color: LiquidGlassTheme.primaryAccent.opacity(0.4), radius: 6, x: 0, y: 2)
                             }
                             .buttonStyle(.plain)
+
+                            if let onClose = onClose {
+                                Button(action: onClose) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 26, height: 26)
+                                        .background(Color.white.opacity(0.08))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Close Details")
+                            }
                         }
                         .fixedSize()
                     } else {
@@ -284,6 +322,19 @@ public struct ItemDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .help(item.favorite ? "Remove from Favorites" : "Add to Favorites")
+
+                            if let onClose = onClose {
+                                Button(action: onClose) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 28, height: 28)
+                                        .background(Color.white.opacity(0.08))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .help("Close Details")
+                            }
                         }
                         .fixedSize()
                     }
