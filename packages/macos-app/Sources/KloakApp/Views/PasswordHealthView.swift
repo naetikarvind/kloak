@@ -5,6 +5,7 @@ public struct PasswordHealthView: View {
     var onSaveItem: ((VaultItem) -> Void)?
     var onDeleteItem: ((String) -> Void)?   // called with item ID to delete (soft-delete)
     var onSelectItem: ((String) -> Void)?
+    var onEnable2FA: ((String) -> Void)? = nil
 
     @ObservedObject private var vaultStore = VaultStore.shared
 
@@ -606,18 +607,23 @@ public struct PasswordHealthView: View {
                         if let setupUrl = item2fa.setupUrl, let url = URL(string: setupUrl) {
                             Button(action: {
                                 NSWorkspace.shared.open(url)
+                                onEnable2FA?(item2fa.item.id)
                             }) {
                                 Label("Enable 2FA", systemImage: "arrow.up.right.square.fill")
                             }
                             .buttonStyle(GlassCapsuleButton(isPrimary: true))
                         } else {
-                            HStack(spacing: 4) {
-                                Image(systemName: "shield.slash")
-                                    .font(.system(size: 10))
-                                Text("No 2FA")
-                                    .font(.system(size: 11, weight: .medium))
+                            Button(action: {
+                                onEnable2FA?(item2fa.item.id)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "shield.slash")
+                                        .font(.system(size: 10))
+                                    Text("Add 2FA")
+                                        .font(.system(size: 11, weight: .medium))
+                                }
                             }
-                            .foregroundColor(.secondary)
+                            .buttonStyle(GlassCapsuleButton(isPrimary: false))
                         }
                     }
                     .padding(10)

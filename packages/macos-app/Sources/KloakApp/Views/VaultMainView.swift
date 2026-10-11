@@ -15,6 +15,7 @@ public struct VaultMainView: View {
 
     @State private var selection: NavigationSection = .allItems
     @State private var selectedItemId: String? = nil
+    @State private var focus2FAOnItemId: String? = nil
     @State private var searchText: String = ""
     @State private var isShowingNewItemSheet: Bool = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -135,6 +136,11 @@ public struct VaultMainView: View {
                 onSaveItem: onSaveItem,
                 onDeleteItem: { id in handleMoveToTrash(id) },
                 onSelectItem: { id in
+                    selectedItemId = id
+                    selection = .allItems
+                },
+                onEnable2FA: { id in
+                    focus2FAOnItemId = id
                     selectedItemId = id
                     selection = .allItems
                 }
@@ -293,6 +299,10 @@ public struct VaultMainView: View {
                                     },
                                     onDeletePermanently: { id in
                                         handleDeletePermanently(id)
+                                    },
+                                    startIn2FAEdit: focus2FAOnItemId == selId,
+                                    onDidFocus2FA: {
+                                        focus2FAOnItemId = nil
                                     }
                                 )
                                 .id(selId)
@@ -334,7 +344,11 @@ public struct VaultMainView: View {
             LogoService.shared.prefetchLogos(for: items)
         }
         .onChange(of: selection) { _, newSel in
-            selectedItemId = nil
+            if let focusId = focus2FAOnItemId {
+                selectedItemId = focusId
+            } else {
+                selectedItemId = nil
+            }
             searchText = ""
             triggerWindowResize(for: newSel, animated: true)
         }

@@ -8,6 +8,18 @@ public struct ItemDetailView: View {
     var onDelete: (String) -> Void
     var onRestore: ((String) -> Void)? = nil
     var onDeletePermanently: ((String) -> Void)? = nil
+    var startIn2FAEdit: Bool = false
+    var onDidFocus2FA: (() -> Void)? = nil
+
+    private enum DetailFocusField: Hashable {
+        case title
+        case username
+        case password
+        case totpSecret
+        case notes
+    }
+
+    @FocusState private var focusedField: DetailFocusField?
 
     private var shouldShowTypeBadge: Bool {
         if case .category(let selectedCategory) = currentSection {
@@ -75,7 +87,8 @@ public struct ItemDetailView: View {
     @State private var editAuthPeriod: Int = 30
 
     public var body: some View {
-        ScrollView {
+        ScrollViewReader { scrollProxy in
+            ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 // Trash Warning Banner
                 if item.trashed || currentSection == .trash {
@@ -526,10 +539,33 @@ public struct ItemDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .animation(.easeInOut(duration: 0.22), value: item.id)
-        .onChange(of: item.id) {
-            isEditing = false
+        .onAppear {
+            if startIn2FAEdit {
+                trigger2FAFocus(proxy: scrollProxy)
+            }
+        }
+        .onChange(of: startIn2FAEdit) { _, shouldFocus in
+            if shouldFocus {
+                trigger2FAFocus(proxy: scrollProxy)
+            }
+        }
+        .onChange(of: item.id) { _, _ in
+            if !startIn2FAEdit {
+                isEditing = false
+            } else {
+                trigger2FAFocus(proxy: scrollProxy)
+            }
+        }
+        .onChange(of: editTotpSecret) { _, newValue in
+            if newValue.lowercased().hasPrefix("otpauth://") || newValue.contains("secret=") {
+                let extracted = TOTPEngine.shared.extractSecret(from: newValue).secret
+                if !extracted.isEmpty && extracted != newValue {
+                    editTotpSecret = extracted
+                }
+            }
         }
     }
+}
 
     // MARK: - Login View & Edit Sections
 
@@ -904,11 +940,17 @@ public struct ItemDetailView: View {
                 TextField("Base32 Key (e.g. JBSWY3DPEHPK3PXP)", text: $editTotpSecret)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12, design: .monospaced))
+                    .focused($focusedField, equals: .totpSecret)
             }
             .padding(10)
             .background(Color.black.opacity(0.3))
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(focusedField == .totpSecret ? LiquidGlassTheme.primaryAccent : Color.clear, lineWidth: 1.5)
+            )
         }
+        .id("authenticator_field")
     }
 
     // MARK: - Payment Card View & Edit Sections
@@ -1389,8 +1431,19 @@ public struct ItemDetailView: View {
 
         VStack(alignment: .leading, spacing: 4) {
             Text("SECRET KEY (BASE32 OR OTPAUTH://)").font(.system(size: 10, weight: .bold)).foregroundColor(.secondary)
-            TextField("JBSWY3DPEHPK3PXP", text: $editTotpSecret).textFieldStyle(.plain).font(.system(size: 12, design: .monospaced)).padding(8).background(Color.black.opacity(0.3)).clipShape(RoundedRectangle(cornerRadius: 6))
+            TextField("JBSWY3DPEHPK3PXP", text: $editTotpSecret)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .monospaced))
+                .focused($focusedField, equals: .totpSecret)
+                .padding(8)
+                .background(Color.black.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(focusedField == .totpSecret ? LiquidGlassTheme.primaryAccent : Color.clear, lineWidth: 1.5)
+                )
         }
+        .id("authenticator_field")
 
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -1528,7 +1581,22 @@ public struct ItemDetailView: View {
         }
     }
 
+    private func trigger2FAFocus(proxy: ScrollViewProxy) {
+        startEditing()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo("authenticator_field", anchor: .center)
+            }
+            focusedField = .totpSecret
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            focusedField = .totpSecret
+            onDidFocus2FA?()
+        }
+    }
+
     private func cancelEditing() {
+        focusedField = nil
         withAnimation(.easeInOut(duration: 0.22)) {
             isEditing = false
         }
@@ -1547,8 +1615,8 @@ public struct ItemDetailView: View {
             updated.username = trimmedUser.isEmpty ? nil : trimmedUser
             updated.password = editPassword.isEmpty ? nil : editPassword
             updated.urls = editUrls.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
-            let trimmedTotp = editTotpSecret.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: " ", with: "")
-            updated.totpSecret = trimmedTotp.isEmpty ? nil : trimmedTotp
+            let extractedTotp = TOTPEngine.shared.extractSecret(from: editTotpSecret).secret
+            updated.totpSecret = extractedTotp.isEmpty ? nil : extractedTotp
 
         case .card:
             updated.username = editCardholderName.isEmpty ? nil : editCardholderName
@@ -1590,8 +1658,8 @@ public struct ItemDetailView: View {
             )
 
         case .authenticator:
-            let trimmedTotp = editTotpSecret.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: " ", with: "")
-            updated.totpSecret = trimmedTotp.isEmpty ? nil : trimmedTotp
+            let extractedTotp = TOTPEngine.shared.extractSecret(from: editTotpSecret).secret
+            updated.totpSecret = extractedTotp.isEmpty ? nil : extractedTotp
             updated.username = editAuthIssuer.isEmpty ? nil : editAuthIssuer
             updated.authenticatorDetails = AuthenticatorDetails(
                 issuer: editAuthIssuer.isEmpty ? nil : editAuthIssuer,
@@ -1620,6 +1688,7 @@ public struct ItemDetailView: View {
         withAnimation(.easeInOut(duration: 0.22)) {
             isEditing = false
         }
+        focusedField = nil
     }
 
     private func generatePassword() {
