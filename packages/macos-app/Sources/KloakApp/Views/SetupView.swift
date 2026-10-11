@@ -1229,13 +1229,38 @@ public struct SetupView: View {
                 fileURL = url
             } else if let data = item as? Data, let url = URL(dataRepresentation: data, relativeTo: nil) {
                 fileURL = url
-            } else if let str = item as? String, let url = URL(string: str) {
-                fileURL = url
+            } else if let str = item as? String {
+                if str.hasPrefix("file://") {
+                    fileURL = URL(string: str)
+                } else {
+                    fileURL = URL(fileURLWithPath: str)
+                }
             }
 
             if let url = fileURL {
+                let isAccessing = url.startAccessingSecurityScopedResource()
+                defer {
+                    if isAccessing {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                // Copy to temp directory while drag session access is live
+                let tempDir = URL(fileURLWithPath: NSTemporaryDirectory())
+                let tempFile = tempDir.appendingPathComponent("dropped_\(UUID().uuidString)_\(url.lastPathComponent)")
+                let targetURL: URL
+                do {
+                    if FileManager.default.fileExists(atPath: tempFile.path) {
+                        try? FileManager.default.removeItem(at: tempFile)
+                    }
+                    try FileManager.default.copyItem(at: url, to: tempFile)
+                    targetURL = tempFile
+                } catch {
+                    targetURL = url
+                }
+
                 DispatchQueue.main.async {
-                    self.handleImportPasswordFile(from: url)
+                    self.handleImportPasswordFile(from: targetURL)
                 }
             }
         }

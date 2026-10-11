@@ -593,12 +593,60 @@ public final class KeychainManager: @unchecked Sendable {
             }
         }
 
-        // 1. Read Data
+        // 1. Read Data via NSFileCoordinator (required for cloud storage like Google Drive, OneDrive, iCloud)
+        var coordinatedData: Data?
+        var coordError: NSError?
+        let coordinator = NSFileCoordinator()
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordError) { coordinatedURL in
+            do {
+                coordinatedData = try Data(contentsOf: coordinatedURL)
+            } catch {
+                coordinatedData = try? Data(contentsOf: coordinatedURL, options: [])
+            }
+        }
+
         let data: Data
-        do {
-            data = try Data(contentsOf: url, options: [.mappedIfSafe])
-        } catch {
-            data = try Data(contentsOf: url)
+        if let d = coordinatedData {
+            data = d
+        } else {
+            // Check if coordination failed due to an offline or un-downloaded cloud file
+            if let ce = coordError {
+                let reason = ce.userInfo[NSLocalizedFailureReasonErrorKey] as? String
+                          ?? ce.userInfo[NSLocalizedDescriptionKey] as? String
+                if let r = reason, !r.isEmpty {
+                    throw NSError(domain: "KloakVault", code: 256, userInfo: [
+                        NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” is stored in cloud storage: \(r)"
+                    ])
+                }
+            }
+
+            // Check if file is dataless / cloud-only on APFS
+            var statBuf = stat()
+            let isDataless = (stat(url.path, &statBuf) == 0) && ((statBuf.st_flags & 0x40000000) != 0)
+            if isDataless || url.path.contains("/Library/CloudStorage/") {
+                let providerName: String
+                if url.path.contains("GoogleDrive") { providerName = "Google Drive" }
+                else if url.path.contains("OneDrive") { providerName = "OneDrive" }
+                else if url.path.contains("ProtonDrive") { providerName = "Proton Drive" }
+                else if url.path.contains("Dropbox") { providerName = "Dropbox" }
+                else if url.path.contains("Mobile Documents") { providerName = "iCloud Drive" }
+                else { providerName = "cloud storage" }
+
+                throw NSError(domain: "KloakVault", code: 256, userInfo: [
+                    NSLocalizedDescriptionKey: "“\(url.lastPathComponent)” is stored online in \(providerName) and is not downloaded to your Mac. Please launch \(providerName) to sync this file, or download it to your Downloads folder first."
+                ])
+            }
+
+            // Direct read fallback
+            if let directData = try? Data(contentsOf: url) {
+                data = directData
+            } else if let posixData = tryReadViaPOSIX(at: url) {
+                data = posixData
+            } else {
+                throw NSError(domain: "KloakVault", code: 256, userInfo: [
+                    NSLocalizedDescriptionKey: "The file “\(url.lastPathComponent)” couldn’t be opened. Please verify the file is downloaded and readable."
+                ])
+            }
         }
 
         // 2. Check for Zip Archive (.1pux, .zip, or PK\x03\x04 zip header)
@@ -690,6 +738,26 @@ public final class KeychainManager: @unchecked Sendable {
             return nil
         }
         return nil
+    }
+
+    private static func tryReadViaPOSIX(at url: URL) -> Data? {
+        let fd = open(url.path, O_RDONLY)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+
+        var result = Data()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while true {
+            let bytesRead = read(fd, &buffer, buffer.count)
+            if bytesRead > 0 {
+                result.append(buffer, count: bytesRead)
+            } else if bytesRead == 0 {
+                break
+            } else {
+                return nil
+            }
+        }
+        return result.isEmpty ? nil : result
     }
 
     public static func stripBOM(_ str: String) -> String {
