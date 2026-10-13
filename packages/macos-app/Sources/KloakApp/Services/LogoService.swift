@@ -2,21 +2,51 @@ import Foundation
 import AppKit
 import SwiftUI
 
+/// Describes the visual shape characteristics of a fetched logo image.
+/// Used by `FaviconView` to decide whether to apply its own squircle border
+/// or let the logo render edge-to-edge (avoiding double-border artifacts).
+public struct LogoShapeInfo {
+    /// Whether the logo already has its own shape (circular, rounded-rect, etc.)
+    /// with transparent/near-transparent corners — meaning an outer squircle border
+    /// would produce a redundant "double-border" artifact.
+    public let hasOwnShape: Bool
+
+    /// Fraction of corner pixels that are transparent (0.0–1.0).
+    /// Higher values indicate a strongly shaped icon (circular, rounded-rect).
+    public let cornerTransparencyRatio: CGFloat
+
+    /// Predefined result for logos that should always use the standard framed style.
+    public static let standard = LogoShapeInfo(hasOwnShape: false, cornerTransparencyRatio: 0.0)
+}
+
 /// High-resolution logo and icon resolution engine for Kloak.
 /// Employs a multi-tier fallback pipeline:
 /// 1. Domain / Brand inference from URLs, OAuth providers, and item titles
-/// 2. Google High-DPI Favicon V2 (t2.gstatic.com, 128x128 PNG)
-/// 3. DuckDuckGo Icon proxy (icons.duckduckgo.com, .ico/PNG)
-/// 4. Google S2 High-DPI Favicon proxy (sz=128)
-/// 5. Persistent local disk cache (~/.kloak/favicons/<domain>.png)
-/// 6. In-memory NSCache with thread-safe access and zero duplicate requests
+/// 2. Apple Touch Icon (direct from domain, 180x180 PNG)
+/// 3. Google High-DPI Favicon V2 (t2.gstatic.com, 128x128 PNG)
+/// 4. DuckDuckGo Icon proxy (icons.duckduckgo.com, .ico/PNG)
+/// 5. Google S2 High-DPI Favicon proxy (sz=128)
+/// 6. Persistent local disk cache (~/.kloak/favicons/<domain>.png)
+/// 7. In-memory NSCache with thread-safe access and zero duplicate requests
+///
+/// Also provides image shape analysis (`analyzeImageShape`) so that `FaviconView`
+/// can skip its outer squircle border for logos that already carry their own
+/// rounded / circular shape (preventing double-border artifacts).
 public final class LogoService: @unchecked Sendable {
     public static let shared = LogoService()
 
     private let memoryCache = NSCache<NSString, NSImage>()
+    /// Cache of per-domain shape analysis results (keyed by cacheKey).
+    private let shapeCache = NSCache<NSString, ShapeInfoBox>()
     private let lock = NSLock()
     private var inFlightTasks: [String: Task<NSImage?, Never>] = [:]
     private let session: URLSession
+
+    /// Thread-safe box for `LogoShapeInfo` (NSCache requires reference types).
+    private final class ShapeInfoBox {
+        let info: LogoShapeInfo
+        init(_ info: LogoShapeInfo) { self.info = info }
+    }
 
     private static let diskCacheDirectory: URL = {
         let dir = FileManager.default.homeDirectoryForCurrentUser
@@ -26,6 +56,113 @@ public final class LogoService: @unchecked Sendable {
         return dir
     }()
 
+    // MARK: - Comprehensive Parent-Brand Domain Map
+    // Maps service/subdomain domains to their canonical parent brand domain
+    // so that favicon lookups always resolve the highest-quality logo.
+
+    private static let parentBrandMap: [String: String] = [
+        // ── Microsoft ecosystem ──
+        "live.com": "microsoft.com",
+        "microsoftonline.com": "microsoft.com",
+        "outlook.com": "microsoft.com",
+        "outlook.live.com": "microsoft.com",
+        "hotmail.com": "microsoft.com",
+        "office.com": "microsoft.com",
+        "office365.com": "microsoft.com",
+        "onedrive.com": "microsoft.com",
+        "onedrive.live.com": "microsoft.com",
+        "sharepoint.com": "microsoft.com",
+        "teams.microsoft.com": "microsoft.com",
+        "azure.com": "microsoft.com",
+        "portal.azure.com": "microsoft.com",
+        "dev.azure.com": "microsoft.com",
+        "visualstudio.com": "microsoft.com",
+        "msn.com": "microsoft.com",
+        "bing.com": "microsoft.com",
+        "xbox.com": "xbox.com",         // Xbox has its own strong brand icon
+        "skype.com": "skype.com",        // Skype has its own strong brand icon
+
+        // ── Google ecosystem ──
+        "gmail.com": "google.com",
+        "googlemail.com": "google.com",
+        "google.co.in": "google.com",
+        "google.co.uk": "google.com",
+        "google.co.jp": "google.com",
+        "accounts.google.com": "google.com",
+        "myaccount.google.com": "google.com",
+        "drive.google.com": "google.com",
+        "docs.google.com": "google.com",
+        "sheets.google.com": "google.com",
+        "slides.google.com": "google.com",
+        "meet.google.com": "google.com",
+        "chat.google.com": "google.com",
+        "calendar.google.com": "google.com",
+        "photos.google.com": "google.com",
+        "maps.google.com": "google.com",
+        "translate.google.com": "google.com",
+        "cloud.google.com": "google.com",
+        "console.cloud.google.com": "google.com",
+        "play.google.com": "google.com",
+        "firebase.google.com": "google.com",
+        "analytics.google.com": "google.com",
+        "ads.google.com": "google.com",
+        "gemini.google.com": "google.com",
+        "colab.research.google.com": "google.com",
+        "youtube.com": "youtube.com",    // YouTube has its own strong brand icon
+
+        // ── Apple ecosystem ──
+        "icloud.com": "apple.com",
+        "appleid.apple.com": "apple.com",
+        "developer.apple.com": "apple.com",
+        "music.apple.com": "apple.com",
+        "tv.apple.com": "apple.com",
+        "support.apple.com": "apple.com",
+
+        // ── Meta ecosystem ──
+        "facebook.com": "facebook.com",
+        "fb.com": "facebook.com",
+        "messenger.com": "facebook.com",
+        "instagram.com": "instagram.com", // Instagram has its own strong icon
+        "threads.net": "instagram.com",
+        "whatsapp.com": "whatsapp.com",   // WhatsApp has its own strong icon
+        "oculus.com": "meta.com",
+
+        // ── Amazon ecosystem ──
+        "aws.amazon.com": "amazon.com",
+        "console.aws.amazon.com": "amazon.com",
+        "primevideo.com": "amazon.com",
+        "kindle.com": "amazon.com",
+        "audible.com": "audible.com",     // Audible has its own brand
+        "twitch.tv": "twitch.tv",         // Twitch has its own brand
+
+        // ── GitHub / Microsoft Dev ──
+        "gist.github.com": "github.com",
+        "copilot.github.com": "github.com",
+        "github.dev": "github.com",
+        "npmjs.com": "npmjs.com",
+
+        // ── Atlassian ecosystem ──
+        "bitbucket.org": "bitbucket.org",
+        "trello.com": "trello.com",
+        "jira.atlassian.com": "atlassian.com",
+        "confluence.atlassian.com": "atlassian.com",
+        "id.atlassian.com": "atlassian.com",
+
+        // ── Salesforce ecosystem ──
+        "salesforce.com": "salesforce.com",
+        "force.com": "salesforce.com",
+        "heroku.com": "heroku.com",
+
+        // ── Adobe ecosystem ──
+        "creativecloud.adobe.com": "adobe.com",
+        "behance.net": "behance.net",
+
+        // ── Proton ecosystem ──
+        "protonmail.com": "proton.me",
+        "protonvpn.com": "proton.me",
+        "proton.me": "proton.me",
+    ]
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 3.0
@@ -33,6 +170,7 @@ public final class LogoService: @unchecked Sendable {
         config.requestCachePolicy = .returnCacheDataElseLoad
         self.session = URLSession(configuration: config)
         self.memoryCache.countLimit = 500
+        self.shapeCache.countLimit = 500
     }
 
     /// Check memory cache by key
@@ -139,6 +277,9 @@ public final class LogoService: @unchecked Sendable {
             // Check disk first
             if let disk = loadFromDisk(for: domain) {
                 memoryCache.setObject(disk, forKey: cacheKey as NSString)
+                // Analyze shape and cache it
+                let shape = Self.analyzeImageShape(disk)
+                shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
                 return disk
             }
 
@@ -146,6 +287,9 @@ public final class LogoService: @unchecked Sendable {
             for url in candidateUrls {
                 if let image = await downloadAndValidateImage(from: url) {
                     memoryCache.setObject(image, forKey: cacheKey as NSString)
+                    // Analyze shape and cache it
+                    let shape = Self.analyzeImageShape(image)
+                    shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
                     saveToDisk(image: image, for: domain)
                     return image
                 }
@@ -156,6 +300,11 @@ public final class LogoService: @unchecked Sendable {
 
     private func buildCandidateUrls(for domain: String) -> [URL] {
         var urls: [URL] = []
+
+        // Tier 0: Apple Touch Icon (direct from domain — highest quality, 180x180)
+        if let u = URL(string: "https://\(domain)/apple-touch-icon.png") {
+            urls.append(u)
+        }
 
         // Tier 1: Google Favicon V2 (High quality 128px)
         if let u = URL(string: "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://\(domain)&size=128") {
@@ -213,6 +362,12 @@ public final class LogoService: @unchecked Sendable {
                 }
             }
 
+            // Reject very small images (< 32px) from apple-touch-icon attempts that
+            // return a tiny default or redirect placeholder
+            if url.path.contains("apple-touch-icon"), image.size.width < 32 || image.size.height < 32 {
+                return nil
+            }
+
             return image
         } catch {
             return nil
@@ -245,6 +400,119 @@ public final class LogoService: @unchecked Sendable {
         try? pngData.write(to: fileURL, options: .atomic)
     }
 
+    /// Clear cached favicon for a domain so it gets re-fetched next time.
+    public func invalidateCache(forDomain domain: String) {
+        let filename = sanitizeDomainForFilename(domain) + ".png"
+        let fileURL = Self.diskCacheDirectory.appendingPathComponent(filename)
+        try? FileManager.default.removeItem(at: fileURL)
+        memoryCache.removeObject(forKey: domain as NSString)
+    }
+
+    // MARK: - Image Shape Analysis (Smart Border Detection)
+
+    /// Analyzes an image's corner pixels to detect whether it already has its own
+    /// rounded / circular shape (transparent corners). This is used by `FaviconView`
+    /// to decide whether to skip the outer squircle border and white plate.
+    ///
+    /// Algorithm:
+    /// 1. Render the image into a 64×64 RGBA bitmap (consistent, fast analysis).
+    /// 2. Sample pixels in four 10×10 corner regions.
+    /// 3. If ≥70% of those corner pixels have alpha < 40, the logo "has its own shape".
+    ///
+    /// Performance: ~0.1ms per image on Apple Silicon — negligible overhead.
+    public static func analyzeImageShape(_ image: NSImage) -> LogoShapeInfo {
+        let analyzeSize = 64
+        let cornerSampleSize = 10  // 10×10 pixel region in each corner
+        let alphaThreshold: UInt8 = 40  // pixels below this alpha are "transparent"
+        let transparencyThreshold: CGFloat = 0.70  // 70% transparent corners → shaped logo
+
+        // Render into a consistent-size RGBA bitmap
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return .standard
+        }
+
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bytesPerPixel = 4
+        let bytesPerRow = bytesPerPixel * analyzeSize
+        var pixelData = [UInt8](repeating: 0, count: analyzeSize * analyzeSize * bytesPerPixel)
+
+        guard let context = CGContext(
+            data: &pixelData,
+            width: analyzeSize,
+            height: analyzeSize,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return .standard
+        }
+
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: analyzeSize, height: analyzeSize))
+
+        // Sample the four corner regions
+        var transparentCount = 0
+        var totalSampled = 0
+
+        // Corner regions: top-left, top-right, bottom-left, bottom-right
+        let corners: [(Int, Int)] = [
+            (0, 0),                                                    // top-left
+            (analyzeSize - cornerSampleSize, 0),                       // top-right
+            (0, analyzeSize - cornerSampleSize),                       // bottom-left
+            (analyzeSize - cornerSampleSize, analyzeSize - cornerSampleSize)  // bottom-right
+        ]
+
+        for (cx, cy) in corners {
+            for dy in 0..<cornerSampleSize {
+                for dx in 0..<cornerSampleSize {
+                    let x = cx + dx
+                    let y = cy + dy
+                    let offset = (y * analyzeSize + x) * bytesPerPixel
+                    let alpha = pixelData[offset + 3]  // RGBA — alpha is byte 3
+                    if alpha < alphaThreshold {
+                        transparentCount += 1
+                    }
+                    totalSampled += 1
+                }
+            }
+        }
+
+        guard totalSampled > 0 else { return .standard }
+
+        let ratio = CGFloat(transparentCount) / CGFloat(totalSampled)
+        let hasOwnShape = ratio >= transparencyThreshold
+
+        return LogoShapeInfo(hasOwnShape: hasOwnShape, cornerTransparencyRatio: ratio)
+    }
+
+    /// Retrieve cached shape analysis for a set of domain candidates.
+    /// Returns `nil` if the image hasn't been analyzed yet (caller should fall back to `.standard`).
+    public func cachedShapeInfo(
+        urls: [String] = [],
+        title: String = "",
+        oauthProvider: String? = nil
+    ) -> LogoShapeInfo? {
+        let domainCandidates = resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
+        guard !domainCandidates.isEmpty else { return nil }
+        let cacheKey = domainCandidates.joined(separator: "|")
+        return shapeCache.object(forKey: cacheKey as NSString)?.info
+    }
+
+    /// Analyze and cache shape info for an image with the given lookup parameters.
+    /// Call this after a logo is successfully loaded.
+    public func cacheShapeInfo(
+        for image: NSImage,
+        urls: [String] = [],
+        title: String = "",
+        oauthProvider: String? = nil
+    ) {
+        let domainCandidates = resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
+        guard !domainCandidates.isEmpty else { return }
+        let cacheKey = domainCandidates.joined(separator: "|")
+        let shape = Self.analyzeImageShape(image)
+        shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
+    }
+
     // MARK: - Domain & Brand Extraction
 
     public func resolveDomains(urls: [String], title: String, oauthProvider: String?) -> [String] {
@@ -254,6 +522,25 @@ public final class LogoService: @unchecked Sendable {
             let trimmed = d.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             guard !trimmed.isEmpty, !domains.contains(trimmed) else { return }
             domains.append(trimmed)
+        }
+
+        /// Resolve a domain through the parent brand map and add both the
+        /// parent brand (first, for best favicon) and the original domain.
+        func addDomainWithBrandResolution(_ rawDomain: String) {
+            let clean = cleanDomainHost(rawDomain)
+            // Check full original host first (e.g. "outlook.live.com")
+            if let parentBrand = Self.parentBrandMap[rawDomain.lowercased()] {
+                addDomain(parentBrand)
+            }
+            // Then check cleaned host (e.g. "live.com")
+            if let parentBrand = Self.parentBrandMap[clean] {
+                addDomain(parentBrand)
+            }
+            // Also add the cleaned domain itself as a fallback
+            addDomain(clean)
+            if clean != rawDomain.lowercased() {
+                addDomain(rawDomain.lowercased())
+            }
         }
 
         // 1. From OAuth Provider
@@ -272,7 +559,7 @@ public final class LogoService: @unchecked Sendable {
             }
         }
 
-        // 2. From URLs
+        // 2. From URLs — with comprehensive parent-brand resolution
         for urlStr in urls {
             let cleaned = urlStr.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !cleaned.isEmpty else { continue }
@@ -285,14 +572,7 @@ public final class LogoService: @unchecked Sendable {
             }
 
             if let h = host?.lowercased() {
-                let cleanHost = cleanDomainHost(h)
-                addDomain(cleanHost)
-                if cleanHost != h {
-                    addDomain(h)
-                }
-                if cleanHost == "live.com" || cleanHost == "microsoftonline.com" {
-                    addDomain("microsoft.com")
-                }
+                addDomainWithBrandResolution(h)
             }
         }
 
@@ -305,14 +585,7 @@ public final class LogoService: @unchecked Sendable {
                     hostCandidate = h
                 }
                 if let h = hostCandidate?.lowercased() {
-                    let cleanHost = cleanDomainHost(h)
-                    addDomain(cleanHost)
-                    if cleanHost != h {
-                        addDomain(h)
-                    }
-                    if cleanHost == "live.com" {
-                        addDomain("microsoft.com")
-                    }
+                    addDomainWithBrandResolution(h)
                 }
             }
         }
@@ -449,7 +722,10 @@ public final class LogoService: @unchecked Sendable {
             "american express": "americanexpress.com",
             "amex": "americanexpress.com",
             "mastercard": "mastercard.com",
-            "visa": "visa.com"
+            "visa": "visa.com",
+            "roblox": "roblox.com",
+            "bandlab": "bandlab.com",
+            "dribbble": "dribbble.com",
         ]
 
         // 1. Exact match

@@ -5,6 +5,10 @@ import AppKit
 /// Uses `LogoService` to query high-res Favicons, Clearbit, and Apple Touch Icons.
 /// For logins without a logo, displays a beautiful deterministic monogram avatar with brand gradient.
 /// For non-login items, displays a modern glass-styled category squircle.
+///
+/// **Smart Border Detection**: When a fetched logo already has its own rounded/circular
+/// shape (detected via corner pixel transparency analysis), the view renders it edge-to-edge
+/// without the white plate and outer squircle border — preventing double-border artifacts.
 public struct FaviconView: View {
     let urls: [String]
     let title: String
@@ -14,6 +18,8 @@ public struct FaviconView: View {
 
     @State private var loadedImage: NSImage?
     @State private var isLoading: Bool = false
+    /// Shape analysis result for the loaded logo — determines rendering mode.
+    @State private var shapeInfo: LogoShapeInfo = .standard
 
     public init(
         urls: [String] = [],
@@ -34,6 +40,16 @@ public struct FaviconView: View {
             oauthProvider: oauthProvider
         )
         _loadedImage = State(initialValue: initial)
+
+        // If we have a cached image, also check for cached shape info
+        if let img = initial {
+            let cached = LogoService.shared.cachedShapeInfo(
+                urls: urls,
+                title: title,
+                oauthProvider: oauthProvider
+            )
+            _shapeInfo = State(initialValue: cached ?? LogoService.analyzeImageShape(img))
+        }
     }
 
     private var squircleRadius: CGFloat {
@@ -44,30 +60,47 @@ public struct FaviconView: View {
     public var body: some View {
         ZStack {
             if let img = loadedImage {
-                ZStack {
-                    // Solid white background — ensures favicons always look crisp
-                    // regardless of row highlight/selection state. Also handles logos
-                    // with transparent backgrounds (e.g. Autodesk, LinkedIn dark variants).
-                    RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                        .fill(Color.white)
-
+                if shapeInfo.hasOwnShape {
+                    // ── Shaped logo (has its own rounded/circular form) ──
+                    // Render edge-to-edge — no white plate, no outer border.
+                    // The logo's own shape IS the container shape.
                     Image(nsImage: img)
                         .resizable()
                         .interpolation(.high)
                         .antialiased(true)
                         .aspectRatio(contentMode: .fit)
-                        // Inset to 78% — logos that don't bleed to the edge
-                        // sit on a clean white plate instead of showing dark transparency.
-                        .frame(width: size * 0.78, height: size * 0.78)
+                        .frame(width: size, height: size)
+                        .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+                        .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+                        .transition(.opacity)
+                } else {
+                    // ── Standard framed logo ──
+                    // White plate + inset logo + subtle border stroke.
+                    ZStack {
+                        // Solid white background — ensures favicons always look crisp
+                        // regardless of row highlight/selection state. Also handles logos
+                        // with transparent backgrounds (e.g. Autodesk, LinkedIn dark variants).
+                        RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                            .fill(Color.white)
+
+                        Image(nsImage: img)
+                            .resizable()
+                            .interpolation(.high)
+                            .antialiased(true)
+                            .aspectRatio(contentMode: .fit)
+                            // Inset to 78% — logos that don't bleed to the edge
+                            // sit on a clean white plate instead of showing dark transparency.
+                            .frame(width: size * 0.78, height: size * 0.78)
+                    }
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                            .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
+                    )
+                    .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+                    .transition(.opacity)
                 }
-                .frame(width: size, height: size)
-                .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                        .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
-                )
-                .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
-                .transition(.opacity)
             } else {
                 fallbackAvatar
             }
@@ -208,6 +241,7 @@ public struct FaviconView: View {
             if loadedImage != nil {
                 withAnimation(.easeOut(duration: 0.15)) {
                     self.loadedImage = nil
+                    self.shapeInfo = .standard
                 }
             }
             return
@@ -216,6 +250,14 @@ public struct FaviconView: View {
         if let cached = LogoService.shared.cachedImageSync(urls: urls, title: title, oauthProvider: oauthProvider) {
             if self.loadedImage !== cached {
                 self.loadedImage = cached
+                // Use cached shape info or analyze on the fly
+                if let cachedShape = LogoService.shared.cachedShapeInfo(urls: urls, title: title, oauthProvider: oauthProvider) {
+                    self.shapeInfo = cachedShape
+                } else {
+                    let shape = LogoService.analyzeImageShape(cached)
+                    self.shapeInfo = shape
+                    LogoService.shared.cacheShapeInfo(for: cached, urls: urls, title: title, oauthProvider: oauthProvider)
+                }
             }
             return
         }
@@ -228,8 +270,17 @@ public struct FaviconView: View {
         )
 
         if let fetched = fetched {
+            // Analyze shape (already cached by LogoService.performWaterfallFetch,
+            // but retrieve it here for the view state)
+            let shape = LogoService.shared.cachedShapeInfo(
+                urls: urls,
+                title: title,
+                oauthProvider: oauthProvider
+            ) ?? LogoService.analyzeImageShape(fetched)
+
             withAnimation(.easeOut(duration: 0.18)) {
                 self.loadedImage = fetched
+                self.shapeInfo = shape
             }
         }
     }
