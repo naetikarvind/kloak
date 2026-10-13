@@ -47,21 +47,38 @@ public struct GlassCardModifier: ViewModifier {
 
 public struct GlassCapsuleButton: ButtonStyle {
     var isPrimary: Bool = true
+    var tintColor: Color? = nil
+
+    public init(isPrimary: Bool = true, tintColor: Color? = nil) {
+        self.isPrimary = isPrimary
+        self.tintColor = tintColor
+    }
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 12, weight: .semibold))
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundColor(isPrimary ? .white : .primary)
+            .foregroundColor(tintColor ?? (isPrimary ? .white : .primary))
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(isPrimary ? AnyShapeStyle(LinearGradient(colors: [LiquidGlassTheme.primaryAccent, Color.blue], startPoint: .top, endPoint: .bottom)) : AnyShapeStyle(Color.white.opacity(0.08)))
+                    .fill(
+                        tintColor != nil
+                            ? AnyShapeStyle(tintColor!.opacity(0.18))
+                            : (isPrimary
+                                ? AnyShapeStyle(LinearGradient(colors: [LiquidGlassTheme.primaryAccent, Color.blue], startPoint: .top, endPoint: .bottom))
+                                : AnyShapeStyle(Color.white.opacity(0.08)))
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(Color.white.opacity(isPrimary ? 0.30 : 0.12), lineWidth: 0.75)
+                            .stroke(
+                                tintColor != nil
+                                    ? tintColor!.opacity(0.5)
+                                    : Color.white.opacity(isPrimary ? 0.30 : 0.12),
+                                lineWidth: 0.75
+                            )
                     )
             )
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)

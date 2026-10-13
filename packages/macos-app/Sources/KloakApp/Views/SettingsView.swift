@@ -657,59 +657,45 @@ public struct SettingsView: View {
 
                         Spacer()
 
-                        // Record Button
-                        Button(action: {
-                            if isRecordingHotkey {
-                                stopRecordingHotkey()
-                            } else {
-                                startRecordingHotkey()
-                            }
-                        }) {
-                            HStack(spacing: 6) {
+                        HStack(spacing: 8) {
+                            // Record Button
+                            Button(action: {
                                 if isRecordingHotkey {
-                                    Circle()
-                                        .fill(LiquidGlassTheme.amberAccent)
-                                        .frame(width: 8, height: 8)
-                                    Text("Press Shortcut Keys…")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(LiquidGlassTheme.amberAccent)
+                                    stopRecordingHotkey()
                                 } else {
-                                    Image(systemName: "record.circle")
-                                        .font(.system(size: 11))
-                                    Text("Record Shortcut")
-                                        .font(.system(size: 11, weight: .semibold))
+                                    startRecordingHotkey()
+                                }
+                            }) {
+                                HStack(spacing: 6) {
+                                    if isRecordingHotkey {
+                                        Circle()
+                                            .fill(LiquidGlassTheme.amberAccent)
+                                            .frame(width: 8, height: 8)
+                                        Text("Press Shortcut Keys…")
+                                    } else {
+                                        Image(systemName: "record.circle")
+                                        Text("Record Shortcut")
+                                    }
                                 }
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(
-                                isRecordingHotkey
-                                    ? LiquidGlassTheme.amberAccent.opacity(0.2)
-                                    : Color.white.opacity(0.08)
+                            .buttonStyle(
+                                GlassCapsuleButton(
+                                    isPrimary: false,
+                                    tintColor: isRecordingHotkey ? LiquidGlassTheme.amberAccent : nil
+                                )
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 7))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 7)
-                                    .stroke(
-                                        isRecordingHotkey
-                                            ? LiquidGlassTheme.amberAccent
-                                            : Color.white.opacity(0.15),
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
 
-                        Button(action: {
-                            AccessibilityAutofillService.shared.triggerAutofill()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "bolt.fill")
-                                Text("Test Overlay")
+                            // Test Overlay Button
+                            Button(action: {
+                                AccessibilityAutofillService.shared.triggerAutofill()
+                            }) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "bolt.fill")
+                                    Text("Test Overlay")
+                                }
                             }
-                            .font(.system(size: 11, weight: .semibold))
+                            .buttonStyle(GlassCapsuleButton(isPrimary: false))
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
                     }
 
                     if isRecordingHotkey {
