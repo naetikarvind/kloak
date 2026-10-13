@@ -20,6 +20,7 @@ public final class WindowSizeManager {
     private init() {}
 
     public func registerWindow(_ window: NSWindow) {
+        window.tabbingMode = .disallowed
         self.mainWindow = window
     }
 

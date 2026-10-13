@@ -19,6 +19,7 @@ public final class AccessibilityAutofillPanel: NSPanel {
         self.hasShadow = true
         self.isMovableByWindowBackground = false
         self.hidesOnDeactivate = false
+        self.tabbingMode = .disallowed
     }
 
     public override var canBecomeKey: Bool {

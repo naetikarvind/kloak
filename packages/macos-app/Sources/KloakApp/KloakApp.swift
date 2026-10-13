@@ -3,6 +3,7 @@ import AppKit
 
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        NSWindow.allowsAutomaticWindowTabbing = false
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -12,12 +13,41 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.applicationIconImage = iconImg
         }
 
-        // Start system-wide accessibility autofill service & hotkey monitor (⌘\)
+        // Start system-wide accessibility autofill service & hotkey monitor
         AccessibilityAutofillService.shared.start()
 
+        sanitizeTabOverview()
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.sanitizeTabOverview()
             if let window = NSApp.windows.first {
+                window.tabbingMode = .disallowed
                 window.makeKeyAndOrderFront(nil)
+            }
+        }
+    }
+
+    private func sanitizeTabOverview() {
+        NSWindow.allowsAutomaticWindowTabbing = false
+        for window in NSApp.windows {
+            window.tabbingMode = .disallowed
+        }
+
+        guard let mainMenu = NSApp.mainMenu else { return }
+        for item in mainMenu.items {
+            if let submenu = item.submenu {
+                for subitem in submenu.items {
+                    let selName = NSStringFromSelector(subitem.action ?? Selector(""))
+                    let titleLower = subitem.title.lowercased()
+                    if selName.localizedCaseInsensitiveContains("taboverview") ||
+                       titleLower.contains("show all tabs") ||
+                       titleLower.contains("show tab overview") ||
+                       (subitem.keyEquivalent == "\\" && subitem.keyEquivalentModifierMask.contains([.command, .option])) {
+                        subitem.action = nil
+                        subitem.keyEquivalent = ""
+                        submenu.removeItem(subitem)
+                    }
+                }
             }
         }
     }
@@ -29,6 +59,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag {
             if let window = sender.windows.first(where: { $0.canBecomeKey }) ?? sender.windows.first {
+                window.tabbingMode = .disallowed
                 window.makeKeyAndOrderFront(nil)
             }
         }
@@ -43,6 +74,7 @@ public struct KloakApp: App {
     @ObservedObject private var devModeManager = DevModeManager.shared
 
     public init() {
+        NSWindow.allowsAutomaticWindowTabbing = false
         IPCServer.shared.start()
     }
 
@@ -177,7 +209,6 @@ public struct KloakApp: App {
                 Button("Autofill in Active App") {
                     AccessibilityAutofillService.shared.triggerAutofill()
                 }
-                .keyboardShortcut("\\", modifiers: .command)
             }
             CommandGroup(replacing: .undoRedo) {
                 Button("Undo") {
@@ -339,6 +370,7 @@ struct WindowAccessor: NSViewRepresentable {
         let view = NSView()
         DispatchQueue.main.async {
             if let window = view.window {
+                window.tabbingMode = .disallowed
                 callback(window)
             }
         }
@@ -348,6 +380,7 @@ struct WindowAccessor: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         DispatchQueue.main.async {
             if let window = nsView.window {
+                window.tabbingMode = .disallowed
                 callback(window)
             }
         }

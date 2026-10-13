@@ -200,23 +200,23 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
         let hkID = EventHotKeyID(signature: hotKeySignature, id: hotKeyIDNumber)
 
-        // Register with GetApplicationEventTarget as primary (Carbon standard for application hotkeys)
+        // Register with GetEventDispatcherTarget as primary (Carbon standard for system-wide global hotkeys)
         var regStatus = RegisterEventHotKey(
             UInt32(cachedHotkeyKeyCode),
             carbonMods,
             hkID,
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             0,
             &carbonHotKeyRef
         )
 
         if regStatus != noErr {
-            NSLog("[Kloak] RegisterEventHotKey on ApplicationEventTarget returned %d. Trying Dispatcher target...", regStatus)
+            NSLog("[Kloak] RegisterEventHotKey on EventDispatcherTarget returned %d. Trying Application target...", regStatus)
             regStatus = RegisterEventHotKey(
                 UInt32(cachedHotkeyKeyCode),
                 carbonMods,
                 hkID,
-                GetEventDispatcherTarget(),
+                GetApplicationEventTarget(),
                 0,
                 &carbonHotKeyRef
             )
@@ -235,7 +235,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
                 10,
                 carbonMods,
                 hkID_ISO,
-                GetApplicationEventTarget(),
+                GetEventDispatcherTarget(),
                 0,
                 &carbonHotKeyRefISO
             )
@@ -312,10 +312,14 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         guard now.timeIntervalSince(lastTriggerTime) > 0.25 else { return }
         lastTriggerTime = now
 
-        if isPanelVisible {
-            hidePanel()
-        } else {
-            triggerAutofill()
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            let panelIsActuallyVisible = AccessibilityAutofillPanelManager.shared.panel?.isVisible == true
+            if self.isPanelVisible && panelIsActuallyVisible {
+                self.hidePanel()
+            } else {
+                self.triggerAutofill()
+            }
         }
     }
 
