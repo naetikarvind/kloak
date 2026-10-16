@@ -52,7 +52,8 @@ public struct FaviconView: View {
             let cached = LogoService.shared.cachedRenderingStyle(
                 urls: urls, title: title, oauthProvider: oauthProvider
             )
-            _renderingStyle = State(initialValue: cached ?? LogoService.classifyRenderingStyle(img))
+            let primaryDomain = LogoService.shared.resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider).first
+            _renderingStyle = State(initialValue: cached ?? LogoService.classifyRenderingStyle(img, domain: primaryDomain))
         }
     }
 
@@ -147,27 +148,56 @@ public struct FaviconView: View {
             }
             .frame(width: size, height: size)
             .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(Color.black.opacity(0.12), lineWidth: 0.75)
+            )
+            .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+
+        case .brandPlate(let r, let g, let b):
+            // ── Brand Plate: coloured backing plate + 78 % inset icon ──────────
+            // Backing plate is filled with brand colour (e.g. LinkedIn blue)
+            // The icon sits inset on top of it, creating a matching coloured strip.
+            ZStack {
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .fill(Color(red: r, green: g, blue: b))
+
+                Image(nsImage: img)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size * 0.78, height: size * 0.78)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(Color.black.opacity(0.12), lineWidth: 0.75)
+            )
             .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
 
         case .circleAdapted:
-            // ── Circle Adapted: white circle clip + full-size icon ───────────────
-            // For circular icons on white backgrounds (Dribbble pink circle, Roblox,
-            // BandLab red circle). Uses Circle() clip (50 % radius) so the container
-            // shape matches the icon's own circular boundary precisely — no visible
-            // white margin gap between the icon's circle edge and the container.
+            // ── Circle Adapted: white squircle plate + 78 % inset icon ───────────
+            // For circular badges, renders on a white squircle plate so it has
+            // a white strip around the logo and a consistent squircle container.
             ZStack {
-                Circle()
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
                     .fill(Color.white)
 
                 Image(nsImage: img)
                     .resizable()
                     .interpolation(.high)
                     .antialiased(true)
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size, height: size)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size * 0.78, height: size * 0.78)
             }
             .frame(width: size, height: size)
-            .clipShape(Circle())
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
+            )
             .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
         }
     }
@@ -309,7 +339,7 @@ public struct FaviconView: View {
                 ) {
                     self.renderingStyle = cachedStyle
                 } else {
-                    let style = LogoService.classifyRenderingStyle(cached)
+                    let style = LogoService.classifyRenderingStyle(cached, domain: domains.first)
                     self.renderingStyle = style
                     LogoService.shared.cacheRenderingStyle(
                         style, urls: urls, title: title, oauthProvider: oauthProvider
@@ -330,7 +360,7 @@ public struct FaviconView: View {
             // Rendering style was cached by performWaterfallFetch; retrieve it.
             let style = LogoService.shared.cachedRenderingStyle(
                 urls: urls, title: title, oauthProvider: oauthProvider
-            ) ?? LogoService.classifyRenderingStyle(fetched)
+            ) ?? LogoService.classifyRenderingStyle(fetched, domain: domains.first)
 
             withAnimation(.easeOut(duration: 0.18)) {
                 self.loadedImage = fetched

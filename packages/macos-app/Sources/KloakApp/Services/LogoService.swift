@@ -7,10 +7,10 @@ import SwiftUI
 /// JEV AI (Just-Enough Vision) rendering mode for a favicon.
 ///
 /// The on-device pixel classifier (`LogoService.classifyRenderingStyle`) inspects
-/// the fetched image's corner and ring pixels to produce one of four modes:
+/// the fetched image's corner and ring pixels to produce one of five modes:
 ///
 /// - **standard**: White backing plate + 78 % inset + subtle border stroke.
-///   For logos on transparent or white backgrounds (e.g. LinkedIn "in" mark).
+///   For logos on transparent or pure-white backgrounds.
 ///
 /// - **fullBleed**: Logo clipped edge-to-edge to the squircle shape, no plate.
 ///   For logos that fill their entire canvas (e.g. the Microsoft 4-colour grid).
@@ -22,11 +22,20 @@ import SwiftUI
 /// - **circleAdapted**: White circle (50 % corner radius) backing + full-size icon.
 ///   For circular icons on a plain white background (e.g. Dribbble, Roblox, BandLab)
 ///   — the circle clip matches the icon's own boundary so no border gap appears.
+///
+/// - **brandPlate**: Coloured squircle plate (sampled from the icon's edge colour)
+///   + 78 % inset icon + a subtle matching border stroke.
+///   For logos whose own squircle background does NOT fully bleed to every corner
+///   (e.g. LinkedIn blue, GitHub dark) — the strip colour mirrors the icon's brand
+///   colour instead of being plain white, creating a cohesive look.
 public enum LogoRenderingStyle {
     case standard
     case fullBleed
     case coloredSquircle(red: Double, green: Double, blue: Double)
     case circleAdapted
+    /// Coloured backing plate whose fill matches the icon's own brand background colour.
+    /// The icon is inset to 78 % of the container size (same as `.standard`).
+    case brandPlate(red: Double, green: Double, blue: Double)
 }
 
 extension LogoRenderingStyle: Equatable {
@@ -35,6 +44,8 @@ extension LogoRenderingStyle: Equatable {
         case (.standard, .standard), (.fullBleed, .fullBleed), (.circleAdapted, .circleAdapted):
             return true
         case let (.coloredSquircle(r1, g1, b1), .coloredSquircle(r2, g2, b2)):
+            return abs(r1 - r2) < 0.01 && abs(g1 - g2) < 0.01 && abs(b1 - b2) < 0.01
+        case let (.brandPlate(r1, g1, b1), .brandPlate(r2, g2, b2)):
             return abs(r1 - r2) < 0.01 && abs(g1 - g2) < 0.01 && abs(b1 - b2) < 0.01
         default:
             return false
@@ -300,7 +311,7 @@ public final class LogoService: @unchecked Sendable {
             if let disk = loadFromDisk(for: domain) {
                 memoryCache.setObject(disk, forKey: cacheKey as NSString)
                 // Run JEV AI classification and cache the result
-                let style = Self.classifyRenderingStyle(disk)
+                let style = Self.classifyRenderingStyle(disk, domain: domain)
                 renderingCache.setObject(RenderingStyleBox(style), forKey: cacheKey as NSString)
                 return disk
             }
@@ -310,7 +321,7 @@ public final class LogoService: @unchecked Sendable {
                 if let image = await downloadAndValidateImage(from: url) {
                     memoryCache.setObject(image, forKey: cacheKey as NSString)
                     // Run JEV AI classification and cache the result
-                    let style = Self.classifyRenderingStyle(image)
+                    let style = Self.classifyRenderingStyle(image, domain: domain)
                     renderingCache.setObject(RenderingStyleBox(style), forKey: cacheKey as NSString)
                     saveToDisk(image: image, for: domain)
                     return image
@@ -432,24 +443,51 @@ public final class LogoService: @unchecked Sendable {
 
     // MARK: - JEV AI — Pixel-Based Rendering Classifier
 
+    /// **JEV AI Domain Override Map** — explicit rendering modes for known brand icons
+    /// that have distinctive brand backgrounds or require exact styling.
+    private static let renderingStyleOverrides: [String: LogoRenderingStyle] = [
+        // LinkedIn — deep brand blue (#0077B5 / #0073B2 -> 0.0, 0.451, 0.698)
+        "linkedin.com":          .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
+        "www.linkedin.com":      .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
+        "learning.linkedin.com": .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
+
+        // Zoom — brand video blue
+        "zoom.us":               .coloredSquircle(red: 0.059, green: 0.373, blue: 0.996),
+
+        // Spotify — Spotify green
+        "spotify.com":           .coloredSquircle(red: 0.118, green: 0.843, blue: 0.376),
+        "accounts.spotify.com":  .coloredSquircle(red: 0.118, green: 0.843, blue: 0.376),
+
+        // Microsoft — full bleed 4-color grid
+        "microsoft.com":         .fullBleed,
+        "live.com":              .fullBleed,
+        "account.live.com":      .fullBleed,
+    ]
+
     /// **JEV AI** (Just-Enough Vision) on-device favicon rendering classifier.
     ///
-    /// Renders the image into a 64×64 RGBA bitmap and applies a four-rule cascade:
-    ///
-    /// | Priority | Corner state | Inner ring | Decision |
-    /// |---|---|---|---|
-    /// | 1 | ≥70 % transparent | — | `.fullBleed` |
-    /// | 2 | ≥60 % white | ≥55 % colored ring | `.circleAdapted` |
-    /// | 3 | ≥45 % colored, low variance | — | `.coloredSquircle(r,g,b)` |
-    /// | 4 | ≥45 % colored, high variance | — | `.fullBleed` |
-    /// | 5 | default | — | `.standard` |
-    ///
-    /// Performance: ~0.1 ms per call on Apple Silicon.
-    public static func classifyRenderingStyle(_ image: NSImage) -> LogoRenderingStyle {
+    /// Inspects the 64×64 RGBA pixel grid to classify the image into one of:
+    /// - `.standard`: White squircle plate + 78% inset logo + subtle border (creates a clean white strip around the logo).
+    ///   Applied to logos on white backgrounds (GitHub, MacOSIcons) and isolated glyphs on transparent backgrounds (Google "G", Scratch "S", Entrar bird).
+    /// - `.coloredSquircle(r, g, b)`: Squircle plate filled with brand colour + logo on top (the white strip is replaced by the brand color, and outer edges are rounded to fit squircle).
+    ///   Applied to solid-background icons (LinkedIn blue, Zoom blue, Spotify green, Roblox dark, Tabrr purple).
+    /// - `.fullBleed`: Multi-coloured icons that bleed to the edge (Microsoft 4-colour grid, BandLab red, Hotstar).
+    public static func classifyRenderingStyle(_ image: NSImage, domain: String? = nil) -> LogoRenderingStyle {
+        // 0. Domain override check
+        if let domain = domain {
+            let key = domain.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            if let override = renderingStyleOverrides[key] {
+                return override
+            }
+            let stripped = key.hasPrefix("www.") ? String(key.dropFirst(4)) : key
+            if let override = renderingStyleOverrides[stripped] {
+                return override
+            }
+        }
+
         let dim = 64
         let cSz = 10          // corner sample region (10×10 px each)
         let αFade: UInt8 = 40       // below → transparent
-        let αSolid: UInt8 = 180     // above → definitely opaque
         let whiteLow: UInt8 = 210   // R,G,B all above → white-ish
 
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
@@ -506,75 +544,82 @@ public final class LogoService: @unchecked Sendable {
         let whiteRatio   = Double(nWhite)        / Double(nTotal)
         let coloredRatio = Double(coloredR.count) / Double(nTotal)
 
-        // ── Rule 1: Transparent corners → shaped icon on transparent background ──
-        // (icons like GitHub Octocat, some Spotify/Discord variants)
-        // Render edge-to-edge with squircle clip — the icon's own shape IS the border.
-        if transpRatio >= 0.70 {
-            return .fullBleed
-        }
-
-        // ── Rule 2: White corners — probe a ring at 35 % radius for color ────────
-        // Detects circular/rounded icons that sit on a white background:
-        // e.g. Dribbble pink circle, Roblox, BandLab on white.
-        // A strong colored ring at 35 % radius means the icon IS circular.
-        if whiteRatio >= 0.60 {
-            let ringRadius = dim * 35 / 100   // 35 % × 64 ≈ 22 px from centre
-            let cx = dim / 2, cy = dim / 2
-            var ringColored = 0, ringTotal = 0
-            var angle = 0
-            while angle < 360 {
-                let rad = Double(angle) * .pi / 180
-                let x = Int(Double(cx) + Double(ringRadius) * cos(rad))
-                let y = Int(Double(cy) + Double(ringRadius) * sin(rad))
-                if x >= 0 && x < dim && y >= 0 && y < dim {
-                    let (r, g, b, a) = px(x, y)
-                    ringTotal += 1
-                    // Count pixel as "colored" if opaque and not white
-                    if a > αSolid && !(r > whiteLow && g > whiteLow && b > whiteLow) {
-                        ringColored += 1
-                    }
-                }
-                angle += 8  // sample every 8 degrees (45 samples total)
-            }
-
-            if ringTotal > 0 && Double(ringColored) / Double(ringTotal) >= 0.55 {
-                // White corners but circular colored centre → circleAdapted.
-                // FaviconView will use a Circle() clip so the container matches
-                // the icon's own circular shape exactly.
-                return .circleAdapted
-            }
-
-            // White corners, no clear circular region → standard framed logo.
+        // ── Rule 1: Predominantly white corners (≥50%) ─────────────────────────
+        // Logos on white backgrounds or white circular containers (GitHub, MacOSIcons, Webbites).
+        // Render on a clean white squircle plate with a 78% inset logo (creating a white strip).
+        if whiteRatio >= 0.50 {
             return .standard
         }
 
-        // ── Rule 3 + 4: Colored (non-white, non-transparent) corners ─────────────
-        if coloredRatio >= 0.45 && !coloredR.isEmpty {
+        // ── Rule 2: Colored corners (≥40%) with uniform solid background ────────
+        // Solid-background icons (Roblox, BandLab, Spotify, etc.)
+        if coloredRatio >= 0.40 && !coloredR.isEmpty {
             let n = Double(coloredR.count)
             let avgR = coloredR.reduce(0, +) / n
             let avgG = coloredG.reduce(0, +) / n
             let avgB = coloredB.reduce(0, +) / n
 
-            // Measure color variance across sampled corner pixels.
             let varR = coloredR.map { ($0 - avgR) * ($0 - avgR) }.reduce(0, +) / n
             let varG = coloredG.map { ($0 - avgG) * ($0 - avgG) }.reduce(0, +) / n
             let varB = coloredB.map { ($0 - avgB) * ($0 - avgB) }.reduce(0, +) / n
             let totalVariance = varR + varG + varB
 
             if totalVariance < 0.05 {
-                // Rule 3: Low variance → uniform solid background colour.
-                // Sample a larger mid-edge strip to refine the average background colour,
-                // then use it to fill the squircle (extends the icon's background).
                 let midSamples = sampleMidEdgeColors(pixels: pixels, dim: dim, αFade: αFade, whiteLow: whiteLow)
                 let bgR = midSamples?.r ?? avgR
                 let bgG = midSamples?.g ?? avgG
                 let bgB = midSamples?.b ?? avgB
                 return .coloredSquircle(red: bgR, green: bgG, blue: bgB)
             } else {
-                // Rule 4: High variance → full-bleed logo (e.g. Microsoft 4-colour grid).
-                // The icon fills its own space with varied colours — clip edge-to-edge.
                 return .fullBleed
             }
+        }
+
+        // ── Rule 3: Transparent corners (≥50%) ─────────────────────────────────
+        // Differentiate between:
+        // (a) Solid rounded rectangle card (e.g. Zoom, LinkedIn, Tabrr) -> .coloredSquircle
+        // (b) Isolated glyph or symbol (e.g. Google "G", Scratch "S", Entrar bird) -> .standard (white strip)
+        if transpRatio >= 0.50 {
+            let insets = [(dim / 2, 6), (dim / 2, dim - 7), (6, dim / 2), (dim - 7, dim / 2)]
+            var midOpaque = 0
+            var midR = [Double](), midG = [Double](), midB = [Double]()
+            for (x, y) in insets {
+                let (r, g, b, a) = px(x, y)
+                if a > αFade {
+                    midOpaque += 1
+                    if !(r > whiteLow && g > whiteLow && b > whiteLow) {
+                        midR.append(Double(r) / 255)
+                        midG.append(Double(g) / 255)
+                        midB.append(Double(b) / 255)
+                    }
+                }
+            }
+
+            var totalOpaque = 0
+            for y in 0..<dim {
+                for x in 0..<dim {
+                    let (_, _, _, a) = px(x, y)
+                    if a > αFade { totalOpaque += 1 }
+                }
+            }
+            let opRatio = Double(totalOpaque) / Double(dim * dim)
+
+            // If mid-edges are consistently colored and overall opacity is high (≥70%),
+            // it's a solid colored card with rounded corners:
+            if midOpaque == 4 && midR.count == 4 && opRatio >= 0.70 {
+                let avgR = midR.reduce(0, +) / 4
+                let avgG = midG.reduce(0, +) / 4
+                let avgB = midB.reduce(0, +) / 4
+                let varR = midR.map { ($0 - avgR) * ($0 - avgR) }.reduce(0, +) / 4
+                let varG = midG.map { ($0 - avgG) * ($0 - avgG) }.reduce(0, +) / 4
+                let varB = midB.map { ($0 - avgB) * ($0 - avgB) }.reduce(0, +) / 4
+                if (varR + varG + varB) < 0.05 {
+                    return .coloredSquircle(red: avgR, green: avgG, blue: avgB)
+                }
+            }
+
+            // Otherwise, it is an isolated symbol on transparent canvas -> .standard (white strip)
+            return .standard
         }
 
         return .standard
