@@ -2,21 +2,44 @@ import Foundation
 import AppKit
 import SwiftUI
 
-/// Describes the visual shape characteristics of a fetched logo image.
-/// Used by `FaviconView` to decide whether to apply its own squircle border
-/// or let the logo render edge-to-edge (avoiding double-border artifacts).
-public struct LogoShapeInfo {
-    /// Whether the logo already has its own shape (circular, rounded-rect, etc.)
-    /// with transparent/near-transparent corners — meaning an outer squircle border
-    /// would produce a redundant "double-border" artifact.
-    public let hasOwnShape: Bool
+// MARK: - JEV AI Rendering Classification
 
-    /// Fraction of corner pixels that are transparent (0.0–1.0).
-    /// Higher values indicate a strongly shaped icon (circular, rounded-rect).
-    public let cornerTransparencyRatio: CGFloat
+/// JEV AI (Just-Enough Vision) rendering mode for a favicon.
+///
+/// The on-device pixel classifier (`LogoService.classifyRenderingStyle`) inspects
+/// the fetched image's corner and ring pixels to produce one of four modes:
+///
+/// - **standard**: White backing plate + 78 % inset + subtle border stroke.
+///   For logos on transparent or white backgrounds (e.g. LinkedIn "in" mark).
+///
+/// - **fullBleed**: Logo clipped edge-to-edge to the squircle shape, no plate.
+///   For logos that fill their entire canvas (e.g. the Microsoft 4-colour grid).
+///
+/// - **coloredSquircle**: Squircle filled with a background colour sampled from
+///   the icon's own corner pixels, then the logo rendered full-size on top.
+///   For icons that have a solid dominant background (e.g. Spotify black, Zoom blue).
+///
+/// - **circleAdapted**: White circle (50 % corner radius) backing + full-size icon.
+///   For circular icons on a plain white background (e.g. Dribbble, Roblox, BandLab)
+///   — the circle clip matches the icon's own boundary so no border gap appears.
+public enum LogoRenderingStyle {
+    case standard
+    case fullBleed
+    case coloredSquircle(red: Double, green: Double, blue: Double)
+    case circleAdapted
+}
 
-    /// Predefined result for logos that should always use the standard framed style.
-    public static let standard = LogoShapeInfo(hasOwnShape: false, cornerTransparencyRatio: 0.0)
+extension LogoRenderingStyle: Equatable {
+    public static func == (lhs: LogoRenderingStyle, rhs: LogoRenderingStyle) -> Bool {
+        switch (lhs, rhs) {
+        case (.standard, .standard), (.fullBleed, .fullBleed), (.circleAdapted, .circleAdapted):
+            return true
+        case let (.coloredSquircle(r1, g1, b1), .coloredSquircle(r2, g2, b2)):
+            return abs(r1 - r2) < 0.01 && abs(g1 - g2) < 0.01 && abs(b1 - b2) < 0.01
+        default:
+            return false
+        }
+    }
 }
 
 /// High-resolution logo and icon resolution engine for Kloak.
@@ -29,23 +52,22 @@ public struct LogoShapeInfo {
 /// 6. Persistent local disk cache (~/.kloak/favicons/<domain>.png)
 /// 7. In-memory NSCache with thread-safe access and zero duplicate requests
 ///
-/// Also provides image shape analysis (`analyzeImageShape`) so that `FaviconView`
-/// can skip its outer squircle border for logos that already carry their own
-/// rounded / circular shape (preventing double-border artifacts).
+/// After fetching, runs the JEV AI pixel classifier (`classifyRenderingStyle`) to
+/// determine the correct rendering mode for `FaviconView`.
 public final class LogoService: @unchecked Sendable {
     public static let shared = LogoService()
 
     private let memoryCache = NSCache<NSString, NSImage>()
-    /// Cache of per-domain shape analysis results (keyed by cacheKey).
-    private let shapeCache = NSCache<NSString, ShapeInfoBox>()
+    /// In-memory cache of JEV AI rendering-style classifications (keyed by cacheKey).
+    private let renderingCache = NSCache<NSString, RenderingStyleBox>()
     private let lock = NSLock()
     private var inFlightTasks: [String: Task<NSImage?, Never>] = [:]
     private let session: URLSession
 
-    /// Thread-safe box for `LogoShapeInfo` (NSCache requires reference types).
-    private final class ShapeInfoBox {
-        let info: LogoShapeInfo
-        init(_ info: LogoShapeInfo) { self.info = info }
+    /// Thread-safe box for `LogoRenderingStyle` (NSCache requires reference types).
+    private final class RenderingStyleBox {
+        let style: LogoRenderingStyle
+        init(_ style: LogoRenderingStyle) { self.style = style }
     }
 
     private static let diskCacheDirectory: URL = {
@@ -170,7 +192,7 @@ public final class LogoService: @unchecked Sendable {
         config.requestCachePolicy = .returnCacheDataElseLoad
         self.session = URLSession(configuration: config)
         self.memoryCache.countLimit = 500
-        self.shapeCache.countLimit = 500
+        self.renderingCache.countLimit = 500
     }
 
     /// Check memory cache by key
@@ -277,9 +299,9 @@ public final class LogoService: @unchecked Sendable {
             // Check disk first
             if let disk = loadFromDisk(for: domain) {
                 memoryCache.setObject(disk, forKey: cacheKey as NSString)
-                // Analyze shape and cache it
-                let shape = Self.analyzeImageShape(disk)
-                shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
+                // Run JEV AI classification and cache the result
+                let style = Self.classifyRenderingStyle(disk)
+                renderingCache.setObject(RenderingStyleBox(style), forKey: cacheKey as NSString)
                 return disk
             }
 
@@ -287,9 +309,9 @@ public final class LogoService: @unchecked Sendable {
             for url in candidateUrls {
                 if let image = await downloadAndValidateImage(from: url) {
                     memoryCache.setObject(image, forKey: cacheKey as NSString)
-                    // Analyze shape and cache it
-                    let shape = Self.analyzeImageShape(image)
-                    shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
+                    // Run JEV AI classification and cache the result
+                    let style = Self.classifyRenderingStyle(image)
+                    renderingCache.setObject(RenderingStyleBox(style), forKey: cacheKey as NSString)
                     saveToDisk(image: image, for: domain)
                     return image
                 }
@@ -408,100 +430,204 @@ public final class LogoService: @unchecked Sendable {
         memoryCache.removeObject(forKey: domain as NSString)
     }
 
-    // MARK: - Image Shape Analysis (Smart Border Detection)
+    // MARK: - JEV AI — Pixel-Based Rendering Classifier
 
-    /// Analyzes an image's corner pixels to detect whether it already has its own
-    /// rounded / circular shape (transparent corners). This is used by `FaviconView`
-    /// to decide whether to skip the outer squircle border and white plate.
+    /// **JEV AI** (Just-Enough Vision) on-device favicon rendering classifier.
     ///
-    /// Algorithm:
-    /// 1. Render the image into a 64×64 RGBA bitmap (consistent, fast analysis).
-    /// 2. Sample pixels in four 10×10 corner regions.
-    /// 3. If ≥70% of those corner pixels have alpha < 40, the logo "has its own shape".
+    /// Renders the image into a 64×64 RGBA bitmap and applies a four-rule cascade:
     ///
-    /// Performance: ~0.1ms per image on Apple Silicon — negligible overhead.
-    public static func analyzeImageShape(_ image: NSImage) -> LogoShapeInfo {
-        let analyzeSize = 64
-        let cornerSampleSize = 10  // 10×10 pixel region in each corner
-        let alphaThreshold: UInt8 = 40  // pixels below this alpha are "transparent"
-        let transparencyThreshold: CGFloat = 0.70  // 70% transparent corners → shaped logo
+    /// | Priority | Corner state | Inner ring | Decision |
+    /// |---|---|---|---|
+    /// | 1 | ≥70 % transparent | — | `.fullBleed` |
+    /// | 2 | ≥60 % white | ≥55 % colored ring | `.circleAdapted` |
+    /// | 3 | ≥45 % colored, low variance | — | `.coloredSquircle(r,g,b)` |
+    /// | 4 | ≥45 % colored, high variance | — | `.fullBleed` |
+    /// | 5 | default | — | `.standard` |
+    ///
+    /// Performance: ~0.1 ms per call on Apple Silicon.
+    public static func classifyRenderingStyle(_ image: NSImage) -> LogoRenderingStyle {
+        let dim = 64
+        let cSz = 10          // corner sample region (10×10 px each)
+        let αFade: UInt8 = 40       // below → transparent
+        let αSolid: UInt8 = 180     // above → definitely opaque
+        let whiteLow: UInt8 = 210   // R,G,B all above → white-ish
 
-        // Render into a consistent-size RGBA bitmap
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return .standard
         }
 
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bytesPerPixel = 4
-        let bytesPerRow = bytesPerPixel * analyzeSize
-        var pixelData = [UInt8](repeating: 0, count: analyzeSize * analyzeSize * bytesPerPixel)
-
-        guard let context = CGContext(
-            data: &pixelData,
-            width: analyzeSize,
-            height: analyzeSize,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: colorSpace,
+        var pixels = [UInt8](repeating: 0, count: dim * dim * 4)
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(
+            data: &pixels,
+            width: dim, height: dim,
+            bitsPerComponent: 8, bytesPerRow: dim * 4,
+            space: cs,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else {
-            return .standard
+        ) else { return .standard }
+
+        ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: dim, height: dim))
+
+        /// Pixel accessor — returns (R, G, B, A) for a coordinate.
+        func px(_ x: Int, _ y: Int) -> (UInt8, UInt8, UInt8, UInt8) {
+            let i = (y * dim + x) * 4
+            return (pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3])
         }
 
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: analyzeSize, height: analyzeSize))
-
-        // Sample the four corner regions
-        var transparentCount = 0
-        var totalSampled = 0
-
-        // Corner regions: top-left, top-right, bottom-left, bottom-right
-        let corners: [(Int, Int)] = [
-            (0, 0),                                                    // top-left
-            (analyzeSize - cornerSampleSize, 0),                       // top-right
-            (0, analyzeSize - cornerSampleSize),                       // bottom-left
-            (analyzeSize - cornerSampleSize, analyzeSize - cornerSampleSize)  // bottom-right
+        // ── Sample four corner regions ──────────────────────────────────────────
+        let cornerOrigins: [(Int, Int)] = [
+            (0, 0), (dim - cSz, 0), (0, dim - cSz), (dim - cSz, dim - cSz)
         ]
 
-        for (cx, cy) in corners {
-            for dy in 0..<cornerSampleSize {
-                for dx in 0..<cornerSampleSize {
-                    let x = cx + dx
-                    let y = cy + dy
-                    let offset = (y * analyzeSize + x) * bytesPerPixel
-                    let alpha = pixelData[offset + 3]  // RGBA — alpha is byte 3
-                    if alpha < alphaThreshold {
-                        transparentCount += 1
+        var nTransparent = 0, nWhite = 0, nTotal = 0
+        var coloredR = [Double](), coloredG = [Double](), coloredB = [Double]()
+
+        for (cx, cy) in cornerOrigins {
+            for dy in 0..<cSz {
+                for dx in 0..<cSz {
+                    let (r, g, b, a) = px(cx + dx, cy + dy)
+                    nTotal += 1
+                    if a < αFade {
+                        nTransparent += 1
+                    } else if r > whiteLow && g > whiteLow && b > whiteLow {
+                        nWhite += 1
+                    } else {
+                        coloredR.append(Double(r) / 255)
+                        coloredG.append(Double(g) / 255)
+                        coloredB.append(Double(b) / 255)
                     }
-                    totalSampled += 1
                 }
             }
         }
 
-        guard totalSampled > 0 else { return .standard }
+        guard nTotal > 0 else { return .standard }
 
-        let ratio = CGFloat(transparentCount) / CGFloat(totalSampled)
-        let hasOwnShape = ratio >= transparencyThreshold
+        let transpRatio  = Double(nTransparent) / Double(nTotal)
+        let whiteRatio   = Double(nWhite)        / Double(nTotal)
+        let coloredRatio = Double(coloredR.count) / Double(nTotal)
 
-        return LogoShapeInfo(hasOwnShape: hasOwnShape, cornerTransparencyRatio: ratio)
+        // ── Rule 1: Transparent corners → shaped icon on transparent background ──
+        // (icons like GitHub Octocat, some Spotify/Discord variants)
+        // Render edge-to-edge with squircle clip — the icon's own shape IS the border.
+        if transpRatio >= 0.70 {
+            return .fullBleed
+        }
+
+        // ── Rule 2: White corners — probe a ring at 35 % radius for color ────────
+        // Detects circular/rounded icons that sit on a white background:
+        // e.g. Dribbble pink circle, Roblox, BandLab on white.
+        // A strong colored ring at 35 % radius means the icon IS circular.
+        if whiteRatio >= 0.60 {
+            let ringRadius = dim * 35 / 100   // 35 % × 64 ≈ 22 px from centre
+            let cx = dim / 2, cy = dim / 2
+            var ringColored = 0, ringTotal = 0
+            var angle = 0
+            while angle < 360 {
+                let rad = Double(angle) * .pi / 180
+                let x = Int(Double(cx) + Double(ringRadius) * cos(rad))
+                let y = Int(Double(cy) + Double(ringRadius) * sin(rad))
+                if x >= 0 && x < dim && y >= 0 && y < dim {
+                    let (r, g, b, a) = px(x, y)
+                    ringTotal += 1
+                    // Count pixel as "colored" if opaque and not white
+                    if a > αSolid && !(r > whiteLow && g > whiteLow && b > whiteLow) {
+                        ringColored += 1
+                    }
+                }
+                angle += 8  // sample every 8 degrees (45 samples total)
+            }
+
+            if ringTotal > 0 && Double(ringColored) / Double(ringTotal) >= 0.55 {
+                // White corners but circular colored centre → circleAdapted.
+                // FaviconView will use a Circle() clip so the container matches
+                // the icon's own circular shape exactly.
+                return .circleAdapted
+            }
+
+            // White corners, no clear circular region → standard framed logo.
+            return .standard
+        }
+
+        // ── Rule 3 + 4: Colored (non-white, non-transparent) corners ─────────────
+        if coloredRatio >= 0.45 && !coloredR.isEmpty {
+            let n = Double(coloredR.count)
+            let avgR = coloredR.reduce(0, +) / n
+            let avgG = coloredG.reduce(0, +) / n
+            let avgB = coloredB.reduce(0, +) / n
+
+            // Measure color variance across sampled corner pixels.
+            let varR = coloredR.map { ($0 - avgR) * ($0 - avgR) }.reduce(0, +) / n
+            let varG = coloredG.map { ($0 - avgG) * ($0 - avgG) }.reduce(0, +) / n
+            let varB = coloredB.map { ($0 - avgB) * ($0 - avgB) }.reduce(0, +) / n
+            let totalVariance = varR + varG + varB
+
+            if totalVariance < 0.05 {
+                // Rule 3: Low variance → uniform solid background colour.
+                // Sample a larger mid-edge strip to refine the average background colour,
+                // then use it to fill the squircle (extends the icon's background).
+                let midSamples = sampleMidEdgeColors(pixels: pixels, dim: dim, αFade: αFade, whiteLow: whiteLow)
+                let bgR = midSamples?.r ?? avgR
+                let bgG = midSamples?.g ?? avgG
+                let bgB = midSamples?.b ?? avgB
+                return .coloredSquircle(red: bgR, green: bgG, blue: bgB)
+            } else {
+                // Rule 4: High variance → full-bleed logo (e.g. Microsoft 4-colour grid).
+                // The icon fills its own space with varied colours — clip edge-to-edge.
+                return .fullBleed
+            }
+        }
+
+        return .standard
     }
 
-    /// Retrieve cached shape analysis for a set of domain candidates.
-    /// Returns `nil` if the image hasn't been analyzed yet (caller should fall back to `.standard`).
-    public func cachedShapeInfo(
+    /// Helper: sample mid-points of all four edges and return the average non-white colour.
+    /// Returns `nil` if no suitable samples are found.
+    private static func sampleMidEdgeColors(
+        pixels: [UInt8], dim: Int, αFade: UInt8, whiteLow: UInt8
+    ) -> (r: Double, g: Double, b: Double)? {
+        let strip = 3  // px wide strip at each edge midpoint
+        let mid = dim / 2
+        var sumR = 0.0, sumG = 0.0, sumB = 0.0, count = 0
+
+        func add(_ x: Int, _ y: Int) {
+            guard x >= 0 && x < dim && y >= 0 && y < dim else { return }
+            let i = (y * dim + x) * 4
+            let r = pixels[i], g = pixels[i + 1], b = pixels[i + 2], a = pixels[i + 3]
+            if a > αFade && !(r > whiteLow && g > whiteLow && b > whiteLow) {
+                sumR += Double(r) / 255; sumG += Double(g) / 255; sumB += Double(b) / 255
+                count += 1
+            }
+        }
+
+        for d in -strip...strip {
+            add(d + mid, 0)         // top edge
+            add(d + mid, dim - 1)   // bottom edge
+            add(0, d + mid)         // left edge
+            add(dim - 1, d + mid)   // right edge
+        }
+
+        guard count > 0 else { return nil }
+        return (sumR / Double(count), sumG / Double(count), sumB / Double(count))
+    }
+
+    // MARK: - Rendering Style Cache API
+
+    /// Retrieve cached JEV AI rendering style for a set of domain candidates.
+    /// Returns `nil` if not yet classified (FaviconView should call `classifyRenderingStyle` directly).
+    public func cachedRenderingStyle(
         urls: [String] = [],
         title: String = "",
         oauthProvider: String? = nil
-    ) -> LogoShapeInfo? {
+    ) -> LogoRenderingStyle? {
         let domainCandidates = resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
         guard !domainCandidates.isEmpty else { return nil }
         let cacheKey = domainCandidates.joined(separator: "|")
-        return shapeCache.object(forKey: cacheKey as NSString)?.info
+        return renderingCache.object(forKey: cacheKey as NSString)?.style
     }
 
-    /// Analyze and cache shape info for an image with the given lookup parameters.
-    /// Call this after a logo is successfully loaded.
-    public func cacheShapeInfo(
-        for image: NSImage,
+    /// Store a JEV AI classification result in the in-memory cache.
+    public func cacheRenderingStyle(
+        _ style: LogoRenderingStyle,
         urls: [String] = [],
         title: String = "",
         oauthProvider: String? = nil
@@ -509,8 +635,7 @@ public final class LogoService: @unchecked Sendable {
         let domainCandidates = resolveDomains(urls: urls, title: title, oauthProvider: oauthProvider)
         guard !domainCandidates.isEmpty else { return }
         let cacheKey = domainCandidates.joined(separator: "|")
-        let shape = Self.analyzeImageShape(image)
-        shapeCache.setObject(ShapeInfoBox(shape), forKey: cacheKey as NSString)
+        renderingCache.setObject(RenderingStyleBox(style), forKey: cacheKey as NSString)
     }
 
     // MARK: - Domain & Brand Extraction

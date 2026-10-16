@@ -2,13 +2,19 @@ import SwiftUI
 import AppKit
 
 /// Displays a high-resolution, vector/HD website brand logo or icon.
-/// Uses `LogoService` to query high-res Favicons, Clearbit, and Apple Touch Icons.
+/// Uses `LogoService` to query high-res Favicons and Apple Touch Icons.
 /// For logins without a logo, displays a beautiful deterministic monogram avatar with brand gradient.
 /// For non-login items, displays a modern glass-styled category squircle.
 ///
-/// **Smart Border Detection**: When a fetched logo already has its own rounded/circular
-/// shape (detected via corner pixel transparency analysis), the view renders it edge-to-edge
-/// without the white plate and outer squircle border — preventing double-border artifacts.
+/// **JEV AI Rendering**: After each logo is fetched, `LogoService.classifyRenderingStyle` analyses
+/// its pixel data to pick one of four rendering modes:
+///
+/// | Mode | Appearance | Examples |
+/// |---|---|---|
+/// | `.standard` | White plate + 78 % inset + border | LinkedIn, Autodesk |
+/// | `.fullBleed` | Edge-to-edge squircle clip, no plate | Microsoft grid, GitHub |
+/// | `.coloredSquircle` | Squircle filled with sampled bg colour | Spotify, Zoom |
+/// | `.circleAdapted` | Circle clip matching the icon's own radius | Dribbble, Roblox, BandLab |
 public struct FaviconView: View {
     let urls: [String]
     let title: String
@@ -18,8 +24,8 @@ public struct FaviconView: View {
 
     @State private var loadedImage: NSImage?
     @State private var isLoading: Bool = false
-    /// Shape analysis result for the loaded logo — determines rendering mode.
-    @State private var shapeInfo: LogoShapeInfo = .standard
+    /// JEV AI rendering mode for the currently loaded logo.
+    @State private var renderingStyle: LogoRenderingStyle = .standard
 
     public init(
         urls: [String] = [],
@@ -41,66 +47,25 @@ public struct FaviconView: View {
         )
         _loadedImage = State(initialValue: initial)
 
-        // If we have a cached image, also check for cached shape info
+        // If we have a cached image, also look up (or compute) a rendering style
         if let img = initial {
-            let cached = LogoService.shared.cachedShapeInfo(
-                urls: urls,
-                title: title,
-                oauthProvider: oauthProvider
+            let cached = LogoService.shared.cachedRenderingStyle(
+                urls: urls, title: title, oauthProvider: oauthProvider
             )
-            _shapeInfo = State(initialValue: cached ?? LogoService.analyzeImageShape(img))
+            _renderingStyle = State(initialValue: cached ?? LogoService.classifyRenderingStyle(img))
         }
     }
 
-    private var squircleRadius: CGFloat {
-        // Standard Apple squircle curvature ratio: ~0.2237 * size
-        max(4.0, size * 0.2237)
-    }
+    /// Standard squircle corner radius — Apple curvature ratio ~0.2237 × size.
+    private var squircleRadius: CGFloat { max(4.0, size * 0.2237) }
+
+    // MARK: - Body
 
     public var body: some View {
         ZStack {
             if let img = loadedImage {
-                if shapeInfo.hasOwnShape {
-                    // ── Shaped logo (has its own rounded/circular form) ──
-                    // Render edge-to-edge — no white plate, no outer border.
-                    // The logo's own shape IS the container shape.
-                    Image(nsImage: img)
-                        .resizable()
-                        .interpolation(.high)
-                        .antialiased(true)
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: size, height: size)
-                        .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
-                        .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
-                        .transition(.opacity)
-                } else {
-                    // ── Standard framed logo ──
-                    // White plate + inset logo + subtle border stroke.
-                    ZStack {
-                        // Solid white background — ensures favicons always look crisp
-                        // regardless of row highlight/selection state. Also handles logos
-                        // with transparent backgrounds (e.g. Autodesk, LinkedIn dark variants).
-                        RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                            .fill(Color.white)
-
-                        Image(nsImage: img)
-                            .resizable()
-                            .interpolation(.high)
-                            .antialiased(true)
-                            .aspectRatio(contentMode: .fit)
-                            // Inset to 78% — logos that don't bleed to the edge
-                            // sit on a clean white plate instead of showing dark transparency.
-                            .frame(width: size * 0.78, height: size * 0.78)
-                    }
-                    .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                            .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
-                    )
-                    .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+                logoView(for: img, style: renderingStyle)
                     .transition(.opacity)
-                }
             } else {
                 fallbackAvatar
             }
@@ -112,10 +77,98 @@ public struct FaviconView: View {
         }
         .onAppear {
             if loadedImage == nil {
-                Task { @MainActor in
-                    await loadLogo()
-                }
+                Task { @MainActor in await loadLogo() }
             }
+        }
+    }
+
+    // MARK: - Four JEV AI Rendering Modes
+
+    @ViewBuilder
+    private func logoView(for img: NSImage, style: LogoRenderingStyle) -> some View {
+        switch style {
+
+        case .standard:
+            // ── Standard: white plate + 78 % inset + subtle border ──────────────
+            // For flat logos on white/transparent backgrounds (LinkedIn, Autodesk).
+            ZStack {
+                // Solid white background — ensures favicons always look crisp
+                // regardless of row highlight/selection state. Also handles logos
+                // with transparent backgrounds (e.g. Autodesk, LinkedIn dark variants).
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .fill(Color.white)
+
+                Image(nsImage: img)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .aspectRatio(contentMode: .fit)
+                    // Inset to 78% — logos that don't bleed to the edge
+                    // sit on a clean white plate instead of showing dark transparency.
+                    .frame(width: size * 0.78, height: size * 0.78)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .stroke(Color.black.opacity(0.09), lineWidth: 0.75)
+            )
+            .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+
+        case .fullBleed:
+            // ── Full Bleed: edge-to-edge with squircle clip, no plate ────────────
+            // For icons that fill their canvas entirely (Microsoft 4-colour grid,
+            // GitHub Octocat on dark bg, etc.). The squircle clips the corners cleanly.
+            Image(nsImage: img)
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .aspectRatio(contentMode: .fill)
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+                .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+
+        case .coloredSquircle(let r, let g, let b):
+            // ── Coloured Squircle: sampled background fill + full-size icon ──────
+            // For icons with a solid dominant background colour (Spotify near-black,
+            // Zoom blue, LinkedIn blue). We fill the squircle with the sampled colour
+            // first so edge compression artefacts are invisible, then render the
+            // icon full-size on top.
+            ZStack {
+                RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
+                    .fill(Color(red: r, green: g, blue: b))
+
+                Image(nsImage: img)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+            }
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
+            .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+
+        case .circleAdapted:
+            // ── Circle Adapted: white circle clip + full-size icon ───────────────
+            // For circular icons on white backgrounds (Dribbble pink circle, Roblox,
+            // BandLab red circle). Uses Circle() clip (50 % radius) so the container
+            // shape matches the icon's own circular boundary precisely — no visible
+            // white margin gap between the icon's circle edge and the container.
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+
+                Image(nsImage: img)
+                    .resizable()
+                    .interpolation(.high)
+                    .antialiased(true)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+            .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
         }
     }
 
@@ -241,7 +294,7 @@ public struct FaviconView: View {
             if loadedImage != nil {
                 withAnimation(.easeOut(duration: 0.15)) {
                     self.loadedImage = nil
-                    self.shapeInfo = .standard
+                    self.renderingStyle = .standard
                 }
             }
             return
@@ -250,13 +303,17 @@ public struct FaviconView: View {
         if let cached = LogoService.shared.cachedImageSync(urls: urls, title: title, oauthProvider: oauthProvider) {
             if self.loadedImage !== cached {
                 self.loadedImage = cached
-                // Use cached shape info or analyze on the fly
-                if let cachedShape = LogoService.shared.cachedShapeInfo(urls: urls, title: title, oauthProvider: oauthProvider) {
-                    self.shapeInfo = cachedShape
+                // Retrieve or compute rendering style for cached image
+                if let cachedStyle = LogoService.shared.cachedRenderingStyle(
+                    urls: urls, title: title, oauthProvider: oauthProvider
+                ) {
+                    self.renderingStyle = cachedStyle
                 } else {
-                    let shape = LogoService.analyzeImageShape(cached)
-                    self.shapeInfo = shape
-                    LogoService.shared.cacheShapeInfo(for: cached, urls: urls, title: title, oauthProvider: oauthProvider)
+                    let style = LogoService.classifyRenderingStyle(cached)
+                    self.renderingStyle = style
+                    LogoService.shared.cacheRenderingStyle(
+                        style, urls: urls, title: title, oauthProvider: oauthProvider
+                    )
                 }
             }
             return
@@ -270,17 +327,14 @@ public struct FaviconView: View {
         )
 
         if let fetched = fetched {
-            // Analyze shape (already cached by LogoService.performWaterfallFetch,
-            // but retrieve it here for the view state)
-            let shape = LogoService.shared.cachedShapeInfo(
-                urls: urls,
-                title: title,
-                oauthProvider: oauthProvider
-            ) ?? LogoService.analyzeImageShape(fetched)
+            // Rendering style was cached by performWaterfallFetch; retrieve it.
+            let style = LogoService.shared.cachedRenderingStyle(
+                urls: urls, title: title, oauthProvider: oauthProvider
+            ) ?? LogoService.classifyRenderingStyle(fetched)
 
             withAnimation(.easeOut(duration: 0.18)) {
                 self.loadedImage = fetched
-                self.shapeInfo = shape
+                self.renderingStyle = style
             }
         }
     }
