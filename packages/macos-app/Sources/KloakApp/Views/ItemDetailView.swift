@@ -172,7 +172,7 @@ public struct ItemDetailView: View {
                                         .stroke(LiquidGlassTheme.primaryAccent.opacity(0.5), lineWidth: 1)
                                 )
                         } else {
-                            Text(item.title)
+                            Text(BrandTitleService.cleanTitle(item.title, url: item.urls.first))
                                 .font(.system(size: 18, weight: .bold))
                                 .lineLimit(2)
                                 .truncationMode(.tail)
@@ -701,7 +701,7 @@ public struct ItemDetailView: View {
                     Spacer()
 
                     Button(action: {
-                        editTitle = item.title
+                        editTitle = BrandTitleService.cleanTitle(item.title, url: item.urls.first)
                         editUsername = item.username ?? ""
                         editPassword = ""
                         editUrls = item.urls
@@ -1567,7 +1567,7 @@ public struct ItemDetailView: View {
     // MARK: - Edit State Management
 
     private func startEditing() {
-        editTitle = item.title
+        editTitle = BrandTitleService.cleanTitle(item.title, url: item.urls.first)
         editUsername = item.username ?? ""
         editPassword = item.password ?? ""
         editUrls = item.urls.isEmpty ? [""] : item.urls

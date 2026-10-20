@@ -591,6 +591,24 @@ public final class VaultStore: ObservableObject {
         return (addedCount, [])
     }
 
+    // MARK: - Title Sanitization & Brand Canonicalization
+
+    public func sanitizeAllItemTitles() {
+        var didModify = false
+        for i in 0..<self.items.count {
+            let clean = BrandTitleService.cleanTitle(self.items[i].title, url: self.items[i].urls.first)
+            if clean != self.items[i].title {
+                self.items[i].title = clean
+                self.items[i].updatedAt = ISO8601DateFormatter().string(from: Date())
+                didModify = true
+            }
+        }
+        if didModify {
+            recordUserActivity()
+            saveVault()
+        }
+    }
+
     // MARK: - Duplicate Management & Resolution
 
     public func mergeDuplicateGroup(_ group: DuplicateAccountGroup) {

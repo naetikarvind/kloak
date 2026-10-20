@@ -65,8 +65,13 @@ public final class KeychainManager: @unchecked Sendable {
 
     // MARK: - Apple Keychain Two-Way Sync (Logins & Passwords)
 
-    /// Strips any "Kloak — ", "Kloak - - ", "Kloak - ", "Kloak-", or "kloak — " prefixes from a title.
+    /// Strips any "Kloak — " prefixes and converts domain/URL titles to canonical brand names.
     public static func cleanTitle(_ raw: String) -> String {
+        return BrandTitleService.cleanTitle(raw)
+    }
+
+    /// Strips any "Kloak — ", "Kloak - - ", "Kloak - ", "Kloak-", or "kloak — " prefixes from a title.
+    public static func stripKloakPrefixes(_ raw: String) -> String {
         var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let separators = CharacterSet(charactersIn: "-—–: \t\r\n")
 

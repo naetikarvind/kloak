@@ -206,9 +206,13 @@ public struct ItemRowView: View {
 
     private var displayTitle: String {
         let t = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !t.isEmpty { return t }
+        if !t.isEmpty {
+            return BrandTitleService.cleanTitle(t, url: item.urls.first)
+        }
         if let u = item.username, !u.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return u }
-        if let url = item.urls.first, !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return url }
+        if let url = item.urls.first, !url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return BrandTitleService.cleanTitle(url)
+        }
         return item.type.displayName
     }
 

@@ -379,6 +379,7 @@ public struct VaultMainView: View {
         .onAppear {
             triggerWindowResize(for: selection, animated: false)
             LogoService.shared.prefetchLogos(for: items)
+            VaultStore.shared.sanitizeAllItemTitles()
         }
         .onChange(of: selection) { _, newSel in
             selectedItemId = nil
@@ -764,6 +765,14 @@ public struct NewItemSheet: View {
                 .padding(8)
                 .background(Color.black.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .onChange(of: url) { _, newUrl in
+                    if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        let brand = BrandTitleService.formatDomainToBrand(newUrl)
+                        if !brand.isEmpty && brand != newUrl {
+                            title = brand
+                        }
+                    }
+                }
         }
 
         VStack(alignment: .leading, spacing: 6) {
@@ -1005,7 +1014,16 @@ public struct NewItemSheet: View {
 
     private func handleSave() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let finalTitle = trimmedTitle.isEmpty ? (type == .card ? "Payment Card" : type == .identity ? "Identity Profile" : "Untitled") : trimmedTitle
+        let finalTitle: String
+        if trimmedTitle.isEmpty {
+            if !url.isEmpty {
+                finalTitle = BrandTitleService.formatDomainToBrand(url)
+            } else {
+                finalTitle = (type == .card ? "Payment Card" : type == .identity ? "Identity Profile" : "Untitled")
+            }
+        } else {
+            finalTitle = BrandTitleService.cleanTitle(trimmedTitle, url: url)
+        }
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
 
         var cardObj: CardDetails? = nil
