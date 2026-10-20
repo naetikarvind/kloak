@@ -4,6 +4,8 @@
  * Contextual Generator & AI Certificate / Domain Owner Threat Inspector.
  */
 
+import { renderFavicon } from './favicon-service';
+
 interface FormContext {
   form: HTMLFormElement | null;
   usernameFields: HTMLInputElement[];
@@ -427,23 +429,14 @@ const POPUP_STYLES = `
   }
 
   .kloak-item-avatar {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 5px;
-    background: rgba(109, 74, 255, 0.15);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
-    font-weight: 700;
-    color: #6D4AFF;
     overflow: hidden;
     flex-shrink: 0;
-  }
-  .kloak-item-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
 
   .kloak-item-info {
@@ -945,10 +938,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
 
       card.innerHTML = `
         <div class="kloak-card-top">
-          <div class="kloak-item-avatar">
-            <img src="https://www.google.com/s2/favicons?domain=${domainForIcon}&sz=32" onerror="this.remove();">
-            <span>${avatarLetter}</span>
-          </div>
+          <div class="kloak-item-avatar"></div>
           <div class="kloak-item-info">
             <div class="kloak-item-username" title="${item.username || 'No Username'}">${item.username || 'No Username'}</div>
             <div class="kloak-item-title">${item.title || hostname} ${item.totpSecret ? '<span style="color: #10B981; font-weight: 600;">• 2FA</span>' : ''}</div>
@@ -974,6 +964,11 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
           </div>
         </div>
       `;
+
+      const avatarBox = card.querySelector('.kloak-item-avatar') as HTMLElement;
+      if (avatarBox) {
+        renderFavicon(avatarBox, { item, size: 24 });
+      }
 
       card.querySelector(`#fill-btn-${itemId}`)?.addEventListener('click', (e) => {
         e.stopPropagation();

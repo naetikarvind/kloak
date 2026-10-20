@@ -632,6 +632,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         break;
       }
 
+      case 'FETCH_IMAGE_DATA_URL': {
+        try {
+          const res = await fetch(message.url);
+          if (!res.ok) {
+            sendResponse({ success: false, status: res.status });
+            break;
+          }
+          const blob = await res.blob();
+          if (blob.size < 50) {
+            sendResponse({ success: false, reason: 'too_small' });
+            break;
+          }
+          const buffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+          const mime = blob.type || 'image/png';
+          sendResponse({
+            success: true,
+            dataUrl: `data:${mime};base64,${base64}`,
+            size: blob.size
+          });
+        } catch (err: any) {
+          sendResponse({ success: false, error: err?.message || 'fetch_failed' });
+        }
+        break;
+      }
+
       default:
         sendResponse({ error: 'Unknown message type' });
     }

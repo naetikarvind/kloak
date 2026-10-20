@@ -3,6 +3,8 @@
  * Full unlock/login support, search, quick copy, and autofill.
  */
 
+import { renderFavicon } from './favicon-service';
+
 let cachedSideItems: any[] = [];
 
 async function checkDirectStatus(): Promise<{ isUnlocked: boolean; items?: any[] } | null> {
@@ -141,21 +143,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const card = document.createElement('div');
       card.className = 'item-card';
 
-      let domain = '';
-      if (item.urls && item.urls[0]) {
-        try {
-          domain = new URL(item.urls[0]).hostname;
-        } catch {
-          domain = item.urls[0];
-        }
-      } else {
-        domain = item.title ? `${item.title.toLowerCase().replace(/[^a-z0-9]/g, '')}.com` : 'example.com';
-      }
-
       card.innerHTML = `
         <div class="item-top">
           <div class="item-title-group">
-            <img class="item-favicon" src="https://www.google.com/s2/favicons?domain=${domain}&sz=32" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 24 24\\' fill=\\'%236D4AFF\\'><path d=\\'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z\\'/></svg>'">
+            <div class="item-favicon-box"></div>
             <div style="overflow: hidden;">
               <div class="item-title">${item.title || 'Untitled'}</div>
               <div class="item-username">${item.username || 'No username'}</div>
@@ -177,6 +168,11 @@ document.addEventListener('DOMContentLoaded', () => {
           </button>
         </div>
       `;
+
+      const favBox = card.querySelector('.item-favicon-box') as HTMLElement;
+      if (favBox) {
+        renderFavicon(favBox, { item, size: 28 });
+      }
 
       // Fill button action
       card.querySelector('.btn-fill')?.addEventListener('click', async (e) => {
