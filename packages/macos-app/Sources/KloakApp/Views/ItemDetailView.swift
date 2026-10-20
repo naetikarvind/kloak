@@ -191,9 +191,11 @@ public struct ItemDetailView: View {
                                     .clipShape(Capsule())
                             }
 
-                            if let folder = folders.first(where: { f in
-                                item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
-                            }) {
+                            let activeFolder: VaultFolder? = isEditing
+                                ? folders.first(where: { $0.id == editFolderId })
+                                : item.currentFolder(in: folders)
+
+                            if let folder = activeFolder {
                                 HStack(spacing: 3) {
                                     Image(systemName: "folder.fill")
                                         .font(.system(size: 9))
@@ -206,7 +208,10 @@ public struct ItemDetailView: View {
                                 .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
                                 .foregroundColor(LiquidGlassTheme.primaryAccent)
                                 .clipShape(Capsule())
-                            } else if let tag = item.tags.first(where: { $0.lowercased() != "imported" }) {
+                            } else if !isEditing, let tag = item.tags.first(where: { rawTag in
+                                let l = rawTag.lowercased()
+                                return l != "imported" && !folders.contains(where: { f in f.id == rawTag || f.name.lowercased() == l })
+                            }) {
                                 Text(tag)
                                     .font(.system(size: 11, weight: .medium))
                                     .lineLimit(1)
@@ -1619,9 +1624,7 @@ public struct ItemDetailView: View {
             editAuthPeriod = auth.period ?? 30
         }
 
-        if let matchingFolder = folders.first(where: { f in
-            item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
-        }) {
+        if let matchingFolder = item.currentFolder(in: folders) {
             editFolderId = matchingFolder.id
         } else {
             editFolderId = ""
@@ -1724,17 +1727,9 @@ public struct ItemDetailView: View {
         }
 
         // Update folder tags
-        let folderIds = Set(folders.map { $0.id })
-        let folderNames = Set(folders.map { $0.name.lowercased() })
-        var newTags = updated.tags.filter { tag in
-            !folderIds.contains(tag) && !folderNames.contains(tag.lowercased())
-        }
-        if let selected = folders.first(where: { $0.id == editFolderId }) {
-            newTags.append(selected.name)
-        }
-        updated.tags = newTags
+        let selected = folders.first(where: { $0.id == editFolderId })
+        updated.setFolder(selected, allFolders: folders)
 
-        updated.updatedAt = ISO8601DateFormatter().string(from: Date())
         onSave(updated)
         withAnimation(.easeInOut(duration: 0.22)) {
             isEditing = false

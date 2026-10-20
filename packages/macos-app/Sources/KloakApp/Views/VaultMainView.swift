@@ -3,7 +3,7 @@ import SwiftUI
 public struct VaultMainView: View {
     @Binding var isUnlocked: Bool
     @Binding var items: [VaultItem]
-    var folders: [VaultFolder]
+    @Binding var folders: [VaultFolder]
     @Binding var settings: VaultSettings
     var onLock: () -> Void
     var onSaveItem: (VaultItem) -> Void
@@ -23,7 +23,7 @@ public struct VaultMainView: View {
     public init(
         isUnlocked: Binding<Bool>,
         items: Binding<[VaultItem]>,
-        folders: [VaultFolder],
+        folders: Binding<[VaultFolder]>,
         settings: Binding<VaultSettings>,
         onLock: @escaping () -> Void,
         onSaveItem: @escaping (VaultItem) -> Void,
@@ -35,7 +35,7 @@ public struct VaultMainView: View {
     ) {
         self._isUnlocked = isUnlocked
         self._items = items
-        self.folders = folders
+        self._folders = folders
         self._settings = settings
         self.onLock = onLock
         self.onSaveItem = onSaveItem
@@ -75,19 +75,10 @@ public struct VaultMainView: View {
                 base = items.filter { $0.type == type && !$0.trashed }
             }
         case .folder(let folderId):
-            let targetFolder = folders.first(where: { $0.id == folderId })
-            let folderName = targetFolder?.name.lowercased() ?? ""
-            base = items.filter { item in
-                guard !item.trashed else { return false }
-                if item.tags.contains(folderId) { return true }
-                if !folderName.isEmpty && item.tags.contains(where: { $0.lowercased() == folderName }) { return true }
-                if folderName == "imported" && item.tags.contains(where: {
-                    let lower = $0.lowercased()
-                    return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
-                }) {
-                    return true
-                }
-                return false
+            if let targetFolder = folders.first(where: { $0.id == folderId }) {
+                base = items.filter { $0.belongsTo(folder: targetFolder, allFolders: folders) }
+            } else {
+                base = items.filter { $0.tags.contains(folderId) }
             }
         case .trash:
             base = items.filter { $0.trashed }
@@ -253,14 +244,22 @@ public struct VaultMainView: View {
             SidebarView(
                 selection: $selection,
                 items: items,
-                folders: folders,
+                folders: $folders,
                 onLock: onLock,
                 onAddItem: { isShowingNewItemSheet = true },
                 onCreateFolder: { name in
-                    _ = VaultStore.shared.createFolder(name: name)
+                    let newFolder = VaultStore.shared.createFolder(name: name)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selection = .folder(newFolder.id)
+                    }
                 },
                 onDeleteFolder: { id in
                     VaultStore.shared.deleteFolder(id: id)
+                    if case .folder(let currentFolderId) = selection, currentFolderId == id {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selection = .allItems
+                        }
+                    }
                 }
             )
             .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 270)
@@ -294,16 +293,7 @@ public struct VaultMainView: View {
                             onAddItem: { isShowingNewItemSheet = true },
                             onMoveToFolder: { item, targetFolder in
                                 if let idx = items.firstIndex(where: { $0.id == item.id }) {
-                                    let folderIds = Set(folders.map { $0.id })
-                                    let folderNames = Set(folders.map { $0.name.lowercased() })
-                                    var newTags = items[idx].tags.filter { tag in
-                                        !folderIds.contains(tag) && !folderNames.contains(tag.lowercased())
-                                    }
-                                    if let target = targetFolder {
-                                        newTags.append(target.name)
-                                    }
-                                    items[idx].tags = newTags
-                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                    items[idx].setFolder(targetFolder, allFolders: folders)
                                     onSaveItem(items[idx])
                                 }
                             },
@@ -1091,6 +1081,7 @@ public struct NewItemSheet: View {
 
         var itemTags: [String] = []
         if let sel = folders.first(where: { $0.id == selectedFolderId }) {
+            itemTags.append(sel.id)
             itemTags.append(sel.name)
         }
 

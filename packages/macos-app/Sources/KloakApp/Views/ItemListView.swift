@@ -163,9 +163,7 @@ public struct ItemRowView: View {
     var onDeletePermanently: ((String) -> Void)? = nil
 
     private var currentFolder: VaultFolder? {
-        folders.first(where: { f in
-            item.tags.contains(f.id) || item.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
-        })
+        item.currentFolder(in: folders)
     }
 
     private var isWeakPassword: Bool {

@@ -90,7 +90,7 @@ public struct KloakApp: App {
                     VaultMainView(
                         isUnlocked: $vaultStore.isUnlocked,
                         items: $vaultStore.items,
-                        folders: vaultStore.folders,
+                        folders: $vaultStore.folders,
                         settings: $vaultStore.settings,
                         onLock: {
                             vaultStore.lock()

@@ -304,6 +304,87 @@ public struct VaultFolder: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - VaultItem Folder Management
+
+extension VaultItem {
+    /// Determines whether this item belongs to the specified folder.
+    public func belongsTo(folder: VaultFolder, allFolders: [VaultFolder]) -> Bool {
+        guard !self.trashed else { return false }
+
+        // 1. Authoritative ID match
+        if self.tags.contains(folder.id) { return true }
+
+        // 2. Exact folder name match (case-insensitive)
+        if self.tags.contains(where: { $0.lowercased() == folder.name.lowercased() }) { return true }
+
+        // 3. Special legacy fallback for "Imported" folder ONLY if item has not been assigned to any other folder
+        if folder.name.lowercased() == "imported" {
+            let otherFolderIds = Set(allFolders.filter { $0.id != folder.id }.map { $0.id })
+            let otherFolderNames = Set(allFolders.filter { $0.id != folder.id }.map { $0.name.lowercased() })
+            let isAssignedToOtherFolder = self.tags.contains(where: { tag in
+                otherFolderIds.contains(tag) || otherFolderNames.contains(tag.lowercased())
+            })
+            if !isAssignedToOtherFolder {
+                return self.tags.contains(where: {
+                    let lower = $0.lowercased()
+                    return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
+                })
+            }
+        }
+
+        return false
+    }
+
+    /// Resolves the current folder that this item belongs to from the given folder list.
+    public func currentFolder(in allFolders: [VaultFolder]) -> VaultFolder? {
+        // 1. Check non-imported folders first
+        let nonImportedFolders = allFolders.filter { $0.name.lowercased() != "imported" }
+        if let match = nonImportedFolders.first(where: { f in
+            self.tags.contains(f.id) || self.tags.contains(where: { $0.lowercased() == f.name.lowercased() })
+        }) {
+            return match
+        }
+
+        // 2. Check for explicit "Imported" folder
+        if let importFolder = allFolders.first(where: { $0.name.lowercased() == "imported" }) {
+            if self.tags.contains(importFolder.id) || self.tags.contains(where: { $0.lowercased() == "imported" }) {
+                return importFolder
+            }
+            if self.tags.contains(where: {
+                let lower = $0.lowercased()
+                return lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
+            }) {
+                return importFolder
+            }
+        }
+
+        return nil
+    }
+
+    /// Cleanly updates the item's folder association, persisting both ID and name and pruning legacy import tags.
+    public mutating func setFolder(_ targetFolder: VaultFolder?, allFolders: [VaultFolder]) {
+        let folderIds = Set(allFolders.map { $0.id })
+        let folderNames = Set(allFolders.map { $0.name.lowercased() })
+
+        var newTags = self.tags.filter { tag in
+            let lower = tag.lowercased()
+            if folderIds.contains(tag) || folderNames.contains(lower) { return false }
+            if lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import") {
+                return false
+            }
+            return true
+        }
+
+        if let target = targetFolder {
+            newTags.append(target.id)
+            newTags.append(target.name)
+        }
+
+        self.tags = newTags
+        self.updatedAt = ISO8601DateFormatter().string(from: Date())
+    }
+}
+
 // MARK: - Vault Settings
 
 public struct VaultSettings: Codable, Hashable, Sendable {

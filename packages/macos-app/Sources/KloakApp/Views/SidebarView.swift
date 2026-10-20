@@ -16,7 +16,7 @@ public enum NavigationSection: Hashable {
 public struct SidebarView: View {
     @Binding var selection: NavigationSection
     var items: [VaultItem]
-    var folders: [VaultFolder]
+    @Binding var folders: [VaultFolder]
     var onLock: () -> Void
     var onAddItem: () -> Void
     var onCreateFolder: ((String) -> Void)? = nil
@@ -69,6 +69,7 @@ public struct SidebarView: View {
                         }
                         .badge(items.filter { !$0.trashed }.count)
                     }
+                    .tag(NavigationSection.allItems)
 
                     NavigationLink(value: NavigationSection.favorites) {
                         Label {
@@ -78,6 +79,7 @@ public struct SidebarView: View {
                         }
                         .badge(items.filter { $0.favorite && !$0.trashed }.count)
                     }
+                    .tag(NavigationSection.favorites)
                 }
 
                 Section(header: sectionHeader("Categories")) {
@@ -93,28 +95,19 @@ public struct SidebarView: View {
                                 : items.filter { $0.type == type && !$0.trashed }.count
                             )
                         }
+                        .tag(NavigationSection.category(type))
                     }
                 }
 
                 Section(header: foldersHeader) {
                     ForEach(folders) { folder in
-                        let count = items.filter { item in
-                            guard !item.trashed else { return false }
-                            if item.tags.contains(folder.id) { return true }
-                            if item.tags.contains(where: { $0.lowercased() == folder.name.lowercased() }) { return true }
-                            if folder.name.lowercased() == "imported" && item.tags.contains(where: {
-                                let lower = $0.lowercased()
-                                return lower == "imported" || lower.contains("keychain") || lower.contains("passwords") || lower.contains("import")
-                            }) {
-                                return true
-                            }
-                            return false
-                        }.count
+                        let count = items.filter { $0.belongsTo(folder: folder, allFolders: folders) }.count
 
                         NavigationLink(value: NavigationSection.folder(folder.id)) {
                             Label(folder.name, systemImage: "folder.fill")
                         }
                         .badge(count)
+                        .tag(NavigationSection.folder(folder.id))
                         .contextMenu {
                             Button(role: .destructive) {
                                 onDeleteFolder?(folder.id)
@@ -152,6 +145,7 @@ public struct SidebarView: View {
                         }
                         .badge(dupCount)
                     }
+                    .tag(NavigationSection.duplicates)
 
                     NavigationLink(value: NavigationSection.passwordHealth) {
                         Label {
@@ -162,27 +156,32 @@ public struct SidebarView: View {
                         }
                         .badge(totalHealthIssues)
                     }
+                    .tag(NavigationSection.passwordHealth)
                 }
 
                 Section(header: sectionHeader("Tools")) {
                     NavigationLink(value: NavigationSection.generator) {
                         Label("Password Generator", systemImage: "dice.fill")
                     }
+                    .tag(NavigationSection.generator)
 
                     NavigationLink(value: NavigationSection.importExport) {
                         Label("Import & Export", systemImage: "arrow.triangle.2.circlepath")
                     }
+                    .tag(NavigationSection.importExport)
                 }
 
                 Section(header: sectionHeader("Manage")) {
                     NavigationLink(value: NavigationSection.settings) {
                         Label("Settings", systemImage: "gearshape.fill")
                     }
+                    .tag(NavigationSection.settings)
 
                     NavigationLink(value: NavigationSection.trash) {
                         Label("Trash", systemImage: "trash.fill")
                             .badge(items.filter { $0.trashed }.count)
                     }
+                    .tag(NavigationSection.trash)
                 }
             }
             .listStyle(.sidebar)
