@@ -150,7 +150,7 @@ public struct FaviconView: View {
             .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                    .stroke(Color.black.opacity(0.12), lineWidth: 0.75)
+                    .stroke(r + g + b < 0.35 ? Color.white.opacity(0.12) : Color.black.opacity(0.12), lineWidth: 0.75)
             )
             .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
 
@@ -173,7 +173,7 @@ public struct FaviconView: View {
             .clipShape(RoundedRectangle(cornerRadius: squircleRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: squircleRadius, style: .continuous)
-                    .stroke(Color.black.opacity(0.12), lineWidth: 0.75)
+                    .stroke(r + g + b < 0.35 ? Color.white.opacity(0.12) : Color.black.opacity(0.12), lineWidth: 0.75)
             )
             .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
 

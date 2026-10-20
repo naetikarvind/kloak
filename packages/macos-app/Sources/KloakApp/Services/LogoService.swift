@@ -454,9 +454,11 @@ public final class LogoService: @unchecked Sendable {
         // Zoom — brand video blue
         "zoom.us":               .coloredSquircle(red: 0.059, green: 0.373, blue: 0.996),
 
-        // Spotify — Spotify green
-        "spotify.com":           .coloredSquircle(red: 0.118, green: 0.843, blue: 0.376),
-        "accounts.spotify.com":  .coloredSquircle(red: 0.118, green: 0.843, blue: 0.376),
+        // Spotify — dark background (#121212) so transparent sound waves render as crisp black on the green circle
+        "spotify.com":           .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
+        "www.spotify.com":       .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
+        "accounts.spotify.com":  .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
+        "open.spotify.com":      .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
 
         // Microsoft — full bleed 4-color grid
         "microsoft.com":         .fullBleed,
@@ -481,6 +483,10 @@ public final class LogoService: @unchecked Sendable {
             }
             let stripped = key.hasPrefix("www.") ? String(key.dropFirst(4)) : key
             if let override = renderingStyleOverrides[stripped] {
+                return override
+            }
+            let cleaned = shared.cleanDomainHost(key)
+            if let override = renderingStyleOverrides[cleaned] {
                 return override
             }
         }
