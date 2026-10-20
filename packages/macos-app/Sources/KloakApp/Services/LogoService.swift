@@ -443,28 +443,9 @@ public final class LogoService: @unchecked Sendable {
 
     // MARK: - JEV AI — Pixel-Based Rendering Classifier
 
-    /// **JEV AI Domain Override Map** — explicit rendering modes for known brand icons
-    /// that have distinctive brand backgrounds or require exact styling.
-    private static let renderingStyleOverrides: [String: LogoRenderingStyle] = [
-        // LinkedIn — deep brand blue (#0077B5 / #0073B2 -> 0.0, 0.451, 0.698)
-        "linkedin.com":          .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
-        "www.linkedin.com":      .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
-        "learning.linkedin.com": .coloredSquircle(red: 0.0, green: 0.451, blue: 0.698),
-
-        // Zoom — brand video blue
-        "zoom.us":               .coloredSquircle(red: 0.059, green: 0.373, blue: 0.996),
-
-        // Spotify — dark background (#121212) so transparent sound waves render as crisp black on the green circle
-        "spotify.com":           .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
-        "www.spotify.com":       .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
-        "accounts.spotify.com":  .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
-        "open.spotify.com":      .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07),
-
-        // Microsoft — full bleed 4-color grid
-        "microsoft.com":         .fullBleed,
-        "live.com":              .fullBleed,
-        "account.live.com":      .fullBleed,
-    ]
+    /// **JEV AI Domain Override Map** — optional overrides for extreme edge cases.
+    /// The vision classifier handles standard, fullBleed, coloredSquircle, and cutout detection automatically.
+    private static let renderingStyleOverrides: [String: LogoRenderingStyle] = [:]
 
     /// **JEV AI** (Just-Enough Vision) on-device favicon rendering classifier.
     ///
@@ -602,17 +583,27 @@ public final class LogoService: @unchecked Sendable {
             }
 
             var totalOpaque = 0
+            var innerTransp = 0
+            var innerTotal = 0
             for y in 0..<dim {
                 for x in 0..<dim {
                     let (_, _, _, a) = px(x, y)
                     if a > αFade { totalOpaque += 1 }
+                    // Inner core region (25% to 75% inset from borders)
+                    if x >= 16 && x < 48 && y >= 16 && y < 48 {
+                        innerTotal += 1
+                        if a < αFade {
+                            innerTransp += 1
+                        }
+                    }
                 }
             }
             let opRatio = Double(totalOpaque) / Double(dim * dim)
+            let innerTranspRatio = Double(innerTransp) / Double(max(1, innerTotal))
 
-            // If mid-edges are consistently colored and overall opacity is high (≥70%),
+            // If mid-edges are consistently colored and overall opacity is high (≥68%),
             // it's a solid colored card with rounded corners:
-            if midOpaque == 4 && midR.count == 4 && opRatio >= 0.70 {
+            if midOpaque == 4 && midR.count == 4 && opRatio >= 0.68 {
                 let avgR = midR.reduce(0, +) / 4
                 let avgG = midG.reduce(0, +) / 4
                 let avgB = midB.reduce(0, +) / 4
@@ -620,6 +611,21 @@ public final class LogoService: @unchecked Sendable {
                 let varG = midG.map { ($0 - avgG) * ($0 - avgG) }.reduce(0, +) / 4
                 let varB = midB.map { ($0 - avgB) * ($0 - avgB) }.reduce(0, +) / 4
                 if (varR + varG + varB) < 0.05 {
+                    // ── JEV AI Cutout Contrast Detection ──
+                    // If the inner core contains transparent cutouts (negative space, e.g. Spotify sound waves),
+                    // filling the background with the body color would erase the graphic!
+                    // Automatically choose a contrasting background so the negative space pops:
+                    if innerTranspRatio > 0.05 {
+                        let luminance = 0.2126 * avgR + 0.7152 * avgG + 0.0722 * avgB
+                        if luminance > 0.35 {
+                            // Bright foreground body (e.g. Spotify green): use dark contrasting plate (#121212)
+                            return .coloredSquircle(red: 0.07, green: 0.07, blue: 0.07)
+                        } else {
+                            // Dark foreground body: use white contrasting plate
+                            return .standard
+                        }
+                    }
+
                     return .coloredSquircle(red: avgR, green: avgG, blue: avgB)
                 }
             }
