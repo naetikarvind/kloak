@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="tileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0b0e24" />
+      <stop offset="45%" stop-color="#181342" />
+      <stop offset="100%" stop-color="#341266" />
+    </linearGradient>
+
+    <!-- Shackle Gradient -->
+    <linearGradient id="shackleGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+
+    <!-- Shield Left Gradient -->
+    <linearGradient id="shieldLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6D28D9" />
+      <stop offset="100%" stop-color="#312E81" />
+    </linearGradient>
+
+    <!-- Shield Right Gradient -->
+    <linearGradient id="shieldRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B0764" />
+      <stop offset="100%" stop-color="#1E1B4B" />
+    </linearGradient>
+
+    <!-- Neon Glow for K Emblem -->
+    <filter id="k-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feColorMatrix type="matrix" values="
+        0 0 0 0 0.49
+        0 0 0 0 0.82
+        0 0 0 0 0.98
+        0 0 0 0.7 0" in="blur" result="colorGlow" />
+      <feComposite in="SourceGraphic" in2="colorGlow" operator="over" />
+    </filter>
+
+    <!-- Glass Rim Highlight -->
+    <linearGradient id="glassRim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.03" />
+    </linearGradient>
+  </defs>
+
+  <!-- App Tile Squircle Container -->
+  <rect x="32" y="32" width="960" height="960" rx="224" fill="url(#tileGrad)" stroke="url(#glassRim)" stroke-width="4" />
+
+  <!-- Inner Ambient Glow Behind Shield -->
+  <circle cx="512" cy="540" r="300" fill="#6366F1" opacity="0.18" filter="blur(60px)" />
+
+  <!-- Lock Shackle -->
+  <g transform="translate(-0.64, -20)">
+    <path d="M 360 400 L 360 270 A 152 152 0 0 1 664 270 L 664 400" 
+          fill="none" stroke="url(#shackleGrad)" stroke-width="64" stroke-linecap="round" />
+  </g>
+
+  <!-- Shield Body -->
+  <g transform="scale(1.02) translate(-10, 0)">
+    <!-- Shield Left Half -->
+    <path d="M 512 280 L 224 360 L 224 640 C 224 820 512 940 512 940 Z" 
+          fill="url(#shieldLeft)" />
+    <!-- Shield Right Half -->
+    <path d="M 512 280 L 800 360 L 800 640 C 800 820 512 940 512 940 Z" 
+          fill="url(#shieldRight)" />
+    <!-- Cyan Outline Trim -->
+    <path d="M 512 280 L 800 360 L 800 640 C 800 820 512 940 512 940 C 512 940 224 820 224 640 L 224 360 Z" 
+          fill="none" stroke="#7DD3FC" stroke-width="14" stroke-linejoin="round" opacity="0.9" />
+  </g>
+
+  <!-- Stylized "K" Cipher Mark -->
+  <g transform="translate(0, 0)">
+    <path d="M 377 440 L 437 440 L 437 760 L 377 760 Z M 437 620 L 557 440 L 637 440 L 487 650 L 647 760 L 557 760 L 437 640 Z" 
+          fill="#FFFFFF" filter="url(#k-glow)" />
+  </g>
+</svg>
