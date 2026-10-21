@@ -3,7 +3,7 @@
 ## Store Metadata
 
 - **Name**: Kloak Password Manager
-- **Version**: 1.0.0
+- **Version**: 1.1.0
 - **Category**: Productivity / Privacy & Security
 - **Short Description** (128 / 132 chars max):
   Local-first password manager with instant autofill, built-in 2FA authenticator, phishing protection, and desktop vault sync.
