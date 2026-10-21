@@ -30,11 +30,13 @@ public struct SettingsView: View {
     @State private var recordingMonitor: Any? = nil
     @State private var hotkeyFeedback: String? = nil
     @ObservedObject private var autofillService = AccessibilityAutofillService.shared
+    @ObservedObject private var iCloudService = ICloudSyncService.shared
 
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 securitySection
+                iCloudSyncSection
                 accessibilityAutofillSection
                 connectedAccountsSection
                 offlineModeSection
@@ -107,6 +109,144 @@ public struct SettingsView: View {
 
                     Toggle("Enable Touch ID Biometric Unlock", isOn: $settings.biometricsEnabled)
                         .onChange(of: settings.biometricsEnabled) { _, _ in onSaveSettings(settings) }
+                }
+            }
+            .padding(16)
+            .background(Color.black.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(14)
+        .glassEffect(cornerRadius: 16)
+    }
+
+    // MARK: - Section: iCloud Multi-Device Sync
+    @ViewBuilder
+    private var iCloudSyncSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("iCloud Multi-Device Sync", systemImage: "icloud.fill")
+                    .font(.system(size: 14, weight: .bold))
+                Spacer()
+                if iCloudService.isSyncEnabled {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(LiquidGlassTheme.emeraldAccent)
+                            .frame(width: 8, height: 8)
+                        Text("Active")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                    .clipShape(Capsule())
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Sync your encrypted vault across all your Macs and Apple devices via your private iCloud Drive. Kloak encrypts your vault with Argon2id and authenticated AES-256-GCM before writing to disk, ensuring 100% Zero-Knowledge End-to-End Encryption where even Apple cannot read your data.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+                    .lineSpacing(2)
+
+                if !iCloudService.isAvailable {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(LiquidGlassTheme.roseAccent)
+                        Text("iCloud Drive is not detected or signed in on this Mac. Please check System Settings > Apple ID > iCloud.")
+                            .font(.system(size: 11))
+                            .foregroundColor(LiquidGlassTheme.roseAccent)
+                    }
+                    .padding(10)
+                    .background(LiquidGlassTheme.roseAccent.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Toggle("Enable iCloud Drive Sync", isOn: Binding(
+                        get: { iCloudService.isSyncEnabled },
+                        set: { enable in
+                            do {
+                                if enable {
+                                    try iCloudService.enableSync()
+                                } else {
+                                    try iCloudService.disableSync()
+                                }
+                            } catch {
+                                print("[Kloak] iCloud sync error: \(error)")
+                            }
+                        }
+                    ))
+                    .toggleStyle(.switch)
+
+                    if iCloudService.isSyncEnabled {
+                        Divider().opacity(0.15)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("Sync Status:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                switch iCloudService.status {
+                                case .disabled:
+                                    Text("Disabled")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                case .syncing:
+                                    HStack(spacing: 4) {
+                                        ProgressView().scaleEffect(0.6)
+                                        Text("Syncing…")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(LiquidGlassTheme.cyanAccent)
+                                    }
+                                case .synced(let date):
+                                    Text("Synced \(date.formatted(date: .omitted, time: .standard))")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                case .error(let msg):
+                                    Text("Error: \(msg)")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(LiquidGlassTheme.roseAccent)
+                                }
+                            }
+
+                            HStack {
+                                Text("Storage Location:")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                Text("iCloud Drive/Kloak/vault.kloak")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(.primary)
+                            }
+
+                            Text("Automatic snapshot backups are created in ~/.kloak/backups before sync transitions.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+
+                            HStack(spacing: 10) {
+                                Button(action: {
+                                    Task {
+                                        _ = await iCloudService.forceSync()
+                                    }
+                                }) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("Sync Now")
+                                    }
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: true))
+
+                                Button(action: {
+                                    iCloudService.revealInFinder()
+                                }) {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "folder")
+                                        Text("Reveal in Finder")
+                                    }
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
                 }
             }
             .padding(16)

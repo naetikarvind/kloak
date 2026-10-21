@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Cpu, Lock, Terminal, RefreshCw, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Shield, Cpu, Lock, Terminal, RefreshCw, EyeOff, CheckCircle2, Cloud } from 'lucide-react';
 
 export const ArchitectureSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -89,6 +89,29 @@ if release.isNewer(than: currentVersion) {
     self.downloadTask = URLSession.shared.downloadTask(with: release.dmgAsset.url)
     self.state = .readyToInstall(localDmgUrl)
 }`,
+    },
+    {
+      icon: Cloud,
+      title: 'Zero-Knowledge iCloud Multi-Device Sync',
+      badge: 'Private iCloud Storage',
+      summary: 'Keep your vault synchronized across all your Macs and Apple devices with zero server trust.',
+      details: [
+        'Local Argon2id + AES-256-GCM encryption occurs on your hardware before bytes touch iCloud Drive.',
+        'Apple and iCloud only store encrypted ciphertext blobs — zero metadata or plaintexts revealed.',
+        'Uses macOS Mobile Documents DispatchSource notification triggers for instant cross-device updates.',
+        'Transparent atomic symlinks preserve local daemon and browser extension IPC without configuration.',
+      ],
+      code: `// Zero-Knowledge iCloud Sync Pipeline
+// 1. Vault encrypted on device with Argon2id + AES-256-GCM
+const ciphertext = encryptVaultPayload(vaultData, masterKey);
+
+// 2. Synced through private iCloud Drive container
+await fs.promises.writeFile(
+  path.join(home, 'Library/Mobile Documents/com~apple~CloudDocs/Kloak/vault.kloak'),
+  ciphertext
+);
+
+// 3. DispatchSource monitors file change events across Macs`,
     },
   ];
 

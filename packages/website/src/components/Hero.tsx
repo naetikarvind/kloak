@@ -28,7 +28,7 @@ export const Hero: React.FC = () => {
   };
 
   return (
-    <section style={{ paddingTop: '56px', paddingBottom: '72px', position: 'relative', overflow: 'hidden' }}>
+    <section style={{ paddingTop: '96px', paddingBottom: '72px', position: 'relative', overflow: 'hidden' }}>
       <div className="container" style={{ textAlign: 'center' }}>
         {/* Release Pill Badge */}
         <div style={{ display: 'inline-flex', marginBottom: '24px' }}>

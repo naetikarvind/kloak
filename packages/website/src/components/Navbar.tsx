@@ -1,223 +1,252 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { KloakLogo } from './KloakLogo';
 import { Download, ShieldCheck, Menu, X, ExternalLink } from 'lucide-react';
 import { GithubIcon, ChromeIcon } from './Icons';
 
 export const Navbar: React.FC = () => {
+  const [visible, setVisible] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
+      const currentScrollY = window.scrollY;
+      const lastScrollY = lastScrollYRef.current;
+
+      setScrolled(currentScrollY > 15);
+
+      // Hide navbar when scrolling down past 70px
+      if (currentScrollY > 70 && currentScrollY > lastScrollY) {
+        setVisible(false);
+        setMobileMenuOpen(false);
+      } else {
+        // Show navbar when scrolling up or at top
+        setVisible(true);
+      }
+
+      lastScrollYRef.current = currentScrollY;
     };
-    window.addEventListener('scroll', handleScroll);
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   return (
-    <header
+    <div
       style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 50,
-        transition: 'all 0.25s ease',
-        background: scrolled
-          ? 'rgba(6, 8, 15, 0.88)'
-          : 'rgba(6, 8, 15, 0.45)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: scrolled
-          ? '1px solid rgba(255, 255, 255, 0.08)'
-          : '1px solid transparent',
+        position: 'fixed',
+        top: '16px',
+        left: '50%',
+        transform: visible ? 'translate(-50%, 0)' : 'translate(-50%, -140%)',
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
+        transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, box-shadow 0.25s ease',
+        zIndex: 100,
+        width: 'min(1140px, calc(100% - 32px))',
       }}
     >
-      <div
-        className="container"
+      <header
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          height: '72px',
-          gap: '16px',
+          width: '100%',
+          background: scrolled
+            ? 'rgba(10, 14, 26, 0.88)'
+            : 'rgba(10, 14, 26, 0.72)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRadius: '20px',
+          boxShadow: scrolled
+            ? '0 18px 45px -10px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+            : '0 10px 30px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.03)',
+          padding: '0 20px',
         }}
       >
-        {/* Brand */}
-        <a
-          href="#"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            textDecoration: 'none',
-            color: 'var(--text-main)',
-            flexShrink: 0,
-          }}
-        >
-          <KloakLogo size={36} withGlow={true} />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.5px', lineHeight: 1.1 }}>
-              Kloak
-            </span>
-            <span style={{ fontSize: '10px', color: 'var(--emerald)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
-              Local-First Vault
-            </span>
-          </div>
-        </a>
-
-        {/* Desktop Nav Links */}
-        <nav
-          style={{
-            display: 'none',
-            alignItems: 'center',
-            gap: '24px',
-          }}
-          className="desktop-nav"
-        >
-          <a href="#features" className="nav-link">Features</a>
-          <a href="#architecture" className="nav-link">Architecture</a>
-          <a href="#generator" className="nav-link">Generator</a>
-          <a href="#compare" className="nav-link">Compare</a>
-          <a href="#downloads" className="nav-link">Downloads</a>
-          <a href="privacy.html" className="nav-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-            <ShieldCheck size={14} color="#10b981" />
-            <span>Privacy</span>
-          </a>
-        </nav>
-
-        {/* Action Buttons - Identical Height & Same Baseline */}
-        <div style={{ display: 'none', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="desktop-actions">
-          <a
-            href="https://github.com/naetikarvind/kloak"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="navbar-btn navbar-btn-ghost"
-          >
-            <GithubIcon size={15} />
-            <span>GitHub</span>
-          </a>
-
-          <a
-            href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="navbar-btn navbar-btn-chrome"
-          >
-            <ChromeIcon size={15} />
-            <span>Chrome Store</span>
-          </a>
-
-          <a
-            href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
-            className="navbar-btn navbar-btn-primary"
-          >
-            <Download size={15} />
-            <span>Download .dmg</span>
-          </a>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          style={{
-            display: 'flex',
-            background: 'none',
-            border: 'none',
-            color: 'var(--text-main)',
-            cursor: 'pointer',
-            padding: '6px',
-            flexShrink: 0,
-          }}
-          className="mobile-toggle"
-          aria-label="Toggle menu"
-        >
-          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
         <div
           style={{
-            background: 'rgba(12, 16, 29, 0.98)',
-            borderBottom: '1px solid var(--border-subtle)',
-            padding: '20px 24px',
             display: 'flex',
-            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            height: '64px',
             gap: '16px',
           }}
         >
+          {/* Brand */}
           <a
-            href="#features"
-            className="mobile-link"
-            onClick={() => setMobileMenuOpen(false)}
+            href="#"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              textDecoration: 'none',
+              color: 'var(--text-main)',
+              flexShrink: 0,
+            }}
           >
-            Features
+            <KloakLogo size={32} withGlow={true} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.4px', lineHeight: 1.1 }}>
+                Kloak
+              </span>
+              <span style={{ fontSize: '9.5px', color: 'var(--emerald)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                Local-First Vault
+              </span>
+            </div>
           </a>
-          <a
-            href="#architecture"
-            className="mobile-link"
-            onClick={() => setMobileMenuOpen(false)}
+
+          {/* Desktop Nav Links */}
+          <nav
+            style={{
+              display: 'none',
+              alignItems: 'center',
+              gap: '22px',
+            }}
+            className="desktop-nav"
           >
-            Architecture
-          </a>
-          <a
-            href="#generator"
-            className="mobile-link"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Generator
-          </a>
-          <a
-            href="#compare"
-            className="mobile-link"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Compare
-          </a>
-          <a
-            href="#downloads"
-            className="mobile-link"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Downloads
-          </a>
-          <a
-            href="privacy.html"
-            className="mobile-link"
-            style={{ color: 'var(--emerald)' }}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Privacy Policy
-          </a>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
-            <a
-              href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
-              className="navbar-btn navbar-btn-primary"
-              style={{ width: '100%', height: '44px', fontSize: '14.5px' }}
-            >
-              <Download size={16} />
-              <span>Download macOS (.dmg)</span>
+            <a href="#features" className="nav-link">Features</a>
+            <a href="#architecture" className="nav-link">Architecture</a>
+            <a href="#generator" className="nav-link">Generator</a>
+            <a href="#compare" className="nav-link">Compare</a>
+            <a href="#downloads" className="nav-link">Downloads</a>
+            <a href="privacy.html" className="nav-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+              <ShieldCheck size={14} color="#10b981" />
+              <span>Privacy</span>
             </a>
+          </nav>
+
+          {/* Action Buttons - Identical Height & Same Baseline */}
+          <div style={{ display: 'none', alignItems: 'center', gap: '8px', flexShrink: 0 }} className="desktop-actions">
+            <a
+              href="https://github.com/naetikarvind/kloak"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="navbar-btn navbar-btn-ghost"
+            >
+              <GithubIcon size={15} />
+              <span>GitHub</span>
+            </a>
+
             <a
               href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
               target="_blank"
               rel="noopener noreferrer"
               className="navbar-btn navbar-btn-chrome"
-              style={{ width: '100%', height: '44px', fontSize: '14.5px' }}
             >
-              <ChromeIcon size={16} />
-              <span>Install Chrome Extension</span>
+              <ChromeIcon size={15} />
+              <span>Chrome Store</span>
+            </a>
+
+            <a
+              href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
+              className="navbar-btn navbar-btn-primary"
+            >
+              <Download size={15} />
+              <span>Download .dmg</span>
             </a>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            style={{
+              display: 'flex',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-main)',
+              cursor: 'pointer',
+              padding: '6px',
+              flexShrink: 0,
+            }}
+            className="mobile-toggle"
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
-      )}
+
+        {/* Mobile Drawer */}
+        {mobileMenuOpen && (
+          <div
+            style={{
+              borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '16px 4px 20px 4px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+            }}
+          >
+            <a
+              href="#features"
+              className="mobile-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Features
+            </a>
+            <a
+              href="#architecture"
+              className="mobile-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Architecture
+            </a>
+            <a
+              href="#generator"
+              className="mobile-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Generator
+            </a>
+            <a
+              href="#compare"
+              className="mobile-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Compare
+            </a>
+            <a
+              href="#downloads"
+              className="mobile-link"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Downloads
+            </a>
+            <a
+              href="privacy.html"
+              className="mobile-link"
+              style={{ color: 'var(--emerald)' }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Privacy Policy
+            </a>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <a
+                href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
+                className="navbar-btn navbar-btn-primary"
+                style={{ width: '100%', height: '42px', fontSize: '14px' }}
+              >
+                <Download size={16} />
+                <span>Download macOS (.dmg)</span>
+              </a>
+              <a
+                href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="navbar-btn navbar-btn-chrome"
+                style={{ width: '100%', height: '42px', fontSize: '14px' }}
+              >
+                <ChromeIcon size={16} />
+                <span>Install Chrome Extension</span>
+              </a>
+            </div>
+          </div>
+        )}
+      </header>
 
       <style>{`
         .nav-link {
           color: var(--text-muted);
           text-decoration: none;
-          font-size: 14px;
+          font-size: 13.5px;
           font-weight: 500;
           transition: color 0.2s;
           white-space: nowrap;
@@ -228,9 +257,9 @@ export const Navbar: React.FC = () => {
         .mobile-link {
           color: var(--text-main);
           text-decoration: none;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
-          padding: 8px 0;
+          padding: 6px 0;
         }
 
         /* Navbar Buttons - Perfectly aligned & identical height */
@@ -305,6 +334,6 @@ export const Navbar: React.FC = () => {
           }
         }
       `}</style>
-    </header>
+    </div>
   );
 };

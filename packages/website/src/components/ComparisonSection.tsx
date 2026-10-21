@@ -61,6 +61,21 @@ export const ComparisonSection: React.FC = () => {
       },
     },
     {
+      title: 'Zero-Knowledge iCloud Multi-Device Sync',
+      desc: 'Sync encrypted vaults across devices via private iCloud Drive with zero server trust.',
+      category: 'architecture',
+      values: {
+        kloak: { status: true, text: 'Zero-Knowledge iCloud' },
+        '1password': { status: false, text: 'Proprietary Cloud' },
+        bitwarden: { status: false, text: 'Azure Cloud' },
+        apple: { status: true, text: 'iCloud Keychain' },
+        keepassxc: { status: false, text: 'Manual File Copy' },
+        dashlane: { status: false, text: 'AWS Cloud' },
+        proton: { status: false, text: 'Proton Cloud' },
+        lastpass: { status: false, text: 'AWS Cloud' },
+      },
+    },
+    {
       title: 'Zero Cloud Breach Exposure',
       desc: 'Immune to remote server compromises and cloud credential leaks.',
       category: 'architecture',

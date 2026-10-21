@@ -101,6 +101,10 @@ export const DownloadsSection: React.FC = () => {
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                  <span>Zero-Knowledge iCloud Multi-Device Sync</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
                   <span>Touch ID &amp; Apple Watch Biometrics</span>
                 </li>
               </ul>

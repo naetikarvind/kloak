@@ -40,6 +40,19 @@ html {
   color-scheme: dark;
 }
 
+/* Anchor Scroll Margin to Prevent Titles from being Cut Off under Floating Navbar */
+section[id],
+div[id],
+#features,
+#architecture,
+#generator,
+#compare,
+#downloads,
+#privacy,
+#faq {
+  scroll-margin-top: 110px !important;
+}
+
 body {
   background-color: var(--bg-base);
   color: var(--text-main);

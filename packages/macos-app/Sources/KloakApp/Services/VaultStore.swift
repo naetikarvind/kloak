@@ -42,6 +42,15 @@ public final class VaultStore: ObservableObject {
 
     public init() {
         checkVaultExistence()
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("KloakVaultRemoteChangeNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                _ = await self?.reloadFromDiskIfUnlocked()
+            }
+        }
     }
 
     // MARK: - Vault Existence Check
@@ -461,10 +470,40 @@ public final class VaultStore: ObservableObject {
                 let vaultFile = VaultFile(header: validHeader, encryptedPayload: encryptedPayload)
                 let fileData = try JSONEncoder().encode(vaultFile)
 
-                try fileData.write(to: Self.vaultFileURL, options: .atomic)
+                // Resolve symbolic links so writing to a symlinked vault file (e.g. iCloud Drive)
+                // atomically updates the target file instead of replacing the symlink.
+                let destinationURL = Self.vaultFileURL.resolvingSymlinksInPath()
+                try fileData.write(to: destinationURL, options: .atomic)
             } catch {
                 print("[Kloak VaultStore] Error saving vault: \(error)")
             }
+        }
+    }
+
+    // MARK: - Reload from Disk on Remote Sync
+    @discardableResult
+    public func reloadFromDiskIfUnlocked() async -> Bool {
+        guard isUnlocked, let currentVaultKey = vaultKey else { return false }
+        let targetURL = Self.vaultFileURL.resolvingSymlinksInPath()
+        guard FileManager.default.fileExists(atPath: targetURL.path) else { return false }
+
+        do {
+            let data = try Data(contentsOf: targetURL)
+            let vaultFile = try JSONDecoder().decode(VaultFile.self, from: data)
+
+            guard let decryptedData = try? CryptoEngine.shared.decrypt(key: currentVaultKey, container: vaultFile.encryptedPayload) else {
+                return false
+            }
+
+            let payload = try JSONDecoder().decode(VaultPayload.self, from: decryptedData)
+            self.cachedHeader = vaultFile.header
+            self.items = payload.items
+            self.folders = payload.folders
+            self.settings = payload.settings
+            LogoService.shared.prefetchLogos(for: payload.items)
+            return true
+        } catch {
+            return false
         }
     }
 
