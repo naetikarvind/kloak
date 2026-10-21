@@ -22,6 +22,22 @@ Kloak is a fast, local-first password manager and authenticator designed for spe
 Enjoy instant, intelligent credential autofill on any website, built-in TOTP two-factor authentication countdowns, anti-phishing domain verification, and high-entropy password generation directly within Google Chrome.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT'S NEW IN V1.1.0
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• ADAPTIVE BRAND VISUALS & FAVICONS
+Crisp, high-resolution favicons with smart color-matched squircle plates and autonomous contrast detection for dark and light icons.
+
+• INTELLIGENT BRAND RESOLUTION
+Automatically links service authentication subdomains (e.g., account.live.com, login.microsoftonline.com) to primary brand identities.
+
+• PERFORMANCE & SPEED
+Instant in-memory logo caching for faster autofill suggestions and side panel browsing.
+
+• FORM DETECTION ENHANCEMENTS
+Refined domain matching and smoother inline autofill badges across complex multi-step login forms.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 KEY FEATURES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -117,6 +133,21 @@ Google Chrome Web Store User Data Policy mandates that the privacy policy explic
 
 - **Live Privacy Policy URL**: `https://naetikarvind.github.io/kloak/privacy.html`
 - **Fallback URL**: `https://naetikarvind.github.io/kloak/privacy`
+
+---
+
+## Version 1.1.0 Submission — Notes for Reviewer
+
+When clicking **Submit for review** in the Chrome Web Store Developer Console, paste the following into the **Notes for the reviewer** text area:
+
+```text
+Release Notes for Version 1.1.0:
+- Upgraded brand visual system: On-device visual adaptation (squircle background plates, contrast detection) for brand favicons in the popup, side panel, and inline autofill overlay.
+- Enhanced parent-brand domain resolution: Maps Single Sign-On and authentication subdomains (e.g., account.live.com, login.microsoftonline.com) to primary brand identities.
+- Performance: Added local in-memory caching for faster credential suggestions.
+- Form autofill refinements for multi-step authentication forms.
+- Permissions & Privacy: Zero new permissions added. All data handling and encryption remain 100% on-device and local-first with zero tracking.
+```
 
 ---
 
