@@ -49,6 +49,8 @@
 		B10000080000000000000008 /* AccessibilityAutofillService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000080000000000000008 /* AccessibilityAutofillService.swift */; };
 		B10000090000000000000009 /* AccessibilityAutofillPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000090000000000000009 /* AccessibilityAutofillPanel.swift */; };
 		A10000100000000000000010 /* BrandTitleService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000100000000000000010 /* BrandTitleService.swift */; };
+		C10000110000000000000011 /* UpdaterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000110000000000000011 /* UpdaterService.swift */; };
+		C10000120000000000000012 /* UpdateSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000120000000000000012 /* UpdateSheet.swift */; };
 		E33CDBCF22EE4C0A86F94A1E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
@@ -95,6 +97,8 @@
 		A10000080000000000000008 /* AccessibilityAutofillService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/AccessibilityAutofillService.swift"; sourceTree = "<group>"; };
 		A10000090000000000000009 /* AccessibilityAutofillPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/UI/AccessibilityAutofillPanel.swift"; sourceTree = "<group>"; };
 		B10000100000000000000010 /* BrandTitleService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/BrandTitleService.swift"; sourceTree = "<group>"; };
+		D10000110000000000000011 /* UpdaterService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/UpdaterService.swift"; sourceTree = "<group>"; };
+		D10000120000000000000012 /* UpdateSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/UpdateSheet.swift"; sourceTree = "<group>"; };
 		58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = "folder"; path = "AppIcon.icon"; sourceTree = "<group>"; };
 		8E2EDE0EB75F49198A06F3A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.xml"; path = "Info.plist"; sourceTree = "<group>"; };
 		96D7472670404CFB938AC830 /* Kloak.entitlements */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.entitlements"; path = "Kloak.entitlements"; sourceTree = "<group>"; };
@@ -157,6 +161,8 @@
 				A10000080000000000000008 /* AccessibilityAutofillService.swift */,
 				A10000090000000000000009 /* AccessibilityAutofillPanel.swift */,
 				B10000100000000000000010 /* BrandTitleService.swift */,
+				D10000110000000000000011 /* UpdaterService.swift */,
+				D10000120000000000000012 /* UpdateSheet.swift */,
 				58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */,
 				8E2EDE0EB75F49198A06F3A1 /* Info.plist */,
 				96D7472670404CFB938AC830 /* Kloak.entitlements */,
@@ -277,6 +283,8 @@
 				B10000080000000000000008 /* AccessibilityAutofillService.swift in Sources */,
 				B10000090000000000000009 /* AccessibilityAutofillPanel.swift in Sources */,
 				A10000100000000000000010 /* BrandTitleService.swift in Sources */,
+				C10000110000000000000011 /* UpdaterService.swift in Sources */,
+				C10000120000000000000012 /* UpdateSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

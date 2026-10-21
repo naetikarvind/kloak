@@ -19,6 +19,7 @@ public struct VaultMainView: View {
     @State private var searchText: String = ""
     @State private var isShowingNewItemSheet: Bool = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @ObservedObject private var updater = UpdaterService.shared
 
     public init(
         isUnlocked: Binding<Bool>,
@@ -380,6 +381,7 @@ public struct VaultMainView: View {
             triggerWindowResize(for: selection, animated: false)
             LogoService.shared.prefetchLogos(for: items)
             VaultStore.shared.sanitizeAllItemTitles()
+            updater.checkForUpdates(userInitiated: false)
         }
         .onChange(of: selection) { _, newSel in
             selectedItemId = nil
@@ -408,6 +410,9 @@ public struct VaultMainView: View {
                     isShowingNewItemSheet = false
                 }
             )
+        }
+        .sheet(isPresented: $updater.showUpdateSheet) {
+            UpdateSheet()
         }
     }
 

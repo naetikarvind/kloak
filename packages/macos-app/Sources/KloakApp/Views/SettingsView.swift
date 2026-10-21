@@ -40,6 +40,7 @@ public struct SettingsView: View {
                 offlineModeSection
                 ipcSection
                 changePasswordSection
+                updatesSection
                 developerModeSection
             }
             .padding(16)
@@ -870,6 +871,50 @@ public struct SettingsView: View {
         }
         .padding(14)
         .glassEffect(cornerRadius: 16)
+    }
+
+    // MARK: - Section: Software Updates
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Software Updates & Release Channel", systemImage: "arrow.triangle.2.circlepath.circle.fill")
+                .font(.system(size: 14, weight: .bold))
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Kloak for macOS")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("Version \(UpdaterService.shared.currentVersion) (Build \(UpdaterService.shared.buildNumber)) • GitHub Release Channel")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    Button(action: {
+                        UpdaterService.shared.checkForUpdates(userInitiated: true)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Check for Updates")
+                        }
+                    }
+                    .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                }
+
+                Text("Kloak automatically checks for updates and downloads DMG installer packages directly from official GitHub releases.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            .padding(14)
+            .background(Color.white.opacity(0.04))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+        }
     }
 
     // MARK: - Section 6: Developer Mode & Maintenance

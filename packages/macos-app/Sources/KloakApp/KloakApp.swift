@@ -166,6 +166,9 @@ public struct KloakApp: App {
                 Button("About Kloak") {
                     NSApp.orderFrontStandardAboutPanel(nil)
                 }
+                Button("Check for Updates…") {
+                    UpdaterService.shared.checkForUpdates(userInitiated: true)
+                }
             }
             CommandGroup(after: .appInfo) {
                 Button("Developer Mode...") {
