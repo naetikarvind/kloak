@@ -202,6 +202,41 @@ public struct SetupView: View {
             }
             .padding(.top, 6)
 
+            if ICloudSyncService.shared.hasCloudVaultAvailable {
+                HStack(spacing: 12) {
+                    Image(systemName: "icloud.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Existing iCloud Vault Detected")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("A Kloak vault was found in your iCloud Drive from another device.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                    Button(action: {
+                        if ICloudSyncService.shared.connectToExistingCloudVault() {
+                            vaultStore.checkVaultExistence()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "link")
+                            Text("Connect & Unlock")
+                        }
+                    }
+                    .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                }
+                .padding(12)
+                .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(LiquidGlassTheme.primaryAccent.opacity(0.3), lineWidth: 1)
+                )
+            }
+
             VStack(spacing: 14) {
                 // Password field
                 VStack(alignment: .leading, spacing: 6) {

@@ -78,6 +78,61 @@ public final class ICloudSyncService: ObservableObject {
         self.isAvailable = FileManager.default.fileExists(atPath: cloudDocs.path)
     }
 
+    // MARK: - Auto-Discovery for Other Devices
+    public var hasCloudVaultAvailable: Bool {
+        guard let cloudFile = iCloudVaultFileURL else { return false }
+        let fm = FileManager.default
+        if fm.fileExists(atPath: cloudFile.path) {
+            return true
+        }
+        // Check for iCloud dataless placeholder (.vault.kloak.icloud)
+        if let dir = iCloudDirectoryURL {
+            let placeholder = dir.appendingPathComponent(".vault.kloak.icloud")
+            if fm.fileExists(atPath: placeholder.path) {
+                // Request download from iCloud
+                try? fm.startDownloadingUbiquitousItem(at: cloudFile)
+                return true
+            }
+        }
+        return false
+    }
+
+    @discardableResult
+    public func connectToExistingCloudVault() -> Bool {
+        guard let cloudFile = iCloudVaultFileURL, let cloudDir = iCloudDirectoryURL else { return false }
+        let fm = FileManager.default
+
+        // If file is not yet downloaded locally from iCloud, trigger download
+        if !fm.fileExists(atPath: cloudFile.path) {
+            let placeholder = cloudDir.appendingPathComponent(".vault.kloak.icloud")
+            if fm.fileExists(atPath: placeholder.path) {
+                try? fm.startDownloadingUbiquitousItem(at: cloudFile)
+            }
+        }
+
+        let localDir = localVaultFileURL.deletingLastPathComponent()
+        try? fm.createDirectory(at: localDir, withIntermediateDirectories: true)
+
+        // Remove any non-symlink empty local file if present
+        if fm.fileExists(atPath: localVaultFileURL.path) {
+            let attrs = try? fm.attributesOfItem(atPath: localVaultFileURL.path)
+            if (attrs?[.type] as? FileAttributeType) != .typeSymbolicLink {
+                createBackup()
+                try? fm.removeItem(at: localVaultFileURL)
+            }
+        }
+
+        if !fm.fileExists(atPath: localVaultFileURL.path) {
+            try? fm.createSymbolicLink(at: localVaultFileURL, withDestinationURL: cloudFile)
+        }
+
+        self.isSyncEnabled = true
+        self.lastSyncDate = Date()
+        self.status = .synced(Date())
+        startObserving()
+        return true
+    }
+
     public func enableSync() throws {
         guard let cloudDir = iCloudDirectoryURL, let cloudFile = iCloudVaultFileURL else {
             throw NSError(domain: "KloakSync", code: 1, userInfo: [NSLocalizedDescriptionKey: "iCloud Drive is not available or enabled on this Mac."])

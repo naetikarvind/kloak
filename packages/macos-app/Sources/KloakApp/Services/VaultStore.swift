@@ -56,8 +56,21 @@ public final class VaultStore: ObservableObject {
     // MARK: - Vault Existence Check
 
     public func checkVaultExistence() {
-        let exists = FileManager.default.fileExists(atPath: Self.vaultFileURL.path)
-        self.hasVault = exists
+        let fm = FileManager.default
+        if fm.fileExists(atPath: Self.vaultFileURL.path) {
+            self.hasVault = true
+            return
+        }
+
+        // Auto-discover iCloud vault on secondary / newly installed devices
+        if ICloudSyncService.shared.hasCloudVaultAvailable {
+            if ICloudSyncService.shared.connectToExistingCloudVault() {
+                self.hasVault = fm.fileExists(atPath: Self.vaultFileURL.path)
+                return
+            }
+        }
+
+        self.hasVault = false
     }
 
     // MARK: - Vault Creation (First Launch)
