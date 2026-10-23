@@ -124,7 +124,7 @@ swift build
 ```
 
 ### 4.4 Loading the Browser Extension (Manifest V3)
-1. Open Google Chrome, Brave, Edge, or Firefox.
+1. Open Google Chrome, Brave or Edge.
 2. Navigate to `chrome://extensions`.
 3. Enable **Developer mode** (top right).
 4. Click **Load unpacked** and select `packages/browser-extension`.
