@@ -1096,7 +1096,7 @@
 
   <!-- Floating Auto-Hiding Capsule Navbar -->
   <nav class="floating-nav" id="floatingNav">
-    <a href="index.html" class="nav-brand">
+    <a href="../" data-home-link class="nav-brand">
       <div class="nav-brand-logo-wrap">
         <img
           src="kloak-logo.png"
@@ -1120,8 +1120,8 @@
     </a>
 
     <div class="nav-links">
-      <a href="index.html" class="nav-link">← Overview</a>
-      <a href="index.html#architecture" class="nav-link">Architecture</a>
+      <a href="../" data-home-link class="nav-link">← Overview</a>
+      <a href="../#architecture" data-home-link data-hash="#architecture" class="nav-link">Architecture</a>
       <a href="#gallery" class="nav-link">Screenshots</a>
       <a href="#section-2" class="nav-link">Data Collection</a>
       <a href="#section-6" class="nav-link">Permissions</a>
@@ -1878,10 +1878,10 @@
       </div>
 
       <div class="footer-links">
-        <a href="index.html" class="footer-link">Home</a>
-        <a href="index.html#architecture" class="footer-link">Architecture</a>
-        <a href="index.html#downloads" class="footer-link">Downloads</a>
-        <a href="privacy.html" class="footer-link" style="color: var(--text-main); font-weight: 600;">Privacy Policy</a>
+        <a href="../" data-home-link class="footer-link">Home</a>
+        <a href="../#architecture" data-home-link data-hash="#architecture" class="footer-link">Architecture</a>
+        <a href="../#downloads" data-home-link data-hash="#downloads" class="footer-link">Downloads</a>
+        <a href="./" class="footer-link" style="color: var(--text-main); font-weight: 600;">Privacy Policy</a>
         <a href="https://github.com/naetikarvind/kloak" target="_blank" rel="noopener noreferrer" class="footer-link">GitHub</a>
       </div>
     </div>
@@ -1889,6 +1889,17 @@
 
   <!-- Interactive JavaScript: Floating Navbar & Lightbox Modal -->
   <script>
+    // 0. Auto-normalize root links based on path (handles /privacy, /privacy/, and /privacy.html)
+    (function normalizeHomeLinks() {
+      const path = window.location.pathname;
+      const inSubdirWithSlash = path.endsWith('/privacy/') || path.endsWith('/privacy/index.html');
+      const rootBase = inSubdirWithSlash ? '../' : './';
+      document.querySelectorAll('a[data-home-link]').forEach(el => {
+        const hash = el.getAttribute('data-hash') || '';
+        el.href = rootBase + hash;
+      });
+    })();
+
     // 1. Floating Auto-Hiding Navbar
     let lastScrollY = window.scrollY;
     const nav = document.getElementById('floatingNav');
