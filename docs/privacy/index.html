@@ -55,6 +55,27 @@
     html {
       scroll-behavior: smooth;
       color-scheme: dark;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(255, 255, 255, 0.18) var(--bg-base);
+    }
+
+    /* Custom Scrollbar matching main website */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.28);
     }
 
     body {
@@ -66,6 +87,22 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       min-height: 100vh;
+    }
+
+    /* Top Viewport Fade Mask */
+    .top-fade-mask {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 76px;
+      background: linear-gradient(180deg, #06080f 0%, rgba(6, 8, 15, 0.95) 40%, rgba(6, 8, 15, 0.5) 75%, transparent 100%);
+      pointer-events: none;
+      z-index: 999;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+      -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
     }
 
     /* Ambient Glow Background */
@@ -652,8 +689,8 @@
     /* Policy Layout: Two-Column (Sidebar TOC + Content) */
     .policy-layout {
       display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 36px;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 32px;
       align-items: start;
       margin-bottom: 80px;
     }
@@ -667,49 +704,59 @@
       }
     }
 
-    /* Sticky Table of Contents Sidebar */
+    /* Sticky Table of Contents Sidebar (Scrollbar-Suppressed & Compact) */
     .toc-sidebar {
       position: sticky;
       top: 96px;
       background: var(--bg-card);
       border: 1px solid var(--border-subtle);
-      border-radius: 18px;
-      padding: 22px;
+      border-radius: 16px;
+      padding: 16px 14px;
       backdrop-filter: blur(16px);
-      max-height: calc(100vh - 120px);
+      -webkit-backdrop-filter: blur(16px);
+      max-height: calc(100vh - 110px);
       overflow-y: auto;
+      scrollbar-width: none; /* Firefox: completely hide scrollbar */
+      -ms-overflow-style: none; /* IE and Edge */
+    }
+
+    .toc-sidebar::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Opera: completely hide scrollbar */
     }
 
     .toc-title {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       color: var(--text-dim);
-      margin-bottom: 16px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
     }
 
     .toc-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
     }
 
     .toc-link {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 13px;
+      gap: 8px;
+      padding: 5px 8px;
+      border-radius: 7px;
+      font-size: 12px;
       color: var(--text-muted);
       text-decoration: none;
-      transition: all 0.2s ease;
-      line-height: 1.4;
+      transition: all 0.15s ease;
+      line-height: 1.35;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .toc-link:hover {
@@ -725,14 +772,14 @@
     }
 
     .toc-num {
-      width: 20px;
-      height: 20px;
-      border-radius: 6px;
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
       background: rgba(255, 255, 255, 0.06);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       color: var(--text-dim);
       flex-shrink: 0;
@@ -741,6 +788,29 @@
     .toc-link.active .toc-num {
       background: var(--primary);
       color: #fff;
+    }
+
+    .toc-cert-box {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .toc-cert-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--emerald);
+      letter-spacing: 0.3px;
+      margin-bottom: 3px;
+    }
+
+    .toc-cert-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.4;
     }
 
     /* Policy Main Content */
@@ -1013,6 +1083,9 @@
   </style>
 </head>
 <body>
+
+  <!-- Top Viewport Fade Mask to prevent content bleed above floating navbar -->
+  <div class="top-fade-mask" aria-hidden="true"></div>
 
   <!-- Ambient Background Atmosphere -->
   <div class="bg-ambient">
@@ -1339,7 +1412,7 @@
       <!-- Sticky Navigation Sidebar -->
       <aside class="toc-sidebar">
         <div class="toc-title">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="8" y1="6" x2="21" y2="6"></line>
             <line x1="8" y1="12" x2="21" y2="12"></line>
             <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -1351,24 +1424,27 @@
         </div>
 
         <ul class="toc-list">
-          <li><a href="#section-1" class="toc-link"><span class="toc-num">1</span><span>Scope &amp; Single Purpose</span></a></li>
-          <li><a href="#section-2" class="toc-link"><span class="toc-num">2</span><span>User Data Collection</span></a></li>
-          <li><a href="#section-3" class="toc-link"><span class="toc-num">3</span><span>Data Handling &amp; Use</span></a></li>
+          <li><a href="#section-1" class="toc-link"><span class="toc-num">1</span><span>Scope &amp; Purpose</span></a></li>
+          <li><a href="#section-2" class="toc-link"><span class="toc-num">2</span><span>Data Collection</span></a></li>
+          <li><a href="#section-3" class="toc-link"><span class="toc-num">3</span><span>Data Handling</span></a></li>
           <li><a href="#section-4" class="toc-link"><span class="toc-num">4</span><span>Storage &amp; Security</span></a></li>
-          <li><a href="#section-5" class="toc-link"><span class="toc-num">5</span><span>Data Sharing &amp; Transfer</span></a></li>
+          <li><a href="#section-5" class="toc-link"><span class="toc-num">5</span><span>Sharing &amp; Transfer</span></a></li>
           <li><a href="#section-6" class="toc-link"><span class="toc-num">6</span><span>Browser Permissions</span></a></li>
           <li><a href="#section-7" class="toc-link"><span class="toc-num">7</span><span>Chrome Store Practices</span></a></li>
-          <li><a href="#section-8" class="toc-link"><span class="toc-num">8</span><span>User Rights (GDPR/CCPA)</span></a></li>
-          <li><a href="#section-9" class="toc-link"><span class="toc-num">9</span><span>Remote Code &amp; SDK Ban</span></a></li>
+          <li><a href="#section-8" class="toc-link"><span class="toc-num">8</span><span>User Rights (GDPR)</span></a></li>
+          <li><a href="#section-9" class="toc-link"><span class="toc-num">9</span><span>Remote Code Ban</span></a></li>
           <li><a href="#section-10" class="toc-link"><span class="toc-num">10</span><span>Contact Information</span></a></li>
         </ul>
 
-        <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
-          <div style="font-size: 11px; font-weight: 700; color: var(--emerald); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
-            ✓ Official Certification
+        <div class="toc-cert-box">
+          <div class="toc-cert-title">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Official Certification</span>
           </div>
-          <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
-            Verified compliant with Google Chrome Web Store User Data Policy.
+          <div class="toc-cert-desc">
+            Verified compliant with Chrome Web Store User Data Policy.
           </div>
         </div>
       </aside>
