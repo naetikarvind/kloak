@@ -1,5 +1,1210 @@
 "use strict";
 (() => {
+  // src/service-domain-service.ts
+  var KNOWN_SERVICES = [
+    // ── Tech Giants & Core Ecosystems ──
+    {
+      id: "google",
+      displayName: "Google",
+      category: "cloud",
+      primaryUrl: "https://accounts.google.com",
+      primaryDomain: "accounts.google.com",
+      domains: [
+        "accounts.google.com",
+        "google.com",
+        "gmail.com",
+        "drive.google.com",
+        "docs.google.com",
+        "sheets.google.com",
+        "slides.google.com",
+        "calendar.google.com",
+        "meet.google.com",
+        "photos.google.com",
+        "cloud.google.com",
+        "console.cloud.google.com"
+      ],
+      aliases: ["gmail", "googlemail", "gsuite", "google workspace", "google account"]
+    },
+    {
+      id: "microsoft",
+      displayName: "Microsoft",
+      category: "cloud",
+      primaryUrl: "https://login.microsoftonline.com",
+      primaryDomain: "login.microsoftonline.com",
+      domains: [
+        "login.microsoftonline.com",
+        "microsoft.com",
+        "account.live.com",
+        "outlook.com",
+        "office.com",
+        "office365.com",
+        "onedrive.live.com",
+        "teams.microsoft.com",
+        "portal.azure.com",
+        "azure.com",
+        "live.com",
+        "hotmail.com",
+        "msn.com",
+        "bing.com"
+      ],
+      aliases: ["outlook", "hotmail", "office", "office365", "o365", "azure", "live", "msn", "teams"]
+    },
+    {
+      id: "apple",
+      displayName: "Apple",
+      category: "cloud",
+      primaryUrl: "https://appleid.apple.com",
+      primaryDomain: "appleid.apple.com",
+      domains: [
+        "appleid.apple.com",
+        "icloud.com",
+        "apple.com",
+        "developer.apple.com",
+        "music.apple.com",
+        "tv.apple.com"
+      ],
+      aliases: ["icloud", "apple id", "appleid", "itunes", "apple developer"]
+    },
+    {
+      id: "amazon",
+      displayName: "Amazon",
+      category: "entertainment",
+      primaryUrl: "https://amazon.com",
+      primaryDomain: "amazon.com",
+      domains: [
+        "amazon.com",
+        "primevideo.com",
+        "audible.com",
+        "kindle.com"
+      ],
+      aliases: ["prime video", "primevideo", "audible"]
+    },
+    {
+      id: "aws",
+      displayName: "AWS",
+      category: "cloud",
+      primaryUrl: "https://console.aws.amazon.com",
+      primaryDomain: "console.aws.amazon.com",
+      domains: [
+        "console.aws.amazon.com",
+        "aws.amazon.com",
+        "signin.aws.amazon.com"
+      ],
+      aliases: ["amazon web services", "aws console", "amazon aws"]
+    },
+    {
+      id: "youtube",
+      displayName: "YouTube",
+      category: "entertainment",
+      primaryUrl: "https://youtube.com",
+      primaryDomain: "youtube.com",
+      domains: [
+        "youtube.com",
+        "music.youtube.com",
+        "studio.youtube.com",
+        "youtu.be"
+      ],
+      aliases: ["yt", "youtube music", "yt music"]
+    },
+    {
+      id: "meta",
+      displayName: "Meta (Facebook)",
+      category: "social",
+      primaryUrl: "https://facebook.com",
+      primaryDomain: "facebook.com",
+      domains: [
+        "facebook.com",
+        "fb.com",
+        "meta.com",
+        "messenger.com"
+      ],
+      aliases: ["facebook", "fb", "messenger"]
+    },
+    {
+      id: "instagram",
+      displayName: "Instagram",
+      category: "social",
+      primaryUrl: "https://instagram.com",
+      primaryDomain: "instagram.com",
+      domains: [
+        "instagram.com",
+        "threads.net"
+      ],
+      aliases: ["insta", "ig", "threads"]
+    },
+    {
+      id: "whatsapp",
+      displayName: "WhatsApp",
+      category: "social",
+      primaryUrl: "https://web.whatsapp.com",
+      primaryDomain: "web.whatsapp.com",
+      domains: [
+        "web.whatsapp.com",
+        "whatsapp.com"
+      ],
+      aliases: ["wa", "whatsapp web"]
+    },
+    {
+      id: "twitter",
+      displayName: "X (Twitter)",
+      category: "social",
+      primaryUrl: "https://x.com",
+      primaryDomain: "x.com",
+      domains: ["x.com", "twitter.com"],
+      aliases: ["x", "twitter", "tweetdeck"]
+    },
+    // ── Developer Platforms & DevOps ──
+    {
+      id: "github",
+      displayName: "GitHub",
+      category: "developer",
+      primaryUrl: "https://github.com",
+      primaryDomain: "github.com",
+      domains: ["github.com", "gist.github.com", "github.dev", "copilot.github.com"],
+      aliases: ["gh", "copilot", "gist"]
+    },
+    {
+      id: "gitlab",
+      displayName: "GitLab",
+      category: "developer",
+      primaryUrl: "https://gitlab.com",
+      primaryDomain: "gitlab.com",
+      domains: ["gitlab.com"],
+      aliases: []
+    },
+    {
+      id: "bitbucket",
+      displayName: "Bitbucket",
+      category: "developer",
+      primaryUrl: "https://bitbucket.org",
+      primaryDomain: "bitbucket.org",
+      domains: ["bitbucket.org"],
+      aliases: []
+    },
+    {
+      id: "atlassian",
+      displayName: "Atlassian",
+      category: "productivity",
+      primaryUrl: "https://id.atlassian.com",
+      primaryDomain: "id.atlassian.com",
+      domains: [
+        "id.atlassian.com",
+        "atlassian.com",
+        "jira.atlassian.com",
+        "confluence.atlassian.com",
+        "trello.com",
+        "bitbucket.org"
+      ],
+      aliases: ["jira", "confluence", "trello"]
+    },
+    {
+      id: "vercel",
+      displayName: "Vercel",
+      category: "developer",
+      primaryUrl: "https://vercel.com",
+      primaryDomain: "vercel.com",
+      domains: ["vercel.com", "vercel.app"],
+      aliases: ["zeit"]
+    },
+    {
+      id: "supabase",
+      displayName: "Supabase",
+      category: "developer",
+      primaryUrl: "https://supabase.com",
+      primaryDomain: "supabase.com",
+      domains: ["supabase.com", "app.supabase.com"],
+      aliases: []
+    },
+    {
+      id: "cloudflare",
+      displayName: "Cloudflare",
+      category: "cloud",
+      primaryUrl: "https://dash.cloudflare.com",
+      primaryDomain: "dash.cloudflare.com",
+      domains: ["dash.cloudflare.com", "cloudflare.com"],
+      aliases: ["cf"]
+    },
+    {
+      id: "docker",
+      displayName: "Docker",
+      category: "developer",
+      primaryUrl: "https://hub.docker.com",
+      primaryDomain: "hub.docker.com",
+      domains: ["hub.docker.com", "docker.com"],
+      aliases: ["docker hub"]
+    },
+    {
+      id: "digitalocean",
+      displayName: "DigitalOcean",
+      category: "cloud",
+      primaryUrl: "https://cloud.digitalocean.com",
+      primaryDomain: "cloud.digitalocean.com",
+      domains: ["cloud.digitalocean.com", "digitalocean.com"],
+      aliases: ["do"]
+    },
+    {
+      id: "heroku",
+      displayName: "Heroku",
+      category: "cloud",
+      primaryUrl: "https://dashboard.heroku.com",
+      primaryDomain: "dashboard.heroku.com",
+      domains: ["dashboard.heroku.com", "heroku.com"],
+      aliases: []
+    },
+    {
+      id: "tailscale",
+      displayName: "Tailscale",
+      category: "tools",
+      primaryUrl: "https://login.tailscale.com",
+      primaryDomain: "login.tailscale.com",
+      domains: ["login.tailscale.com", "tailscale.com"],
+      aliases: []
+    },
+    {
+      id: "netlify",
+      displayName: "Netlify",
+      category: "developer",
+      primaryUrl: "https://app.netlify.com",
+      primaryDomain: "app.netlify.com",
+      domains: ["app.netlify.com", "netlify.com"],
+      aliases: []
+    },
+    {
+      id: "railway",
+      displayName: "Railway",
+      category: "developer",
+      primaryUrl: "https://railway.app",
+      primaryDomain: "railway.app",
+      domains: ["railway.app"],
+      aliases: []
+    },
+    {
+      id: "render",
+      displayName: "Render",
+      category: "developer",
+      primaryUrl: "https://dashboard.render.com",
+      primaryDomain: "dashboard.render.com",
+      domains: ["dashboard.render.com", "render.com"],
+      aliases: []
+    },
+    {
+      id: "cursor",
+      displayName: "Cursor",
+      category: "developer",
+      primaryUrl: "https://cursor.com",
+      primaryDomain: "cursor.com",
+      domains: ["cursor.com"],
+      aliases: ["cursor ai"]
+    },
+    {
+      id: "linear",
+      displayName: "Linear",
+      category: "productivity",
+      primaryUrl: "https://linear.app",
+      primaryDomain: "linear.app",
+      domains: ["linear.app"],
+      aliases: []
+    },
+    {
+      id: "npm",
+      displayName: "npm",
+      category: "developer",
+      primaryUrl: "https://npmjs.com",
+      primaryDomain: "npmjs.com",
+      domains: ["npmjs.com"],
+      aliases: ["node package manager"]
+    },
+    {
+      id: "postman",
+      displayName: "Postman",
+      category: "developer",
+      primaryUrl: "https://identity.getpostman.com",
+      primaryDomain: "identity.getpostman.com",
+      domains: ["identity.getpostman.com", "postman.com", "web.postman.co"],
+      aliases: []
+    },
+    {
+      id: "sentry",
+      displayName: "Sentry",
+      category: "developer",
+      primaryUrl: "https://sentry.io",
+      primaryDomain: "sentry.io",
+      domains: ["sentry.io"],
+      aliases: []
+    },
+    {
+      id: "datadog",
+      displayName: "Datadog",
+      category: "developer",
+      primaryUrl: "https://app.datadoghq.com",
+      primaryDomain: "app.datadoghq.com",
+      domains: ["app.datadoghq.com", "datadoghq.com"],
+      aliases: []
+    },
+    // ── AI & Machine Learning ──
+    {
+      id: "openai",
+      displayName: "OpenAI (ChatGPT)",
+      category: "ai",
+      primaryUrl: "https://chatgpt.com",
+      primaryDomain: "chatgpt.com",
+      domains: ["chatgpt.com", "platform.openai.com", "openai.com"],
+      aliases: ["chatgpt", "gpt", "dall-e", "openai api"]
+    },
+    {
+      id: "anthropic",
+      displayName: "Anthropic (Claude)",
+      category: "ai",
+      primaryUrl: "https://claude.ai",
+      primaryDomain: "claude.ai",
+      domains: ["claude.ai", "anthropic.com", "console.anthropic.com"],
+      aliases: ["claude", "claude ai", "anthropic api"]
+    },
+    {
+      id: "gemini",
+      displayName: "Google Gemini",
+      category: "ai",
+      primaryUrl: "https://gemini.google.com",
+      primaryDomain: "gemini.google.com",
+      domains: ["gemini.google.com", "deepmind.google", "ai.google.dev"],
+      aliases: ["google gemini", "bard", "deepmind"]
+    },
+    {
+      id: "perplexity",
+      displayName: "Perplexity AI",
+      category: "ai",
+      primaryUrl: "https://perplexity.ai",
+      primaryDomain: "perplexity.ai",
+      domains: ["perplexity.ai"],
+      aliases: ["perplexity"]
+    },
+    {
+      id: "huggingface",
+      displayName: "Hugging Face",
+      category: "ai",
+      primaryUrl: "https://huggingface.co",
+      primaryDomain: "huggingface.co",
+      domains: ["huggingface.co"],
+      aliases: ["hf"]
+    },
+    {
+      id: "midjourney",
+      displayName: "Midjourney",
+      category: "ai",
+      primaryUrl: "https://midjourney.com",
+      primaryDomain: "midjourney.com",
+      domains: ["midjourney.com"],
+      aliases: []
+    },
+    {
+      id: "replicate",
+      displayName: "Replicate",
+      category: "ai",
+      primaryUrl: "https://replicate.com",
+      primaryDomain: "replicate.com",
+      domains: ["replicate.com"],
+      aliases: []
+    },
+    // ── Privacy & Security ──
+    {
+      id: "proton",
+      displayName: "Proton",
+      category: "tools",
+      primaryUrl: "https://account.proton.me",
+      primaryDomain: "account.proton.me",
+      domains: [
+        "account.proton.me",
+        "proton.me",
+        "protonmail.com",
+        "protonvpn.com",
+        "pass.proton.me",
+        "drive.proton.me"
+      ],
+      aliases: ["protonmail", "proton mail", "proton vpn", "proton pass"]
+    },
+    {
+      id: "kloak",
+      displayName: "Kloak",
+      category: "tools",
+      primaryUrl: "https://naetikarvind.github.io/kloak/",
+      primaryDomain: "naetikarvind.github.io",
+      domains: ["naetikarvind.github.io", "kloak.app"],
+      aliases: ["kloak password manager"]
+    },
+    {
+      id: "bitwarden",
+      displayName: "Bitwarden",
+      category: "tools",
+      primaryUrl: "https://vault.bitwarden.com",
+      primaryDomain: "vault.bitwarden.com",
+      domains: ["vault.bitwarden.com", "bitwarden.com"],
+      aliases: []
+    },
+    {
+      id: "onepassword",
+      displayName: "1Password",
+      category: "tools",
+      primaryUrl: "https://my.1password.com",
+      primaryDomain: "my.1password.com",
+      domains: ["my.1password.com", "1password.com"],
+      aliases: ["1password"]
+    },
+    {
+      id: "lastpass",
+      displayName: "LastPass",
+      category: "tools",
+      primaryUrl: "https://lastpass.com",
+      primaryDomain: "lastpass.com",
+      domains: ["lastpass.com"],
+      aliases: []
+    },
+    // ── Productivity & Collaboration ──
+    {
+      id: "notion",
+      displayName: "Notion",
+      category: "productivity",
+      primaryUrl: "https://notion.so",
+      primaryDomain: "notion.so",
+      domains: ["notion.so", "notion.site"],
+      aliases: []
+    },
+    {
+      id: "figma",
+      displayName: "Figma",
+      category: "productivity",
+      primaryUrl: "https://figma.com",
+      primaryDomain: "figma.com",
+      domains: ["figma.com"],
+      aliases: ["figjam"]
+    },
+    {
+      id: "canva",
+      displayName: "Canva",
+      category: "productivity",
+      primaryUrl: "https://canva.com",
+      primaryDomain: "canva.com",
+      domains: ["canva.com"],
+      aliases: []
+    },
+    {
+      id: "slack",
+      displayName: "Slack",
+      category: "social",
+      primaryUrl: "https://slack.com",
+      primaryDomain: "slack.com",
+      domains: ["slack.com", "app.slack.com"],
+      aliases: []
+    },
+    {
+      id: "discord",
+      displayName: "Discord",
+      category: "social",
+      primaryUrl: "https://discord.com",
+      primaryDomain: "discord.com",
+      domains: ["discord.com", "discord.gg"],
+      aliases: []
+    },
+    {
+      id: "zoom",
+      displayName: "Zoom",
+      category: "productivity",
+      primaryUrl: "https://zoom.us",
+      primaryDomain: "zoom.us",
+      domains: ["zoom.us", "us04web.zoom.us", "us02web.zoom.us"],
+      aliases: ["zoom video"]
+    },
+    {
+      id: "dropbox",
+      displayName: "Dropbox",
+      category: "productivity",
+      primaryUrl: "https://dropbox.com",
+      primaryDomain: "dropbox.com",
+      domains: ["dropbox.com", "paper.dropbox.com"],
+      aliases: []
+    },
+    {
+      id: "box",
+      displayName: "Box",
+      category: "productivity",
+      primaryUrl: "https://box.com",
+      primaryDomain: "box.com",
+      domains: ["box.com", "app.box.com"],
+      aliases: []
+    },
+    {
+      id: "miro",
+      displayName: "Miro",
+      category: "productivity",
+      primaryUrl: "https://miro.com",
+      primaryDomain: "miro.com",
+      domains: ["miro.com", "realtimeboard.com"],
+      aliases: []
+    },
+    {
+      id: "airtable",
+      displayName: "Airtable",
+      category: "productivity",
+      primaryUrl: "https://airtable.com",
+      primaryDomain: "airtable.com",
+      domains: ["airtable.com"],
+      aliases: []
+    },
+    {
+      id: "asana",
+      displayName: "Asana",
+      category: "productivity",
+      primaryUrl: "https://app.asana.com",
+      primaryDomain: "app.asana.com",
+      domains: ["app.asana.com", "asana.com"],
+      aliases: []
+    },
+    {
+      id: "monday",
+      displayName: "Monday.com",
+      category: "productivity",
+      primaryUrl: "https://monday.com",
+      primaryDomain: "monday.com",
+      domains: ["monday.com"],
+      aliases: ["monday"]
+    },
+    {
+      id: "clickup",
+      displayName: "ClickUp",
+      category: "productivity",
+      primaryUrl: "https://app.clickup.com",
+      primaryDomain: "app.clickup.com",
+      domains: ["app.clickup.com", "clickup.com"],
+      aliases: []
+    },
+    {
+      id: "loom",
+      displayName: "Loom",
+      category: "productivity",
+      primaryUrl: "https://loom.com",
+      primaryDomain: "loom.com",
+      domains: ["loom.com"],
+      aliases: []
+    },
+    {
+      id: "evernote",
+      displayName: "Evernote",
+      category: "productivity",
+      primaryUrl: "https://evernote.com",
+      primaryDomain: "evernote.com",
+      domains: ["evernote.com"],
+      aliases: []
+    },
+    {
+      id: "adobe",
+      displayName: "Adobe Creative Cloud",
+      category: "productivity",
+      primaryUrl: "https://account.adobe.com",
+      primaryDomain: "account.adobe.com",
+      domains: ["account.adobe.com", "adobe.com", "creativecloud.adobe.com", "behance.net"],
+      aliases: ["adobe", "photoshop", "illustrator", "creative cloud", "behance"]
+    },
+    {
+      id: "salesforce",
+      displayName: "Salesforce",
+      category: "productivity",
+      primaryUrl: "https://login.salesforce.com",
+      primaryDomain: "login.salesforce.com",
+      domains: ["login.salesforce.com", "salesforce.com", "force.com"],
+      aliases: []
+    },
+    // ── Social, Community & Content ──
+    {
+      id: "linkedin",
+      displayName: "LinkedIn",
+      category: "social",
+      primaryUrl: "https://linkedin.com",
+      primaryDomain: "linkedin.com",
+      domains: ["linkedin.com", "learning.linkedin.com", "recruiter.linkedin.com"],
+      aliases: []
+    },
+    {
+      id: "reddit",
+      displayName: "Reddit",
+      category: "social",
+      primaryUrl: "https://reddit.com",
+      primaryDomain: "reddit.com",
+      domains: ["reddit.com", "old.reddit.com"],
+      aliases: []
+    },
+    {
+      id: "pinterest",
+      displayName: "Pinterest",
+      category: "social",
+      primaryUrl: "https://pinterest.com",
+      primaryDomain: "pinterest.com",
+      domains: ["pinterest.com"],
+      aliases: []
+    },
+    {
+      id: "tiktok",
+      displayName: "TikTok",
+      category: "social",
+      primaryUrl: "https://tiktok.com",
+      primaryDomain: "tiktok.com",
+      domains: ["tiktok.com"],
+      aliases: []
+    },
+    {
+      id: "telegram",
+      displayName: "Telegram",
+      category: "social",
+      primaryUrl: "https://web.telegram.org",
+      primaryDomain: "web.telegram.org",
+      domains: ["web.telegram.org", "telegram.org", "t.me"],
+      aliases: ["tg"]
+    },
+    {
+      id: "signal",
+      displayName: "Signal",
+      category: "social",
+      primaryUrl: "https://signal.org",
+      primaryDomain: "signal.org",
+      domains: ["signal.org"],
+      aliases: []
+    },
+    {
+      id: "medium",
+      displayName: "Medium",
+      category: "social",
+      primaryUrl: "https://medium.com",
+      primaryDomain: "medium.com",
+      domains: ["medium.com"],
+      aliases: []
+    },
+    {
+      id: "substack",
+      displayName: "Substack",
+      category: "social",
+      primaryUrl: "https://substack.com",
+      primaryDomain: "substack.com",
+      domains: ["substack.com"],
+      aliases: []
+    },
+    {
+      id: "wordpress",
+      displayName: "WordPress",
+      category: "productivity",
+      primaryUrl: "https://wordpress.com",
+      primaryDomain: "wordpress.com",
+      domains: ["wordpress.com", "wordpress.org"],
+      aliases: ["wp"]
+    },
+    // ── Streaming & Entertainment ──
+    {
+      id: "netflix",
+      displayName: "Netflix",
+      category: "entertainment",
+      primaryUrl: "https://netflix.com",
+      primaryDomain: "netflix.com",
+      domains: ["netflix.com"],
+      aliases: []
+    },
+    {
+      id: "spotify",
+      displayName: "Spotify",
+      category: "entertainment",
+      primaryUrl: "https://accounts.spotify.com",
+      primaryDomain: "accounts.spotify.com",
+      domains: ["accounts.spotify.com", "open.spotify.com", "spotify.com"],
+      aliases: []
+    },
+    {
+      id: "hotstar",
+      displayName: "Disney+ Hotstar",
+      category: "entertainment",
+      primaryUrl: "https://hotstar.com",
+      primaryDomain: "hotstar.com",
+      domains: ["hotstar.com", "disneyplus.com"],
+      aliases: ["disney", "disney+", "disneyplus", "hotstar"]
+    },
+    {
+      id: "hulu",
+      displayName: "Hulu",
+      category: "entertainment",
+      primaryUrl: "https://hulu.com",
+      primaryDomain: "hulu.com",
+      domains: ["hulu.com"],
+      aliases: []
+    },
+    {
+      id: "max",
+      displayName: "Max (HBO)",
+      category: "entertainment",
+      primaryUrl: "https://max.com",
+      primaryDomain: "max.com",
+      domains: ["max.com", "hbomax.com"],
+      aliases: ["hbo", "hbomax"]
+    },
+    {
+      id: "twitch",
+      displayName: "Twitch",
+      category: "entertainment",
+      primaryUrl: "https://twitch.tv",
+      primaryDomain: "twitch.tv",
+      domains: ["twitch.tv"],
+      aliases: []
+    },
+    {
+      id: "bandlab",
+      displayName: "BandLab",
+      category: "entertainment",
+      primaryUrl: "https://bandlab.com",
+      primaryDomain: "bandlab.com",
+      domains: ["bandlab.com"],
+      aliases: []
+    },
+    // ── Gaming ──
+    {
+      id: "steam",
+      displayName: "Steam",
+      category: "entertainment",
+      primaryUrl: "https://steampowered.com",
+      primaryDomain: "steampowered.com",
+      domains: ["steampowered.com", "steamcommunity.com"],
+      aliases: ["valve", "steamcommunity"]
+    },
+    {
+      id: "epicgames",
+      displayName: "Epic Games",
+      category: "entertainment",
+      primaryUrl: "https://store.epicgames.com",
+      primaryDomain: "store.epicgames.com",
+      domains: ["store.epicgames.com", "epicgames.com", "unrealengine.com"],
+      aliases: ["epic", "fortnite", "unreal"]
+    },
+    {
+      id: "playstation",
+      displayName: "PlayStation (Sony)",
+      category: "entertainment",
+      primaryUrl: "https://my.playstation.com",
+      primaryDomain: "my.playstation.com",
+      domains: ["my.playstation.com", "playstation.com", "sony.com"],
+      aliases: ["psn", "sony"]
+    },
+    {
+      id: "xbox",
+      displayName: "Xbox",
+      category: "entertainment",
+      primaryUrl: "https://xbox.com",
+      primaryDomain: "xbox.com",
+      domains: ["xbox.com"],
+      aliases: []
+    },
+    {
+      id: "nintendo",
+      displayName: "Nintendo",
+      category: "entertainment",
+      primaryUrl: "https://accounts.nintendo.com",
+      primaryDomain: "accounts.nintendo.com",
+      domains: ["accounts.nintendo.com", "nintendo.com"],
+      aliases: []
+    },
+    {
+      id: "roblox",
+      displayName: "Roblox",
+      category: "entertainment",
+      primaryUrl: "https://roblox.com",
+      primaryDomain: "roblox.com",
+      domains: ["roblox.com"],
+      aliases: []
+    },
+    // ── Finance, Payments & Crypto ──
+    {
+      id: "stripe",
+      displayName: "Stripe",
+      category: "finance",
+      primaryUrl: "https://dashboard.stripe.com",
+      primaryDomain: "dashboard.stripe.com",
+      domains: ["dashboard.stripe.com", "stripe.com"],
+      aliases: []
+    },
+    {
+      id: "paypal",
+      displayName: "PayPal",
+      category: "finance",
+      primaryUrl: "https://paypal.com",
+      primaryDomain: "paypal.com",
+      domains: ["paypal.com", "paypal.me"],
+      aliases: []
+    },
+    {
+      id: "coinbase",
+      displayName: "Coinbase",
+      category: "finance",
+      primaryUrl: "https://coinbase.com",
+      primaryDomain: "coinbase.com",
+      domains: ["coinbase.com", "pro.coinbase.com"],
+      aliases: []
+    },
+    {
+      id: "binance",
+      displayName: "Binance",
+      category: "finance",
+      primaryUrl: "https://binance.com",
+      primaryDomain: "binance.com",
+      domains: ["binance.com", "binance.us"],
+      aliases: []
+    },
+    {
+      id: "kraken",
+      displayName: "Kraken",
+      category: "finance",
+      primaryUrl: "https://kraken.com",
+      primaryDomain: "kraken.com",
+      domains: ["kraken.com"],
+      aliases: []
+    },
+    {
+      id: "robinhood",
+      displayName: "Robinhood",
+      category: "finance",
+      primaryUrl: "https://robinhood.com",
+      primaryDomain: "robinhood.com",
+      domains: ["robinhood.com"],
+      aliases: []
+    },
+    {
+      id: "wise",
+      displayName: "Wise",
+      category: "finance",
+      primaryUrl: "https://wise.com",
+      primaryDomain: "wise.com",
+      domains: ["wise.com", "transferwise.com"],
+      aliases: ["transferwise"]
+    },
+    {
+      id: "revolut",
+      displayName: "Revolut",
+      category: "finance",
+      primaryUrl: "https://revolut.com",
+      primaryDomain: "revolut.com",
+      domains: ["revolut.com", "app.revolut.com"],
+      aliases: []
+    },
+    {
+      id: "chase",
+      displayName: "Chase Bank",
+      category: "finance",
+      primaryUrl: "https://chase.com",
+      primaryDomain: "chase.com",
+      domains: ["chase.com"],
+      aliases: ["chase"]
+    },
+    {
+      id: "bankofamerica",
+      displayName: "Bank of America",
+      category: "finance",
+      primaryUrl: "https://bankofamerica.com",
+      primaryDomain: "bankofamerica.com",
+      domains: ["bankofamerica.com", "bofa.com"],
+      aliases: ["bofa"]
+    },
+    {
+      id: "wellsfargo",
+      displayName: "Wells Fargo",
+      category: "finance",
+      primaryUrl: "https://wellsfargo.com",
+      primaryDomain: "wellsfargo.com",
+      domains: ["wellsfargo.com"],
+      aliases: []
+    },
+    {
+      id: "citi",
+      displayName: "Citibank",
+      category: "finance",
+      primaryUrl: "https://citi.com",
+      primaryDomain: "citi.com",
+      domains: ["citi.com", "citibank.com"],
+      aliases: ["citi"]
+    },
+    {
+      id: "capitalone",
+      displayName: "Capital One",
+      category: "finance",
+      primaryUrl: "https://capitalone.com",
+      primaryDomain: "capitalone.com",
+      domains: ["capitalone.com"],
+      aliases: []
+    },
+    {
+      id: "amex",
+      displayName: "American Express",
+      category: "finance",
+      primaryUrl: "https://americanexpress.com",
+      primaryDomain: "americanexpress.com",
+      domains: ["americanexpress.com", "amex.com"],
+      aliases: ["amex"]
+    },
+    // ── Commerce & Marketplaces ──
+    {
+      id: "shopify",
+      displayName: "Shopify",
+      category: "finance",
+      primaryUrl: "https://admin.shopify.com",
+      primaryDomain: "admin.shopify.com",
+      domains: ["admin.shopify.com", "shopify.com", "myshopify.com"],
+      aliases: []
+    },
+    {
+      id: "ebay",
+      displayName: "eBay",
+      category: "finance",
+      primaryUrl: "https://ebay.com",
+      primaryDomain: "ebay.com",
+      domains: ["ebay.com"],
+      aliases: []
+    },
+    {
+      id: "etsy",
+      displayName: "Etsy",
+      category: "finance",
+      primaryUrl: "https://etsy.com",
+      primaryDomain: "etsy.com",
+      domains: ["etsy.com"],
+      aliases: []
+    },
+    {
+      id: "uber",
+      displayName: "Uber",
+      category: "tools",
+      primaryUrl: "https://uber.com",
+      primaryDomain: "uber.com",
+      domains: ["uber.com", "m.uber.com", "ubereats.com"],
+      aliases: ["uber eats"]
+    },
+    {
+      id: "airbnb",
+      displayName: "Airbnb",
+      category: "tools",
+      primaryUrl: "https://airbnb.com",
+      primaryDomain: "airbnb.com",
+      domains: ["airbnb.com"],
+      aliases: []
+    },
+    {
+      id: "booking",
+      displayName: "Booking.com",
+      category: "tools",
+      primaryUrl: "https://booking.com",
+      primaryDomain: "booking.com",
+      domains: ["booking.com"],
+      aliases: ["booking"]
+    },
+    // ── Browsers & Web Tools ──
+    {
+      id: "opera",
+      displayName: "Opera",
+      category: "tools",
+      primaryUrl: "https://auth.opera.com",
+      primaryDomain: "auth.opera.com",
+      domains: ["auth.opera.com", "opera.com"],
+      aliases: []
+    },
+    {
+      id: "brave",
+      displayName: "Brave",
+      category: "tools",
+      primaryUrl: "https://brave.com",
+      primaryDomain: "brave.com",
+      domains: ["brave.com", "search.brave.com"],
+      aliases: []
+    },
+    {
+      id: "firefox",
+      displayName: "Firefox (Mozilla)",
+      category: "tools",
+      primaryUrl: "https://accounts.firefox.com",
+      primaryDomain: "accounts.firefox.com",
+      domains: ["accounts.firefox.com", "mozilla.org", "firefox.com"],
+      aliases: ["mozilla"]
+    },
+    {
+      id: "duckduckgo",
+      displayName: "DuckDuckGo",
+      category: "tools",
+      primaryUrl: "https://duckduckgo.com",
+      primaryDomain: "duckduckgo.com",
+      domains: ["duckduckgo.com"],
+      aliases: ["ddg"]
+    }
+  ];
+  function normalizeServiceName(query) {
+    return query.toLowerCase().replace(/\s*\([^)]*\)|\s*\[[^\]]*\]/g, "").replace(/[^\w\s.-]/g, "").replace(/\b(login|signin|sign in|account|portal|dashboard|auth|app|inc|llc|official)\b/g, "").trim().replace(/\s+/g, " ");
+  }
+  function extractCleanDomain(input) {
+    let cleaned = input.toLowerCase().trim();
+    cleaned = cleaned.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const prefixes = [
+      "www.",
+      "app.",
+      "mail.",
+      "accounts.",
+      "account.",
+      "login.",
+      "signin.",
+      "auth.",
+      "m.",
+      "dashboard.",
+      "portal.",
+      "api.",
+      "sso.",
+      "my.",
+      "web.",
+      "id.",
+      "secure.",
+      "identity.",
+      "admin."
+    ];
+    for (const p of prefixes) {
+      if (cleaned.startsWith(p)) {
+        cleaned = cleaned.slice(p.length);
+        break;
+      }
+    }
+    return cleaned;
+  }
+  function resolveServiceDomains(rawTitle) {
+    if (!rawTitle) return null;
+    const normalized = normalizeServiceName(rawTitle);
+    if (!normalized || normalized.length < 2) return null;
+    if (rawTitle.includes(".") || rawTitle.startsWith("http://") || rawTitle.startsWith("https://")) {
+      const fromUrl = resolveServiceFromUrl(rawTitle);
+      if (fromUrl) {
+        const match = KNOWN_SERVICES.find((s) => s.id === fromUrl.serviceId);
+        if (match) {
+          return {
+            serviceId: match.id,
+            displayName: match.displayName,
+            primaryUrl: match.primaryUrl,
+            primaryDomain: match.primaryDomain,
+            domains: match.domains,
+            urls: match.domains.map((d) => `https://${d}`),
+            matchType: "url_domain"
+          };
+        }
+      }
+      const cleanHost = rawTitle.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      if (cleanHost.includes(".")) {
+        return {
+          serviceId: cleanHost.split(".")[0],
+          displayName: cleanHost.split(".")[0].charAt(0).toUpperCase() + cleanHost.split(".")[0].slice(1),
+          primaryUrl: `https://${cleanHost}`,
+          primaryDomain: cleanHost,
+          domains: [cleanHost],
+          urls: [`https://${cleanHost}`],
+          matchType: "url_domain"
+        };
+      }
+    }
+    for (const s of KNOWN_SERVICES) {
+      if (s.id === normalized || s.displayName.toLowerCase() === normalized) {
+        return buildInfo(s, "exact");
+      }
+      if (s.aliases && s.aliases.some((a) => a.toLowerCase() === normalized)) {
+        return buildInfo(s, "alias");
+      }
+    }
+    for (const s of KNOWN_SERVICES) {
+      const sId = s.id.toLowerCase();
+      const sName = s.displayName.toLowerCase();
+      if (normalized.startsWith(sId + " ") || normalized.endsWith(" " + sId) || normalized.startsWith(sName + " ") || normalized.endsWith(" " + sName)) {
+        return buildInfo(s, "prefix");
+      }
+      if (s.aliases) {
+        for (const a of s.aliases) {
+          const al = a.toLowerCase();
+          if (normalized.startsWith(al + " ") || normalized.endsWith(" " + al)) {
+            return buildInfo(s, "alias");
+          }
+        }
+      }
+    }
+    if (normalized.length >= 3) {
+      const prefixMatch = KNOWN_SERVICES.find((s) => {
+        if (s.id.startsWith(normalized)) return true;
+        if (s.displayName.toLowerCase().startsWith(normalized)) return true;
+        if (s.aliases && s.aliases.some((a) => a.toLowerCase().startsWith(normalized))) return true;
+        return false;
+      });
+      if (prefixMatch) {
+        return buildInfo(prefixMatch, "prefix");
+      }
+    }
+    if (!normalized.includes(" ") && normalized.length >= 3 && /^[a-z0-9-]+$/.test(normalized)) {
+      const domain = `${normalized}.com`;
+      return {
+        serviceId: normalized,
+        displayName: normalized.charAt(0).toUpperCase() + normalized.slice(1),
+        primaryUrl: `https://${domain}`,
+        primaryDomain: domain,
+        domains: [domain],
+        urls: [`https://${domain}`],
+        matchType: "heuristic"
+      };
+    }
+    return null;
+  }
+  function buildInfo(service, matchType) {
+    return {
+      serviceId: service.id,
+      displayName: service.displayName,
+      primaryUrl: service.primaryUrl,
+      primaryDomain: service.primaryDomain,
+      domains: service.domains,
+      urls: service.domains.map((d) => `https://${d}`),
+      matchType
+    };
+  }
+  function resolveServiceFromUrl(urlOrHost) {
+    if (!urlOrHost) return null;
+    const raw = urlOrHost.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+    const clean = extractCleanDomain(raw);
+    for (const s of KNOWN_SERVICES) {
+      if (s.domains.some((d) => d === raw)) {
+        return {
+          displayName: s.displayName,
+          serviceId: s.id,
+          domains: s.domains
+        };
+      }
+    }
+    for (const s of KNOWN_SERVICES) {
+      if (s.domains.some((d) => raw.endsWith("." + d))) {
+        return {
+          displayName: s.displayName,
+          serviceId: s.id,
+          domains: s.domains
+        };
+      }
+    }
+    for (const s of KNOWN_SERVICES) {
+      if (s.domains.some((d) => d === clean || clean.endsWith("." + d))) {
+        return {
+          displayName: s.displayName,
+          serviceId: s.id,
+          domains: s.domains
+        };
+      }
+    }
+    const namePart = clean.split(".")[0];
+    if (namePart && namePart.length >= 2) {
+      return {
+        displayName: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+        serviceId: namePart,
+        domains: [clean]
+      };
+    }
+    return null;
+  }
+  function getAllKnownServiceNames() {
+    return KNOWN_SERVICES.map((s) => s.displayName).sort((a, b) => a.localeCompare(b));
+  }
+
   // src/favicon-service.ts
   var PARENT_BRAND_MAP = {
     // ── Microsoft ecosystem ──
@@ -244,6 +1449,8 @@
   function inferDomainFromTitle(title) {
     const clean = sanitizeTitle(title).toLowerCase();
     if (!clean) return null;
+    const service = resolveServiceDomains(clean);
+    if (service) return service.primaryDomain;
     if (BRAND_DICTIONARY[clean]) return BRAND_DICTIONARY[clean];
     for (const [brand, domain] of Object.entries(BRAND_DICTIONARY)) {
       if (clean === brand || clean.startsWith(brand + " ") || clean.endsWith(" " + brand)) {
@@ -1117,7 +2324,8 @@
           </div>
           <div class="card-content">
             <div class="card-label">Title / Service</div>
-            <input type="text" class="edit-input" id="field-title" placeholder="e.g. GitHub, Google, Netflix">
+            <input type="text" class="edit-input" id="field-title" placeholder="e.g. GitHub, Google, Netflix" list="kloak-services-datalist" autocomplete="off">
+            <datalist id="kloak-services-datalist"></datalist>
           </div>
         </div>
       </div>
@@ -1223,6 +2431,17 @@
               </div>
               <input type="text" class="edit-input url-input" placeholder="https://example.com">
             </div>
+          </div>
+          <!-- Smart Domain Suggestions -->
+          <div class="domain-suggestions-box" id="domain-suggestions-box" style="display: none;">
+            <div class="domain-suggestions-header">
+              <div class="domain-suggestions-title">
+                <svg viewBox="0 0 24 24" class="sparkle-svg"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+                <span id="domain-suggestions-label">Suggested Domains:</span>
+              </div>
+              <span class="domain-suggestions-count" id="domain-suggestions-count">0</span>
+            </div>
+            <div class="domain-chips-container" id="domain-chips-container"></div>
           </div>
           <button class="btn-add-inline" id="btn-add-more-url">
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -1480,7 +2699,135 @@
       else container.innerHTML = '<div class="detail-empty">Select an item to view details</div>';
     });
     if (type === "login") {
-      let generateAndSetPreview2 = function() {
+      let getCurrentUrls2 = function() {
+        const inputs = urlContainer?.querySelectorAll(".url-input");
+        if (!inputs) return [];
+        const list = [];
+        inputs.forEach((inp) => {
+          const val = inp.value.trim();
+          if (val) list.push(val);
+        });
+        return list;
+      }, isDomainAdded2 = function(domain) {
+        const cleanTarget = domain.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        const current = getCurrentUrls2();
+        return current.some((u) => {
+          const clean = u.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+          return clean === cleanTarget || clean.endsWith("." + cleanTarget) || cleanTarget.endsWith("." + clean);
+        });
+      }, applyDomainToForm2 = function(domain) {
+        const targetUrl = domain.startsWith("http://") || domain.startsWith("https://") ? domain : `https://${domain}`;
+        const inputs = urlContainer?.querySelectorAll(".url-input");
+        let applied = false;
+        if (inputs) {
+          for (let i = 0; i < inputs.length; i++) {
+            const inp = inputs[i];
+            if (!inp.value.trim()) {
+              inp.value = targetUrl;
+              inp.dataset.autofilled = "true";
+              applied = true;
+              break;
+            }
+          }
+        }
+        if (!applied) {
+          addUrlInputRow2(targetUrl);
+        }
+        if (titleInput) {
+          updateDomainSuggestions2(titleInput.value, false);
+        }
+      }, addUrlInputRow2 = function(initialVal = "") {
+        if (!urlContainer) return;
+        const row = document.createElement("div");
+        row.className = "multi-url-row";
+        row.innerHTML = `
+        <div class="card-icon" style="margin-right: 6px;">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </div>
+        <input type="text" class="edit-input url-input" placeholder="https://" value="${escHtml(initialVal)}">
+        <div class="action-icon btn-del-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+      `;
+        const urlInput = row.querySelector(".url-input");
+        if (initialVal) {
+          urlInput.dataset.autofilled = "true";
+        }
+        bindUrlInput2(urlInput);
+        row.querySelector(".btn-del-url")?.addEventListener("click", () => {
+          row.remove();
+          if (titleInput) updateDomainSuggestions2(titleInput.value, false);
+        });
+        urlContainer.appendChild(row);
+      }, bindUrlInput2 = function(input) {
+        input.addEventListener("input", () => {
+          delete input.dataset.autofilled;
+          const val = input.value.trim();
+          if (val && titleInput && (!titleInput.value.trim() || titleInput.dataset.autoinferred === "true")) {
+            const rev = resolveServiceFromUrl(val);
+            if (rev) {
+              titleInput.value = rev.displayName;
+              titleInput.dataset.autoinferred = "true";
+              const avatarBox = document.getElementById("title-avatar-box");
+              if (avatarBox) {
+                renderFavicon(avatarBox, { title: rev.displayName, size: 24 });
+              }
+              updateDomainSuggestions2(rev.displayName, false);
+              return;
+            }
+          }
+          if (titleInput && titleInput.value.trim()) {
+            updateDomainSuggestions2(titleInput.value, false);
+          }
+        });
+      }, updateDomainSuggestions2 = function(query, autoFillPrimary = true) {
+        if (!suggestionsBox || !chipsContainer) return;
+        const clean = query.trim();
+        if (!clean) {
+          suggestionsBox.style.display = "none";
+          chipsContainer.innerHTML = "";
+          return;
+        }
+        const match = resolveServiceDomains(clean);
+        if (!match || !match.domains || match.domains.length === 0) {
+          suggestionsBox.style.display = "none";
+          chipsContainer.innerHTML = "";
+          return;
+        }
+        if (autoFillPrimary) {
+          const firstUrlInput = urlContainer?.querySelector(".url-input");
+          if (firstUrlInput) {
+            const curVal = firstUrlInput.value.trim();
+            if (!curVal || firstUrlInput.dataset.autofilled === "true") {
+              firstUrlInput.value = match.primaryUrl;
+              firstUrlInput.dataset.autofilled = "true";
+            }
+          }
+        }
+        if (suggestionsLabel) {
+          suggestionsLabel.textContent = `${match.displayName} Domains:`;
+        }
+        if (suggestionsCount) {
+          suggestionsCount.textContent = `${match.domains.length}`;
+        }
+        chipsContainer.innerHTML = "";
+        match.domains.forEach((domain) => {
+          const added = isDomainAdded2(domain);
+          const chip = document.createElement("div");
+          chip.className = `domain-chip ${added ? "active" : ""}`;
+          chip.title = added ? `Already added (${domain})` : `Click to add ${domain}`;
+          chip.innerHTML = `
+          <span class="chip-symbol">${added ? "\u2713" : "+"}</span>
+          <span class="chip-text">${escHtml(domain)}</span>
+        `;
+          if (!added) {
+            chip.addEventListener("click", (e) => {
+              e.stopPropagation();
+              applyDomainToForm2(domain);
+            });
+          }
+          chipsContainer.appendChild(chip);
+        });
+        suggestionsBox.style.display = "block";
+      }, generateAndSetPreview2 = function() {
         const len = parseInt(slider?.value || "20", 10);
         const upper = document.getElementById("chk-upper")?.checked;
         const lower = document.getElementById("chk-lower")?.checked;
@@ -1502,11 +2849,21 @@
           updateStrengthMeter(pwd);
         }
       };
-      var generateAndSetPreview = generateAndSetPreview2;
+      var getCurrentUrls = getCurrentUrls2, isDomainAdded = isDomainAdded2, applyDomainToForm = applyDomainToForm2, addUrlInputRow = addUrlInputRow2, bindUrlInput = bindUrlInput2, updateDomainSuggestions = updateDomainSuggestions2, generateAndSetPreview = generateAndSetPreview2;
       const titleInput = document.getElementById("field-title");
       const pwdInput = document.getElementById("field-password");
       const strengthBox = document.getElementById("strength-box");
       const genPanel = document.getElementById("gen-panel");
+      const datalist = document.getElementById("kloak-services-datalist");
+      if (datalist) {
+        datalist.innerHTML = getAllKnownServiceNames().map((name) => `<option value="${name}"></option>`).join("");
+      }
+      const suggestionsBox = document.getElementById("domain-suggestions-box");
+      const suggestionsLabel = document.getElementById("domain-suggestions-label");
+      const suggestionsCount = document.getElementById("domain-suggestions-count");
+      const chipsContainer = document.getElementById("domain-chips-container");
+      const urlContainer = document.getElementById("url-inputs-container");
+      urlContainer?.querySelectorAll(".url-input").forEach((inp) => bindUrlInput2(inp));
       if (initialValues?.title && titleInput) {
         titleInput.value = initialValues.title;
         const avatarBox = document.getElementById("title-avatar-box");
@@ -1516,6 +2873,20 @@
             urls: initialValues.url ? [initialValues.url] : [],
             size: 24
           });
+        }
+        updateDomainSuggestions2(initialValues.title, !initialValues.url);
+      } else if (initialValues?.url) {
+        const urlInput = document.querySelector(".url-input");
+        if (urlInput) urlInput.value = initialValues.url;
+        const rev = resolveServiceFromUrl(initialValues.url);
+        if (rev && titleInput) {
+          titleInput.value = rev.displayName;
+          titleInput.dataset.autoinferred = "true";
+          const avatarBox = document.getElementById("title-avatar-box");
+          if (avatarBox) {
+            renderFavicon(avatarBox, { title: rev.displayName, size: 24 });
+          }
+          updateDomainSuggestions2(rev.displayName, false);
         }
       }
       if (initialValues?.username) {
@@ -1527,17 +2898,14 @@
         if (strengthBox) strengthBox.style.display = "flex";
         updateStrengthMeter(initialValues.password);
       }
-      if (initialValues?.url) {
-        const urlInput = document.querySelector(".url-input");
-        if (urlInput) urlInput.value = initialValues.url;
-      }
       titleInput?.addEventListener("input", () => {
+        delete titleInput.dataset.autoinferred;
         const val = titleInput.value.trim();
         const avatarBox = document.getElementById("title-avatar-box");
-        if (!avatarBox) return;
-        if (val.length >= 2) {
+        if (avatarBox && val.length >= 2) {
           renderFavicon(avatarBox, { title: val, size: 24 });
         }
+        updateDomainSuggestions2(val, true);
       });
       document.getElementById("btn-gen-alias")?.addEventListener("click", () => {
         const userInput = document.getElementById("field-username");
@@ -1598,19 +2966,7 @@
         }
       });
       document.getElementById("btn-add-more-url")?.addEventListener("click", () => {
-        const urlContainer = document.getElementById("url-inputs-container");
-        if (!urlContainer) return;
-        const row = document.createElement("div");
-        row.className = "multi-url-row";
-        row.innerHTML = `
-        <div class="card-icon" style="margin-right: 6px;">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-        </div>
-        <input type="text" class="edit-input url-input" placeholder="https://">
-        <div class="action-icon btn-del-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
-      `;
-        row.querySelector(".btn-del-url")?.addEventListener("click", () => row.remove());
-        urlContainer.appendChild(row);
+        addUrlInputRow2("");
       });
     }
     if (type === "alias") {
@@ -2829,6 +4185,7 @@ ${notes}`;
     const container = document.getElementById("detail-pane");
     if (!container) return;
     isEditing = true;
+    const currentUrls = item.urls && item.urls.length > 0 ? item.urls : [""];
     container.innerHTML = `
     <div class="creation-header">
       <div class="creation-title-group">
@@ -2847,8 +4204,9 @@ ${notes}`;
     <div class="card">
       <div class="card-row">
         <div class="card-content">
-          <div class="card-label">Title</div>
-          <input type="text" class="edit-input" id="edit-title" value="${escHtml(item.title || "")}">
+          <div class="card-label">Title / Service</div>
+          <input type="text" class="edit-input" id="edit-title" value="${escHtml(item.title || "")}" list="kloak-edit-services-datalist" autocomplete="off">
+          <datalist id="kloak-edit-services-datalist"></datalist>
         </div>
       </div>
       <div class="card-row">
@@ -2869,11 +4227,34 @@ ${notes}`;
           <input type="text" class="edit-input" id="edit-totp" value="${escHtml(item.totpSecret || "")}" placeholder="Base32 key">
         </div>
       </div>
-      <div class="card-row">
-        <div class="card-content">
-          <div class="card-label">Website</div>
-          <input type="text" class="edit-input" id="edit-url" value="${escHtml((item.urls || [])[0] || "")}">
+      <div class="card-row" style="flex-direction: column; align-items: stretch;">
+        <div class="card-label" style="margin-bottom: 6px;">Websites</div>
+        <div id="edit-urls-container">
+          ${currentUrls.map((u, i) => `
+            <div class="multi-url-row" style="margin-bottom: 6px;">
+              <div class="card-icon" style="margin-right: 6px;">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+              </div>
+              <input type="text" class="edit-input edit-url-input" placeholder="https://" value="${escHtml(u)}">
+              ${i > 0 ? `<div class="action-icon btn-del-edit-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>` : ""}
+            </div>
+          `).join("")}
         </div>
+        <!-- Smart Domain Suggestions in Edit Mode -->
+        <div class="domain-suggestions-box" id="edit-domain-suggestions-box" style="display: none;">
+          <div class="domain-suggestions-header">
+            <div class="domain-suggestions-title">
+              <svg viewBox="0 0 24 24" class="sparkle-svg"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+              <span id="edit-domain-suggestions-label">Suggested Domains:</span>
+            </div>
+            <span class="domain-suggestions-count" id="edit-domain-suggestions-count">0</span>
+          </div>
+          <div class="domain-chips-container" id="edit-domain-chips-container"></div>
+        </div>
+        <button class="btn-add-inline" id="btn-edit-add-more-url">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Add another website
+        </button>
       </div>
       <div class="card-row">
         <div class="card-content">
@@ -2883,17 +4264,160 @@ ${notes}`;
       </div>
     </div>
   `;
+    const editDatalist = document.getElementById("kloak-edit-services-datalist");
+    if (editDatalist) {
+      editDatalist.innerHTML = getAllKnownServiceNames().map((name) => `<option value="${name}"></option>`).join("");
+    }
+    const editTitleInput = document.getElementById("edit-title");
+    const editUrlsContainer = document.getElementById("edit-urls-container");
+    const editSuggestionsBox = document.getElementById("edit-domain-suggestions-box");
+    const editSuggestionsLabel = document.getElementById("edit-domain-suggestions-label");
+    const editSuggestionsCount = document.getElementById("edit-domain-suggestions-count");
+    const editChipsContainer = document.getElementById("edit-domain-chips-container");
+    function getEditUrls() {
+      const inputs = editUrlsContainer?.querySelectorAll(".edit-url-input");
+      if (!inputs) return [];
+      const list = [];
+      inputs.forEach((inp) => {
+        const val = inp.value.trim();
+        if (val) list.push(val);
+      });
+      return list;
+    }
+    function isEditDomainAdded(domain) {
+      const cleanTarget = domain.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+      const current = getEditUrls();
+      return current.some((u) => {
+        const clean = u.toLowerCase().trim().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+        return clean === cleanTarget || clean.endsWith("." + cleanTarget) || cleanTarget.endsWith("." + clean);
+      });
+    }
+    function applyDomainToEditForm(domain) {
+      const targetUrl = domain.startsWith("http://") || domain.startsWith("https://") ? domain : `https://${domain}`;
+      const inputs = editUrlsContainer?.querySelectorAll(".edit-url-input");
+      let applied = false;
+      if (inputs) {
+        for (let i = 0; i < inputs.length; i++) {
+          const inp = inputs[i];
+          if (!inp.value.trim()) {
+            inp.value = targetUrl;
+            applied = true;
+            break;
+          }
+        }
+      }
+      if (!applied) {
+        addEditUrlInputRow(targetUrl);
+      }
+      if (editTitleInput) {
+        updateEditDomainSuggestions(editTitleInput.value);
+      }
+    }
+    function addEditUrlInputRow(initialVal = "") {
+      if (!editUrlsContainer) return;
+      const row = document.createElement("div");
+      row.className = "multi-url-row";
+      row.style.marginBottom = "6px";
+      row.innerHTML = `
+      <div class="card-icon" style="margin-right: 6px;">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      </div>
+      <input type="text" class="edit-input edit-url-input" placeholder="https://" value="${escHtml(initialVal)}">
+      <div class="action-icon btn-del-edit-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+    `;
+      const urlInput = row.querySelector(".edit-url-input");
+      bindEditUrlInput(urlInput);
+      row.querySelector(".btn-del-edit-url")?.addEventListener("click", () => {
+        row.remove();
+        if (editTitleInput) updateEditDomainSuggestions(editTitleInput.value);
+      });
+      editUrlsContainer.appendChild(row);
+    }
+    function bindEditUrlInput(input) {
+      input.addEventListener("input", () => {
+        const val = input.value.trim();
+        if (val && editTitleInput && !editTitleInput.value.trim()) {
+          const rev = resolveServiceFromUrl(val);
+          if (rev) {
+            editTitleInput.value = rev.displayName;
+            updateEditDomainSuggestions(rev.displayName);
+            return;
+          }
+        }
+        if (editTitleInput && editTitleInput.value.trim()) {
+          updateEditDomainSuggestions(editTitleInput.value);
+        }
+      });
+    }
+    function updateEditDomainSuggestions(query) {
+      if (!editSuggestionsBox || !editChipsContainer) return;
+      const clean = query.trim();
+      if (!clean) {
+        editSuggestionsBox.style.display = "none";
+        editChipsContainer.innerHTML = "";
+        return;
+      }
+      const match = resolveServiceDomains(clean);
+      if (!match || !match.domains || match.domains.length === 0) {
+        editSuggestionsBox.style.display = "none";
+        editChipsContainer.innerHTML = "";
+        return;
+      }
+      if (editSuggestionsLabel) {
+        editSuggestionsLabel.textContent = `${match.displayName} Domains:`;
+      }
+      if (editSuggestionsCount) {
+        editSuggestionsCount.textContent = `${match.domains.length}`;
+      }
+      editChipsContainer.innerHTML = "";
+      match.domains.forEach((domain) => {
+        const added = isEditDomainAdded(domain);
+        const chip = document.createElement("div");
+        chip.className = `domain-chip ${added ? "active" : ""}`;
+        chip.title = added ? `Already added (${domain})` : `Click to add ${domain}`;
+        chip.innerHTML = `
+        <span class="chip-symbol">${added ? "\u2713" : "+"}</span>
+        <span class="chip-text">${escHtml(domain)}</span>
+      `;
+        if (!added) {
+          chip.addEventListener("click", (e) => {
+            e.stopPropagation();
+            applyDomainToEditForm(domain);
+          });
+        }
+        editChipsContainer.appendChild(chip);
+      });
+      editSuggestionsBox.style.display = "block";
+    }
+    editUrlsContainer?.querySelectorAll(".edit-url-input").forEach((inp) => bindEditUrlInput(inp));
+    editUrlsContainer?.querySelectorAll(".btn-del-edit-url").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.currentTarget.closest(".multi-url-row")?.remove();
+        if (editTitleInput) updateEditDomainSuggestions(editTitleInput.value);
+      });
+    });
+    document.getElementById("btn-edit-add-more-url")?.addEventListener("click", () => {
+      addEditUrlInputRow("");
+    });
+    editTitleInput?.addEventListener("input", () => {
+      updateEditDomainSuggestions(editTitleInput.value);
+    });
+    if (item.title) {
+      updateEditDomainSuggestions(item.title);
+    }
     document.getElementById("btn-cancel-edit")?.addEventListener("click", () => {
       renderDetailPane(item);
     });
     document.getElementById("btn-save-edit")?.addEventListener("click", () => {
+      const editUrlInputs = Array.from(document.querySelectorAll(".edit-url-input"));
+      const urls = editUrlInputs.map((i) => i.value.trim()).filter(Boolean);
       const updated = {
         ...item,
         title: document.getElementById("edit-title").value,
         username: document.getElementById("edit-username").value,
         password: document.getElementById("edit-password").value,
         totpSecret: document.getElementById("edit-totp").value.trim().replace(/\s+/g, "") || void 0,
-        urls: [document.getElementById("edit-url").value].filter(Boolean),
+        urls,
         notes: document.getElementById("edit-notes").value,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };

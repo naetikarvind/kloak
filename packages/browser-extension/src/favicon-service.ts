@@ -16,6 +16,8 @@
  * 6. High-performance memory cache for frame-0 instant rendering
  */
 
+import { resolveServiceDomains } from './service-domain-service';
+
 export type LogoRenderingStyle =
   | { type: 'standard' }
   | { type: 'fullBleed' }
@@ -285,6 +287,12 @@ export function sanitizeTitle(title: string): string {
 export function inferDomainFromTitle(title: string): string | null {
   const clean = sanitizeTitle(title).toLowerCase();
   if (!clean) return null;
+
+  // 1. Check rich multi-domain service registry
+  const service = resolveServiceDomains(clean);
+  if (service) return service.primaryDomain;
+
+  // 2. Check brand dictionary
   if (BRAND_DICTIONARY[clean]) return BRAND_DICTIONARY[clean];
 
   for (const [brand, domain] of Object.entries(BRAND_DICTIONARY)) {

@@ -4,6 +4,12 @@
  */
 
 import { renderFavicon, resolveItemDomains } from './favicon-service';
+import {
+  resolveServiceDomains,
+  resolveServiceFromUrl,
+  getAllKnownServiceNames,
+  ServiceDomainInfo
+} from './service-domain-service';
 
 let allItems: any[] = [];
 let activeItem: any = null;
@@ -360,7 +366,8 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
           </div>
           <div class="card-content">
             <div class="card-label">Title / Service</div>
-            <input type="text" class="edit-input" id="field-title" placeholder="e.g. GitHub, Google, Netflix">
+            <input type="text" class="edit-input" id="field-title" placeholder="e.g. GitHub, Google, Netflix" list="kloak-services-datalist" autocomplete="off">
+            <datalist id="kloak-services-datalist"></datalist>
           </div>
         </div>
       </div>
@@ -466,6 +473,17 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
               </div>
               <input type="text" class="edit-input url-input" placeholder="https://example.com">
             </div>
+          </div>
+          <!-- Smart Domain Suggestions -->
+          <div class="domain-suggestions-box" id="domain-suggestions-box" style="display: none;">
+            <div class="domain-suggestions-header">
+              <div class="domain-suggestions-title">
+                <svg viewBox="0 0 24 24" class="sparkle-svg"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+                <span id="domain-suggestions-label">Suggested Domains:</span>
+              </div>
+              <span class="domain-suggestions-count" id="domain-suggestions-count">0</span>
+            </div>
+            <div class="domain-chips-container" id="domain-chips-container"></div>
           </div>
           <button class="btn-add-inline" id="btn-add-more-url">
             <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -729,6 +747,178 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
     const strengthBox = document.getElementById('strength-box');
     const genPanel = document.getElementById('gen-panel');
 
+    // ── 1. Service Quick-Picks Datalist ──
+    const datalist = document.getElementById('kloak-services-datalist');
+    if (datalist) {
+      datalist.innerHTML = getAllKnownServiceNames()
+        .map(name => `<option value="${name}"></option>`)
+        .join('');
+    }
+
+    // ── 2. Smart Domain Intelligence & Suggestions Engine ──
+    const suggestionsBox = document.getElementById('domain-suggestions-box');
+    const suggestionsLabel = document.getElementById('domain-suggestions-label');
+    const suggestionsCount = document.getElementById('domain-suggestions-count');
+    const chipsContainer = document.getElementById('domain-chips-container');
+    const urlContainer = document.getElementById('url-inputs-container');
+
+    function getCurrentUrls(): string[] {
+      const inputs = urlContainer?.querySelectorAll<HTMLInputElement>('.url-input');
+      if (!inputs) return [];
+      const list: string[] = [];
+      inputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val) list.push(val);
+      });
+      return list;
+    }
+
+    function isDomainAdded(domain: string): boolean {
+      const cleanTarget = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      const current = getCurrentUrls();
+      return current.some(u => {
+        const clean = u.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        return clean === cleanTarget || clean.endsWith('.' + cleanTarget) || cleanTarget.endsWith('.' + clean);
+      });
+    }
+
+    function applyDomainToForm(domain: string) {
+      const targetUrl = domain.startsWith('http://') || domain.startsWith('https://')
+        ? domain
+        : `https://${domain}`;
+
+      const inputs = urlContainer?.querySelectorAll<HTMLInputElement>('.url-input');
+      let applied = false;
+      if (inputs) {
+        for (let i = 0; i < inputs.length; i++) {
+          const inp = inputs[i];
+          if (!inp.value.trim()) {
+            inp.value = targetUrl;
+            inp.dataset.autofilled = 'true';
+            applied = true;
+            break;
+          }
+        }
+      }
+
+      if (!applied) {
+        addUrlInputRow(targetUrl);
+      }
+
+      if (titleInput) {
+        updateDomainSuggestions(titleInput.value, false);
+      }
+    }
+
+    function addUrlInputRow(initialVal: string = '') {
+      if (!urlContainer) return;
+      const row = document.createElement('div');
+      row.className = 'multi-url-row';
+      row.innerHTML = `
+        <div class="card-icon" style="margin-right: 6px;">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+        </div>
+        <input type="text" class="edit-input url-input" placeholder="https://" value="${escHtml(initialVal)}">
+        <div class="action-icon btn-del-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+      `;
+      const urlInput = row.querySelector('.url-input') as HTMLInputElement;
+      if (initialVal) {
+        urlInput.dataset.autofilled = 'true';
+      }
+      bindUrlInput(urlInput);
+      row.querySelector('.btn-del-url')?.addEventListener('click', () => {
+        row.remove();
+        if (titleInput) updateDomainSuggestions(titleInput.value, false);
+      });
+      urlContainer.appendChild(row);
+    }
+
+    function bindUrlInput(input: HTMLInputElement) {
+      input.addEventListener('input', () => {
+        delete input.dataset.autofilled;
+        const val = input.value.trim();
+
+        // Bi-directional inference: infer service title & logo from entered URL if title is blank or auto-inferred
+        if (val && titleInput && (!titleInput.value.trim() || titleInput.dataset.autoinferred === 'true')) {
+          const rev = resolveServiceFromUrl(val);
+          if (rev) {
+            titleInput.value = rev.displayName;
+            titleInput.dataset.autoinferred = 'true';
+            const avatarBox = document.getElementById('title-avatar-box');
+            if (avatarBox) {
+              renderFavicon(avatarBox, { title: rev.displayName, size: 24 });
+            }
+            updateDomainSuggestions(rev.displayName, false);
+            return;
+          }
+        }
+
+        if (titleInput && titleInput.value.trim()) {
+          updateDomainSuggestions(titleInput.value, false);
+        }
+      });
+    }
+
+    function updateDomainSuggestions(query: string, autoFillPrimary: boolean = true) {
+      if (!suggestionsBox || !chipsContainer) return;
+      const clean = query.trim();
+      if (!clean) {
+        suggestionsBox.style.display = 'none';
+        chipsContainer.innerHTML = '';
+        return;
+      }
+
+      const match: ServiceDomainInfo | null = resolveServiceDomains(clean);
+      if (!match || !match.domains || match.domains.length === 0) {
+        suggestionsBox.style.display = 'none';
+        chipsContainer.innerHTML = '';
+        return;
+      }
+
+      // Auto-fill primary canonical URL if first input is empty or was previously auto-filled
+      if (autoFillPrimary) {
+        const firstUrlInput = urlContainer?.querySelector<HTMLInputElement>('.url-input');
+        if (firstUrlInput) {
+          const curVal = firstUrlInput.value.trim();
+          if (!curVal || firstUrlInput.dataset.autofilled === 'true') {
+            firstUrlInput.value = match.primaryUrl;
+            firstUrlInput.dataset.autofilled = 'true';
+          }
+        }
+      }
+
+      if (suggestionsLabel) {
+        suggestionsLabel.textContent = `${match.displayName} Domains:`;
+      }
+      if (suggestionsCount) {
+        suggestionsCount.textContent = `${match.domains.length}`;
+      }
+
+      chipsContainer.innerHTML = '';
+      match.domains.forEach(domain => {
+        const added = isDomainAdded(domain);
+        const chip = document.createElement('div');
+        chip.className = `domain-chip ${added ? 'active' : ''}`;
+        chip.title = added ? `Already added (${domain})` : `Click to add ${domain}`;
+        chip.innerHTML = `
+          <span class="chip-symbol">${added ? '✓' : '+'}</span>
+          <span class="chip-text">${escHtml(domain)}</span>
+        `;
+        if (!added) {
+          chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            applyDomainToForm(domain);
+          });
+        }
+        chipsContainer.appendChild(chip);
+      });
+
+      suggestionsBox.style.display = 'block';
+    }
+
+    // Attach listeners to initial URL inputs
+    urlContainer?.querySelectorAll<HTMLInputElement>('.url-input').forEach(inp => bindUrlInput(inp));
+
     if (initialValues?.title && titleInput) {
       titleInput.value = initialValues.title;
       const avatarBox = document.getElementById('title-avatar-box');
@@ -739,7 +929,22 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
           size: 24
         });
       }
+      updateDomainSuggestions(initialValues.title, !initialValues.url);
+    } else if (initialValues?.url) {
+      const urlInput = document.querySelector('.url-input') as HTMLInputElement;
+      if (urlInput) urlInput.value = initialValues.url;
+      const rev = resolveServiceFromUrl(initialValues.url);
+      if (rev && titleInput) {
+        titleInput.value = rev.displayName;
+        titleInput.dataset.autoinferred = 'true';
+        const avatarBox = document.getElementById('title-avatar-box');
+        if (avatarBox) {
+          renderFavicon(avatarBox, { title: rev.displayName, size: 24 });
+        }
+        updateDomainSuggestions(rev.displayName, false);
+      }
     }
+
     if (initialValues?.username) {
       const userInput = document.getElementById('field-username') as HTMLInputElement;
       if (userInput) userInput.value = initialValues.username;
@@ -749,18 +954,15 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
       if (strengthBox) strengthBox.style.display = 'flex';
       updateStrengthMeter(initialValues.password);
     }
-    if (initialValues?.url) {
-      const urlInput = document.querySelector('.url-input') as HTMLInputElement;
-      if (urlInput) urlInput.value = initialValues.url;
-    }
 
     titleInput?.addEventListener('input', () => {
+      delete titleInput.dataset.autoinferred;
       const val = titleInput.value.trim();
       const avatarBox = document.getElementById('title-avatar-box');
-      if (!avatarBox) return;
-      if (val.length >= 2) {
+      if (avatarBox && val.length >= 2) {
         renderFavicon(avatarBox, { title: val, size: 24 });
       }
+      updateDomainSuggestions(val, true);
     });
 
     document.getElementById('btn-gen-alias')?.addEventListener('click', () => {
@@ -852,19 +1054,7 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
     });
 
     document.getElementById('btn-add-more-url')?.addEventListener('click', () => {
-      const urlContainer = document.getElementById('url-inputs-container');
-      if (!urlContainer) return;
-      const row = document.createElement('div');
-      row.className = 'multi-url-row';
-      row.innerHTML = `
-        <div class="card-icon" style="margin-right: 6px;">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-        </div>
-        <input type="text" class="edit-input url-input" placeholder="https://">
-        <div class="action-icon btn-del-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
-      `;
-      row.querySelector('.btn-del-url')?.addEventListener('click', () => row.remove());
-      urlContainer.appendChild(row);
+      addUrlInputRow('');
     });
   }
 
@@ -2225,6 +2415,8 @@ function enterEditMode(item: any) {
   if (!container) return;
   isEditing = true;
 
+  const currentUrls: string[] = item.urls && item.urls.length > 0 ? item.urls : [''];
+
   container.innerHTML = `
     <div class="creation-header">
       <div class="creation-title-group">
@@ -2243,8 +2435,9 @@ function enterEditMode(item: any) {
     <div class="card">
       <div class="card-row">
         <div class="card-content">
-          <div class="card-label">Title</div>
-          <input type="text" class="edit-input" id="edit-title" value="${escHtml(item.title || '')}">
+          <div class="card-label">Title / Service</div>
+          <input type="text" class="edit-input" id="edit-title" value="${escHtml(item.title || '')}" list="kloak-edit-services-datalist" autocomplete="off">
+          <datalist id="kloak-edit-services-datalist"></datalist>
         </div>
       </div>
       <div class="card-row">
@@ -2265,11 +2458,34 @@ function enterEditMode(item: any) {
           <input type="text" class="edit-input" id="edit-totp" value="${escHtml(item.totpSecret || '')}" placeholder="Base32 key">
         </div>
       </div>
-      <div class="card-row">
-        <div class="card-content">
-          <div class="card-label">Website</div>
-          <input type="text" class="edit-input" id="edit-url" value="${escHtml((item.urls || [])[0] || '')}">
+      <div class="card-row" style="flex-direction: column; align-items: stretch;">
+        <div class="card-label" style="margin-bottom: 6px;">Websites</div>
+        <div id="edit-urls-container">
+          ${currentUrls.map((u, i) => `
+            <div class="multi-url-row" style="margin-bottom: 6px;">
+              <div class="card-icon" style="margin-right: 6px;">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+              </div>
+              <input type="text" class="edit-input edit-url-input" placeholder="https://" value="${escHtml(u)}">
+              ${i > 0 ? `<div class="action-icon btn-del-edit-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>` : ''}
+            </div>
+          `).join('')}
         </div>
+        <!-- Smart Domain Suggestions in Edit Mode -->
+        <div class="domain-suggestions-box" id="edit-domain-suggestions-box" style="display: none;">
+          <div class="domain-suggestions-header">
+            <div class="domain-suggestions-title">
+              <svg viewBox="0 0 24 24" class="sparkle-svg"><path d="M19 9l1.25-2.75L23 5l-2.75-1.25L19 1l-1.25 2.75L15 5l2.75 1.25L19 9zm-7.5.5L9 4 6.5 9.5 1 12l5.5 2.5L9 20l2.5-5.5L17 12l-5.5-2.5zM19 15l-1.25 2.75L15 19l2.75 1.25L19 23l1.25-2.75L23 19l-2.75-1.25L19 15z"/></svg>
+              <span id="edit-domain-suggestions-label">Suggested Domains:</span>
+            </div>
+            <span class="domain-suggestions-count" id="edit-domain-suggestions-count">0</span>
+          </div>
+          <div class="domain-chips-container" id="edit-domain-chips-container"></div>
+        </div>
+        <button class="btn-add-inline" id="btn-edit-add-more-url">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Add another website
+        </button>
       </div>
       <div class="card-row">
         <div class="card-content">
@@ -2280,18 +2496,188 @@ function enterEditMode(item: any) {
     </div>
   `;
 
+  // 1. Populate Datalist
+  const editDatalist = document.getElementById('kloak-edit-services-datalist');
+  if (editDatalist) {
+    editDatalist.innerHTML = getAllKnownServiceNames()
+      .map(name => `<option value="${name}"></option>`)
+      .join('');
+  }
+
+  // 2. Wire Domain Suggestions for Edit Mode
+  const editTitleInput = document.getElementById('edit-title') as HTMLInputElement;
+  const editUrlsContainer = document.getElementById('edit-urls-container');
+  const editSuggestionsBox = document.getElementById('edit-domain-suggestions-box');
+  const editSuggestionsLabel = document.getElementById('edit-domain-suggestions-label');
+  const editSuggestionsCount = document.getElementById('edit-domain-suggestions-count');
+  const editChipsContainer = document.getElementById('edit-domain-chips-container');
+
+  function getEditUrls(): string[] {
+    const inputs = editUrlsContainer?.querySelectorAll<HTMLInputElement>('.edit-url-input');
+    if (!inputs) return [];
+    const list: string[] = [];
+    inputs.forEach(inp => {
+      const val = inp.value.trim();
+      if (val) list.push(val);
+    });
+    return list;
+  }
+
+  function isEditDomainAdded(domain: string): boolean {
+    const cleanTarget = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const current = getEditUrls();
+    return current.some(u => {
+      const clean = u.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      return clean === cleanTarget || clean.endsWith('.' + cleanTarget) || cleanTarget.endsWith('.' + clean);
+    });
+  }
+
+  function applyDomainToEditForm(domain: string) {
+    const targetUrl = domain.startsWith('http://') || domain.startsWith('https://')
+      ? domain
+      : `https://${domain}`;
+
+    const inputs = editUrlsContainer?.querySelectorAll<HTMLInputElement>('.edit-url-input');
+    let applied = false;
+    if (inputs) {
+      for (let i = 0; i < inputs.length; i++) {
+        const inp = inputs[i];
+        if (!inp.value.trim()) {
+          inp.value = targetUrl;
+          applied = true;
+          break;
+        }
+      }
+    }
+
+    if (!applied) {
+      addEditUrlInputRow(targetUrl);
+    }
+
+    if (editTitleInput) {
+      updateEditDomainSuggestions(editTitleInput.value);
+    }
+  }
+
+  function addEditUrlInputRow(initialVal: string = '') {
+    if (!editUrlsContainer) return;
+    const row = document.createElement('div');
+    row.className = 'multi-url-row';
+    row.style.marginBottom = '6px';
+    row.innerHTML = `
+      <div class="card-icon" style="margin-right: 6px;">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+      </div>
+      <input type="text" class="edit-input edit-url-input" placeholder="https://" value="${escHtml(initialVal)}">
+      <div class="action-icon btn-del-edit-url" style="color: var(--danger);"><svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg></div>
+    `;
+    const urlInput = row.querySelector('.edit-url-input') as HTMLInputElement;
+    bindEditUrlInput(urlInput);
+    row.querySelector('.btn-del-edit-url')?.addEventListener('click', () => {
+      row.remove();
+      if (editTitleInput) updateEditDomainSuggestions(editTitleInput.value);
+    });
+    editUrlsContainer.appendChild(row);
+  }
+
+  function bindEditUrlInput(input: HTMLInputElement) {
+    input.addEventListener('input', () => {
+      const val = input.value.trim();
+      if (val && editTitleInput && !editTitleInput.value.trim()) {
+        const rev = resolveServiceFromUrl(val);
+        if (rev) {
+          editTitleInput.value = rev.displayName;
+          updateEditDomainSuggestions(rev.displayName);
+          return;
+        }
+      }
+      if (editTitleInput && editTitleInput.value.trim()) {
+        updateEditDomainSuggestions(editTitleInput.value);
+      }
+    });
+  }
+
+  function updateEditDomainSuggestions(query: string) {
+    if (!editSuggestionsBox || !editChipsContainer) return;
+    const clean = query.trim();
+    if (!clean) {
+      editSuggestionsBox.style.display = 'none';
+      editChipsContainer.innerHTML = '';
+      return;
+    }
+
+    const match: ServiceDomainInfo | null = resolveServiceDomains(clean);
+    if (!match || !match.domains || match.domains.length === 0) {
+      editSuggestionsBox.style.display = 'none';
+      editChipsContainer.innerHTML = '';
+      return;
+    }
+
+    if (editSuggestionsLabel) {
+      editSuggestionsLabel.textContent = `${match.displayName} Domains:`;
+    }
+    if (editSuggestionsCount) {
+      editSuggestionsCount.textContent = `${match.domains.length}`;
+    }
+
+    editChipsContainer.innerHTML = '';
+    match.domains.forEach(domain => {
+      const added = isEditDomainAdded(domain);
+      const chip = document.createElement('div');
+      chip.className = `domain-chip ${added ? 'active' : ''}`;
+      chip.title = added ? `Already added (${domain})` : `Click to add ${domain}`;
+      chip.innerHTML = `
+        <span class="chip-symbol">${added ? '✓' : '+'}</span>
+        <span class="chip-text">${escHtml(domain)}</span>
+      `;
+      if (!added) {
+        chip.addEventListener('click', (e) => {
+          e.stopPropagation();
+          applyDomainToEditForm(domain);
+        });
+      }
+      editChipsContainer.appendChild(chip);
+    });
+
+    editSuggestionsBox.style.display = 'block';
+  }
+
+  // Bind initial edit url inputs & del buttons
+  editUrlsContainer?.querySelectorAll<HTMLInputElement>('.edit-url-input').forEach(inp => bindEditUrlInput(inp));
+  editUrlsContainer?.querySelectorAll('.btn-del-edit-url').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      (e.currentTarget as HTMLElement).closest('.multi-url-row')?.remove();
+      if (editTitleInput) updateEditDomainSuggestions(editTitleInput.value);
+    });
+  });
+
+  document.getElementById('btn-edit-add-more-url')?.addEventListener('click', () => {
+    addEditUrlInputRow('');
+  });
+
+  editTitleInput?.addEventListener('input', () => {
+    updateEditDomainSuggestions(editTitleInput.value);
+  });
+
+  if (item.title) {
+    updateEditDomainSuggestions(item.title);
+  }
+
   document.getElementById('btn-cancel-edit')?.addEventListener('click', () => {
     renderDetailPane(item);
   });
 
   document.getElementById('btn-save-edit')?.addEventListener('click', () => {
+    const editUrlInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.edit-url-input'));
+    const urls = editUrlInputs.map(i => i.value.trim()).filter(Boolean);
+
     const updated = {
       ...item,
       title: (document.getElementById('edit-title') as HTMLInputElement).value,
       username: (document.getElementById('edit-username') as HTMLInputElement).value,
       password: (document.getElementById('edit-password') as HTMLInputElement).value,
       totpSecret: (document.getElementById('edit-totp') as HTMLInputElement).value.trim().replace(/\s+/g, '') || undefined,
-      urls: [(document.getElementById('edit-url') as HTMLInputElement).value].filter(Boolean),
+      urls,
       notes: (document.getElementById('edit-notes') as HTMLTextAreaElement).value,
       updatedAt: new Date().toISOString(),
     };

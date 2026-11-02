@@ -378,6 +378,90 @@
     }
     .btn-add-inline svg { width: 14px; height: 14px; fill: currentColor; }
 
+    /* ── SMART DOMAIN SUGGESTIONS CHIPS ── */
+    .domain-suggestions-box {
+      margin-top: 8px;
+      margin-bottom: 8px;
+      padding: 9px 12px;
+      background: rgba(109, 74, 255, 0.08);
+      border: 1px solid rgba(109, 74, 255, 0.22);
+      border-radius: 8px;
+      animation: paneSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .domain-suggestions-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 7px;
+    }
+    .domain-suggestions-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9E9AA8;
+      letter-spacing: 0.2px;
+    }
+    .domain-suggestions-title .sparkle-svg {
+      width: 13px;
+      height: 13px;
+      fill: var(--accent);
+      flex-shrink: 0;
+    }
+    .domain-suggestions-count {
+      font-size: 9.5px;
+      color: var(--accent);
+      background: rgba(109, 74, 255, 0.15);
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .domain-chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .domain-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #e2e8f0;
+      transition: all 0.16s ease;
+      user-select: none;
+    }
+    .domain-chip:hover {
+      background: rgba(109, 74, 255, 0.18);
+      border-color: rgba(109, 74, 255, 0.45);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(109, 74, 255, 0.2);
+    }
+    .domain-chip.active {
+      background: rgba(16, 185, 129, 0.14);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: #34d399;
+      cursor: default;
+    }
+    .domain-chip .chip-symbol {
+      font-size: 10px;
+      font-weight: 700;
+      opacity: 0.85;
+    }
+    .domain-chip.active .chip-symbol {
+      color: #34d399;
+    }
+    .domain-chip:not(.active) .chip-symbol {
+      color: var(--accent);
+    }
+
     /* ── TOTP PREVIEW ── */
     .totp-inline-preview {
       display: inline-flex;
