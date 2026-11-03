@@ -1449,6 +1449,372 @@ function showThreatBanner(analysis: any, aiEvaluation?: any, connectedAccount?: 
   });
 }
 
+// ── Auto Password Save Bar Styles ──
+const SAVE_BAR_STYLES = `
+  .kloak-save-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(17, 15, 28, 0.97), rgba(22, 18, 36, 0.97));
+    border: 1px solid rgba(109, 74, 255, 0.5);
+    border-radius: 12px;
+    box-shadow: 0 16px 44px rgba(0,0,0,0.7), 0 0 24px rgba(109, 74, 255, 0.2);
+    backdrop-filter: blur(16px);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-width: 320px;
+    max-width: 480px;
+    opacity: 0;
+    transition: opacity 0.25s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: all;
+  }
+  .kloak-save-bar.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .kloak-save-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #6D4AFF, #4D35CC);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .kloak-save-icon svg {
+    width: 15px;
+    height: 15px;
+    fill: #fff;
+  }
+  .kloak-save-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .kloak-save-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #f5f4fb;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kloak-save-subtitle {
+    font-size: 10px;
+    color: #9E9AA8;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kloak-save-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .kloak-save-btn {
+    border: none;
+    border-radius: 7px;
+    padding: 5px 11px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .kloak-save-btn.primary {
+    background: linear-gradient(135deg, #6D4AFF, #5038DD);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.4);
+  }
+  .kloak-save-btn.primary:hover {
+    background: linear-gradient(135deg, #7D5AFF, #6048EE);
+    transform: translateY(-1px);
+  }
+  .kloak-save-btn.secondary {
+    background: rgba(255,255,255,0.07);
+    color: #A09AB8;
+    border: 1px solid rgba(255,255,255,0.12);
+  }
+  .kloak-save-btn.secondary:hover {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }
+  .kloak-save-btn.update {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+  }
+  .kloak-save-btn.update:hover {
+    background: linear-gradient(135deg, #34D399, #10B981);
+    transform: translateY(-1px);
+  }
+  .kloak-save-dismiss {
+    background: transparent;
+    border: none;
+    color: #9E9AA8;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+    flex-shrink: 0;
+  }
+  .kloak-save-dismiss:hover { color: #fff; }
+`;
+
+// ── Auto Password Save Bar State ──
+let activeSaveBar: HTMLElement | null = null;
+let saveDismissTimer: number | null = null;
+
+// ── Save Prompt Bar Builder ──
+function showSaveBar(opts: {
+  action: 'save_new' | 'update_password';
+  domain: string;
+  username: string;
+  password: string;
+  existingItem?: any;
+}) {
+  const root = ensureShadowRoot();
+
+  if (activeSaveBar) {
+    activeSaveBar.remove();
+    activeSaveBar = null;
+    if (saveDismissTimer) { clearTimeout(saveDismissTimer); saveDismissTimer = null; }
+  }
+
+  // Inject styles once
+  if (!root.querySelector('#kloak-save-bar-style')) {
+    const st = document.createElement('style');
+    st.id = 'kloak-save-bar-style';
+    st.textContent = SAVE_BAR_STYLES;
+    root.appendChild(st);
+  }
+
+  const isUpdate = opts.action === 'update_password';
+  const titleText = isUpdate
+    ? `Update saved password?`
+    : `Save login to Kloak?`;
+  const subtitleText = isUpdate
+    ? `${opts.domain} · ${opts.username || 'Password changed'}`
+    : `${opts.domain}${opts.username ? ` · ${opts.username}` : ''}`;
+
+  const bar = document.createElement('div');
+  bar.className = 'kloak-save-bar';
+  bar.innerHTML = `
+    <div class="kloak-save-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+    </div>
+    <div class="kloak-save-text">
+      <div class="kloak-save-title">${titleText}</div>
+      <div class="kloak-save-subtitle">${subtitleText}</div>
+    </div>
+    <div class="kloak-save-actions">
+      <button class="kloak-save-btn ${isUpdate ? 'update' : 'primary'}" id="kloak-save-confirm">
+        ${isUpdate ? '✓ Update' : '💾 Save'}
+      </button>
+      <button class="kloak-save-btn secondary" id="kloak-save-never">Never</button>
+    </div>
+    <button class="kloak-save-dismiss" id="kloak-save-dismiss" title="Dismiss">✕</button>
+  `;
+
+  root.appendChild(bar);
+  activeSaveBar = bar;
+
+  // Animate in
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      bar.classList.add('visible');
+    });
+  });
+
+  // Auto-dismiss after 18 seconds
+  saveDismissTimer = window.setTimeout(() => dismissSaveBar(), 18000);
+
+  bar.querySelector('#kloak-save-confirm')?.addEventListener('click', () => {
+    if (isUpdate && opts.existingItem) {
+      chrome.runtime.sendMessage({
+        type: 'UPDATE_ITEM',
+        item: { ...opts.existingItem, password: opts.password }
+      }, () => {
+        showToastNotification('🔑 Password updated in Kloak!');
+      });
+    } else {
+      const hostname = opts.domain.replace(/^www\./, '');
+      const newItem = {
+        type: 'login',
+        title: hostname.charAt(0).toUpperCase() + hostname.slice(1),
+        username: opts.username,
+        password: opts.password,
+        urls: [window.location.href],
+        notes: '',
+        createdAt: new Date().toISOString()
+      };
+      chrome.runtime.sendMessage({ type: 'ADD_ITEM', item: newItem }, () => {
+        showToastNotification('✅ Login saved to Kloak!');
+      });
+    }
+    dismissSaveBar();
+  });
+
+  bar.querySelector('#kloak-save-dismiss')?.addEventListener('click', () => dismissSaveBar());
+  bar.querySelector('#kloak-save-never')?.addEventListener('click', () => {
+    // Mark domain as "never save" in session storage to suppress this page
+    try { sessionStorage.setItem(`kloak-never-save-${opts.domain}`, '1'); } catch {}
+    dismissSaveBar();
+  });
+}
+
+function dismissSaveBar() {
+  if (activeSaveBar) {
+    activeSaveBar.classList.remove('visible');
+    const bar = activeSaveBar;
+    activeSaveBar = null;
+    setTimeout(() => bar.remove(), 280);
+  }
+  if (saveDismissTimer) { clearTimeout(saveDismissTimer); saveDismissTimer = null; }
+}
+
+// ── Form Submission Credential Capture ──
+// Captures credentials when a login/signup form is submitted.
+
+interface CapturedCredentials {
+  username: string;
+  password: string;
+  capturedAt: number;
+}
+
+let lastCaptured: CapturedCredentials | null = null;
+let lastSaveCheckUrl: string | null = null;
+
+function captureFormCredentials(form?: HTMLFormElement | null): CapturedCredentials | null {
+  // Find password field
+  const passwordFields = Array.from(document.querySelectorAll('input[type="password"]'))
+    .filter(el => isVisible(el as HTMLElement)) as HTMLInputElement[];
+
+  if (passwordFields.length === 0) return null;
+
+  // Prefer confirm-password field if there are two, otherwise use the first
+  const passwordField = passwordFields.find(f =>
+    !/(confirm|repeat|verify|retype)/i.test(f.name + f.id + f.placeholder)
+  ) || passwordFields[0];
+
+  const password = passwordField.value.trim();
+  if (!password || password.length < 6) return null;
+
+  // Find username/email field
+  const ctx = analyzeFormContext(passwordField);
+  const usernameField = ctx.usernameFields[0] || getAllCredentialInputs().find(i => i.type !== 'password');
+  const username = usernameField?.value.trim() || '';
+
+  return { username, password, capturedAt: Date.now() };
+}
+
+function triggerSaveCheck(credentials: CapturedCredentials) {
+  const url = window.location.href;
+  const domain = window.location.hostname.replace(/^www\./, '');
+
+  // Don't prompt again for same URL within 5 seconds
+  if (lastSaveCheckUrl === url && Date.now() - (lastCaptured?.capturedAt || 0) < 5000) return;
+
+  // Respect "Never save" session setting
+  try {
+    if (sessionStorage.getItem(`kloak-never-save-${domain}`)) return;
+  } catch {}
+
+  lastSaveCheckUrl = url;
+  lastCaptured = credentials;
+
+  chrome.runtime.sendMessage({
+    type: 'CHECK_OR_PROMPT_SAVE',
+    url,
+    username: credentials.username,
+    password: credentials.password
+  }, (resp) => {
+    if (!resp || resp.action === 'none') return;
+    showSaveBar({
+      action: resp.action,
+      domain: resp.domain || domain,
+      username: resp.username || credentials.username,
+      password: resp.password || credentials.password,
+      existingItem: resp.item
+    });
+  });
+}
+
+// ── Form Submit Interception ──
+function attachFormSubmitListeners() {
+  // 1. Listen for form submit events (covers traditional forms)
+  document.addEventListener('submit', (e) => {
+    const form = e.target as HTMLFormElement;
+    const creds = captureFormCredentials(form);
+    if (creds) triggerSaveCheck(creds);
+  }, { capture: true });
+
+  // 2. Listen for button clicks on submit buttons (covers JS-driven forms)
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const isSubmit = target.matches('button[type="submit"], input[type="submit"]') ||
+      target.matches('button:not([type="button"])') ||
+      target.closest('button[type="submit"], button:not([type="button"])') !== null;
+
+    if (!isSubmit) return;
+
+    // Delay slightly so the form values are fully populated before we read them
+    setTimeout(() => {
+      const creds = captureFormCredentials();
+      if (creds) triggerSaveCheck(creds);
+    }, 100);
+  }, { capture: true });
+
+  // 3. Listen for Enter keydown on credential fields (single-page / multi-step flows)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const target = e.target as HTMLInputElement;
+    if (!target || target.tagName !== 'INPUT') return;
+    if (!isCredentialField(target)) return;
+
+    setTimeout(() => {
+      const creds = captureFormCredentials();
+      if (creds) triggerSaveCheck(creds);
+    }, 150);
+  }, { capture: true });
+
+  // 4. SPA / XHR navigation: fire on URL change after form fill
+  let lastKnownUrl = window.location.href;
+  const urlCheckInterval = setInterval(() => {
+    const currentUrl = window.location.href;
+    if (currentUrl !== lastKnownUrl) {
+      lastKnownUrl = currentUrl;
+      // URL changed - likely navigated after login. Check if we have recent credentials.
+      if (lastCaptured && Date.now() - lastCaptured.capturedAt < 8000) {
+        triggerSaveCheck(lastCaptured);
+        lastCaptured = null;
+      }
+      // New page - reset credentials
+      setTimeout(() => { lastCaptured = null; }, 1000);
+    }
+  }, 500);
+
+  // Cleanup interval on page unload
+  window.addEventListener('beforeunload', () => {
+    clearInterval(urlCheckInterval);
+    // Trigger save check on page navigation with captured credentials
+    if (lastCaptured && Date.now() - lastCaptured.capturedAt < 8000) {
+      triggerSaveCheck(lastCaptured);
+    }
+  });
+}
+
+// Start the save interceptors
+attachFormSubmitListeners();
+
 // ── Injected Credential Listener ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'INJECT_CREDENTIALS') {
