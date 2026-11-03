@@ -2,7 +2,7 @@ import Foundation
 
 /// Intelligent brand and title formatting service that converts raw domain names,
 /// hostnames, and URLs into clean, human-readable, official brand titles (e.g. "account.live.com" -> "Microsoft").
-public final class BrandTitleService {
+public final class BrandTitleService: @unchecked Sendable {
     public static let shared = BrandTitleService()
 
     /// Curated canonical brand names for common web services and domains

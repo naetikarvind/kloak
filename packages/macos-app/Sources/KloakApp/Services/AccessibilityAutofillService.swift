@@ -315,9 +315,16 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         Task { @MainActor [weak self] in
             guard let self = self else { return }
             let panelIsActuallyVisible = AccessibilityAutofillPanelManager.shared.panel?.isVisible == true
+
             if self.isPanelVisible && panelIsActuallyVisible {
                 self.hidePanel()
             } else {
+                // Fix stale state: isPanelVisible=true but panel already gone (e.g. panel failed to show
+                // or was dismissed without clearing the flag). Reset before triggering.
+                if self.isPanelVisible && !panelIsActuallyVisible {
+                    NSLog("[Kloak] toggleAutofill: stale isPanelVisible — resetting to false before trigger")
+                    self.isPanelVisible = false
+                }
                 self.triggerAutofill()
             }
         }
@@ -325,6 +332,12 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     public func triggerAutofill(preferredApp: NSRunningApplication? = nil) {
         checkAccessibilityPermission()
+
+        let trusted = Self.isProcessTrusted()
+        let frontApp = NSWorkspace.shared.frontmostApplication
+        NSLog("[Kloak] triggerAutofill: isProcessTrusted=%d, frontmost=%@",
+              trusted ? 1 : 0,
+              frontApp?.localizedName ?? "nil")
 
         // 1. Identify target external application
         let targetApp: NSRunningApplication? = {
@@ -336,7 +349,12 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
             if let f = front, f.bundleIdentifier != myBundleId && f.bundleIdentifier != "app.kloak.macos" && f.activationPolicy == .regular {
                 return f
             }
-            return ActiveContextService.shared.lastExternalApp ?? ActiveContextService.shared.getTargetExternalApplication()
+            // Kloak is frontmost (e.g. user hit the hotkey from Kloak's own window).
+            // Fall back to the last known external target so the panel can still anchor.
+            let fallback = ActiveContextService.shared.lastExternalApp ?? ActiveContextService.shared.getTargetExternalApplication()
+            NSLog("[Kloak] triggerAutofill: Kloak is frontmost — falling back to lastExternalApp=%@",
+                  fallback?.localizedName ?? "none")
+            return fallback
         }()
 
         self.currentTargetApp = targetApp

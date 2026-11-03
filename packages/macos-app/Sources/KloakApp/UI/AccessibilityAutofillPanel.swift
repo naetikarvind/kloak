@@ -23,7 +23,10 @@ public final class AccessibilityAutofillPanel: NSPanel {
     }
 
     public override var canBecomeKey: Bool {
-        return true
+        // Non-activating panel must NOT steal key-window focus from the target app.
+        // Returning false keeps the target field focused so AX coordinate lookup
+        // (done before show()) operated on the correct window.
+        return false
     }
 
     public override var canBecomeMain: Bool {
@@ -69,8 +72,11 @@ public final class AccessibilityAutofillPanelManager {
         guard let p = panel else { return }
 
         p.setFrame(panelRect, display: true, animate: false)
-        NSApp.activate(ignoringOtherApps: true)
-        p.makeKeyAndOrderFront(nil)
+        // Do NOT call NSApp.activate() or makeKeyAndOrderFront() here:
+        // • activate() would steal focus from the target app, breaking AX coordinate lookup.
+        // • makeKeyAndOrderFront() triggers canBecomeKey (now false), which would be a no-op
+        //   anyway, but its side effects can reorder windows unexpectedly on macOS 14+.
+        // orderFrontRegardless() is sufficient for a .nonactivatingPanel at .popUpMenu level.
         p.orderFrontRegardless()
     }
 

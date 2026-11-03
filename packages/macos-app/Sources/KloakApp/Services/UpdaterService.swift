@@ -88,7 +88,7 @@ public enum UpdateStatus: Equatable, Sendable {
 // MARK: - UpdaterService
 
 @MainActor
-public final class UpdaterService: NSObject, ObservableObject, URLSessionDownloadDelegate {
+public final class UpdaterService: NSObject, ObservableObject {
     public static let shared = UpdaterService()
 
     @Published public var status: UpdateStatus = .idle
@@ -221,8 +221,22 @@ public final class UpdaterService: NSObject, ObservableObject, URLSessionDownloa
         }
     }
 
-    // MARK: - URLSessionDownloadDelegate
+    // MARK: - Installation & Open
 
+    public func installUpdate(dmgURL: URL) {
+        // Open the DMG file with default handler (macOS DiskImageMounter)
+        // This mounts the volume and pops open Finder showing Kloak.app and /Applications symlink
+        NSWorkspace.shared.open(dmgURL)
+    }
+
+    public func dismiss() {
+        showUpdateSheet = false
+    }
+}
+
+// MARK: - URLSessionDownloadDelegate
+
+extension UpdaterService: @preconcurrency URLSessionDownloadDelegate {
     public func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
@@ -277,17 +291,5 @@ public final class UpdaterService: NSObject, ObservableObject, URLSessionDownloa
                 self.status = .error(message: error.localizedDescription)
             }
         }
-    }
-
-    // MARK: - Installation & Open
-
-    public func installUpdate(dmgURL: URL) {
-        // Open the DMG file with default handler (macOS DiskImageMounter)
-        // This mounts the volume and pops open Finder showing Kloak.app and /Applications symlink
-        NSWorkspace.shared.open(dmgURL)
-    }
-
-    public func dismiss() {
-        showUpdateSheet = false
     }
 }

@@ -28,7 +28,7 @@ import SwiftUI
 ///   For logos whose own squircle background does NOT fully bleed to every corner
 ///   (e.g. LinkedIn blue, GitHub dark) — the strip colour mirrors the icon's brand
 ///   colour instead of being plain white, creating a cohesive look.
-public enum LogoRenderingStyle {
+public enum LogoRenderingStyle: Sendable {
     case standard
     case fullBleed
     case coloredSquircle(red: Double, green: Double, blue: Double)
@@ -265,26 +265,29 @@ public final class LogoService: @unchecked Sendable {
         }
 
         // Deduplicate in-flight requests for the same domain
-        lock.lock()
-        if let current = inFlightTasks[cacheKey] {
-            lock.unlock()
-            return await current.value
-        }
+        let task = getOrSetInFlightTask(cacheKey: cacheKey, domainCandidates: domainCandidates)
+        let result = await task.value
+        removeInFlightTask(cacheKey: cacheKey)
+        return result
+    }
 
+    private func getOrSetInFlightTask(cacheKey: String, domainCandidates: [String]) -> Task<NSImage?, Never> {
+        lock.lock()
+        defer { lock.unlock() }
+        if let current = inFlightTasks[cacheKey] {
+            return current
+        }
         let newTask = Task<NSImage?, Never> {
             return await self.performWaterfallFetch(domains: domainCandidates, cacheKey: cacheKey)
         }
-
         inFlightTasks[cacheKey] = newTask
-        lock.unlock()
+        return newTask
+    }
 
-        let result = await newTask.value
-
+    private func removeInFlightTask(cacheKey: String) {
         lock.lock()
+        defer { lock.unlock() }
         inFlightTasks.removeValue(forKey: cacheKey)
-        lock.unlock()
-
-        return result
     }
 
     /// Prefetch logos for a batch of vault items in background
