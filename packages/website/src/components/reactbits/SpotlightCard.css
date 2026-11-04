@@ -1,0 +1,59 @@
+.reactbits-spotlight-card {
+  position: relative;
+  border-radius: 20px;
+  background: rgba(15, 22, 38, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.28s ease,
+              box-shadow 0.28s ease;
+  will-change: transform;
+}
+
+.reactbits-spotlight-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.65), 0 0 20px -5px var(--spotlight-color, rgba(109, 74, 255, 0.12));
+}
+
+.reactbits-spotlight-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: var(--spotlight-opacity, 0);
+  background: radial-gradient(
+    circle var(--spotlight-size, 340px) at var(--spotlight-x, 0) var(--spotlight-y, 0),
+    var(--spotlight-color, rgba(109, 74, 255, 0.18)),
+    transparent 70%
+  );
+  transition: opacity 0.22s ease-out;
+  z-index: 1;
+}
+
+.reactbits-spotlight-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactbits-spotlight-card {
+    transition: none !important;
+    transform: none !important;
+  }
+  .reactbits-spotlight-card:hover {
+    transform: none !important;
+  }
+  .reactbits-spotlight-glow {
+    transition: none !important;
+    opacity: 0.25 !important;
+    background: radial-gradient(
+      circle at center,
+      var(--spotlight-color, rgba(109, 74, 255, 0.12)),
+      transparent 80%
+    );
+  }
+}

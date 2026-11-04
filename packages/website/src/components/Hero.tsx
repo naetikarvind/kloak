@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Download, Shield, Key, Fingerprint, Lock, Check, Copy, ArrowRight, Sparkles } from 'lucide-react';
 import { KloakLogo } from './KloakLogo';
 import { ChromeIcon } from './Icons';
+import { ShinyText, DecryptedText, MagnetButton, TiltedCard } from './reactbits';
 
 export const Hero: React.FC = () => {
   const [totpSeconds, setTotpSeconds] = useState(24);
@@ -34,7 +35,7 @@ export const Hero: React.FC = () => {
         <div style={{ display: 'inline-flex', marginBottom: '24px' }}>
           <div className="badge-pill">
             <span className="badge-dot" />
-            <span style={{ color: '#ffffff', fontWeight: 700 }}>v1.0.0 Live</span>
+            <ShinyText text="v1.0.0 Live" className="badge-shiny" style={{ fontWeight: 700 }} />
             <span style={{ opacity: 0.5 }}>•</span>
             <span>macOS Universal (.dmg) &amp; Chrome Web Store</span>
             <Sparkles size={14} color="#f59e0b" />
@@ -55,7 +56,9 @@ export const Hero: React.FC = () => {
         >
           Your Secrets. <br />
           <span className="text-gradient">Zero Servers. </span>
-          <span className="text-gradient-cyan">Total Kloak.</span>
+          <span className="text-gradient-cyan">
+            <DecryptedText text="Total Kloak." speed={40} maxIterations={10} animateOn="mount" />
+          </span>
         </h1>
 
         {/* Subheading */}
@@ -86,35 +89,39 @@ export const Hero: React.FC = () => {
             marginBottom: '40px',
           }}
         >
-          <a
-            href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
-            className="btn-primary"
-            style={{ padding: '15px 30px', fontSize: '16px' }}
-          >
-            <Download size={20} />
-            <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
-              <div>Download for macOS</div>
-              <div style={{ fontSize: '11px', opacity: 0.8, fontWeight: 500 }}>
-                Universal Binary • Apple Silicon &amp; Intel • v1.0.0
+          <MagnetButton magnetStrength={10}>
+            <a
+              href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
+              className="btn-primary"
+              style={{ padding: '15px 30px', fontSize: '16px' }}
+            >
+              <Download size={20} />
+              <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                <div>Download for macOS</div>
+                <div style={{ fontSize: '11px', opacity: 0.8, fontWeight: 500 }}>
+                  Universal Binary • Apple Silicon &amp; Intel • v1.0.0
+                </div>
               </div>
-            </div>
-          </a>
+            </a>
+          </MagnetButton>
 
-          <a
-            href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-chrome"
-            style={{ padding: '15px 30px', fontSize: '16px' }}
-          >
-            <ChromeIcon size={20} />
-            <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
-              <div>Add to Chrome</div>
-              <div style={{ fontSize: '11px', opacity: 0.85, fontWeight: 500 }}>
-                Chrome Web Store • 1-Click Install
+          <MagnetButton magnetStrength={10}>
+            <a
+              href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-chrome"
+              style={{ padding: '15px 30px', fontSize: '16px' }}
+            >
+              <ChromeIcon size={20} />
+              <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                <div>Add to Chrome</div>
+                <div style={{ fontSize: '11px', opacity: 0.85, fontWeight: 500 }}>
+                  Chrome Web Store • 1-Click Install
+                </div>
               </div>
-            </div>
-          </a>
+            </a>
+          </MagnetButton>
         </div>
 
         {/* Trust Points */}
@@ -167,18 +174,19 @@ export const Hero: React.FC = () => {
             }}
           />
 
-          {/* Window Container */}
-          <div
-            className="glass-panel"
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              border: '1px solid rgba(255, 255, 255, 0.12)',
-              boxShadow: '0 30px 100px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-              overflow: 'hidden',
-              textAlign: 'left',
-            }}
-          >
+          {/* Window Container with React Bits TiltedCard 3D Interactive Perspective */}
+          <TiltedCard maxAngle={5} scale={1.01} glareEnable={true}>
+            <div
+              className="glass-panel"
+              style={{
+                position: 'relative',
+                zIndex: 1,
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                boxShadow: '0 30px 100px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                overflow: 'hidden',
+                textAlign: 'left',
+              }}
+            >
             {/* macOS Title Bar */}
             <div
               style={{
@@ -405,8 +413,9 @@ export const Hero: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </TiltedCard>
       </div>
+    </div>
 
       <style>{`
         @media (max-width: 860px) {

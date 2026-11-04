@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Copy, Check, ShieldCheck, Sparkles, Sliders, Hash } from 'lucide-react';
+import { SpotlightCard, DecryptedText, MagnetButton } from './reactbits';
 
 const WORD_LIST = [
   'amber', 'beacon', 'cipher', 'daemon', 'enclave', 'falcon', 'galaxy',
@@ -106,9 +107,9 @@ export const GeneratorDemo: React.FC = () => {
           </p>
         </div>
 
-        {/* Generator Card */}
-        <div
-          className="glass-panel"
+        {/* Generator Card with React Bits SpotlightCard */}
+        <SpotlightCard
+          spotlightColor="rgba(56, 189, 248, 0.2)"
           style={{
             padding: '36px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -186,7 +187,15 @@ export const GeneratorDemo: React.FC = () => {
                 letterSpacing: mode === 'password' ? '1.5px' : '0.5px',
               }}
             >
-              {generated}
+              {generated ? (
+                <DecryptedText
+                  text={generated}
+                  speed={28}
+                  maxIterations={8}
+                  animateOn="mount"
+                  sequential={true}
+                />
+              ) : null}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -210,18 +219,20 @@ export const GeneratorDemo: React.FC = () => {
                 <RefreshCw size={18} />
               </button>
 
-              <button
-                onClick={handleCopy}
-                className="btn-primary"
-                style={{
-                  padding: '10px 18px',
-                  fontSize: '14px',
-                  borderRadius: '10px',
-                }}
-              >
-                {copied ? <Check size={16} color="#ffffff" /> : <Copy size={16} />}
-                <span>{copied ? 'Copied!' : 'Copy'}</span>
-              </button>
+              <MagnetButton magnetStrength={8}>
+                <button
+                  onClick={handleCopy}
+                  className="btn-primary"
+                  style={{
+                    padding: '10px 18px',
+                    fontSize: '14px',
+                    borderRadius: '10px',
+                  }}
+                >
+                  {copied ? <Check size={16} color="#ffffff" /> : <Copy size={16} />}
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                </button>
+              </MagnetButton>
             </div>
           </div>
 
@@ -384,7 +395,7 @@ export const GeneratorDemo: React.FC = () => {
               </>
             )}
           </div>
-        </div>
+        </SpotlightCard>
       </div>
     </section>
   );

@@ -1,0 +1,51 @@
+.reactbits-star-border-container {
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  padding: 1px;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.reactbits-star-border-glow {
+  position: absolute;
+  width: 300%;
+  height: 300%;
+  top: -100%;
+  left: -100%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 280deg,
+    var(--border-color, #6D4AFF) 330deg,
+    transparent 360deg
+  );
+  animation: reactbits-star-border-spin var(--border-speed, 6s) linear infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.reactbits-star-border-inner {
+  position: relative;
+  border-radius: 19px;
+  background: #0f1626;
+  z-index: 2;
+  height: 100%;
+}
+
+@keyframes reactbits-star-border-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactbits-star-border-glow {
+    animation: none !important;
+    background: var(--border-color, #6D4AFF);
+    opacity: 0.3;
+  }
+}

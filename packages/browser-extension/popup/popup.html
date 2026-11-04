@@ -112,7 +112,7 @@
 
     .header-right { display: flex; align-items: center; gap: 8px; }
 
-    /* ── ANIMATIONS ── */
+    /* ── ANIMATIONS (React Bits & Modern Web Guidance) ── */
     @keyframes dropdownPop {
       0% { opacity: 0; transform: translateY(-8px) scale(0.95); }
       100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -137,6 +137,46 @@
     @keyframes pulseRing {
       0%, 100% { transform: scale(1); }
       50% { transform: scale(1.08); }
+    }
+
+    @keyframes kloakShine {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
+    .shiny-text {
+      color: #b5b5b5a4;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 1) 50%, rgba(255, 255, 255, 0.4) 100%);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      animation: kloakShine 3.5s linear infinite;
+    }
+
+    .item-card, .suggested-card {
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+                  background-color 0.2s ease,
+                  box-shadow 0.2s ease;
+    }
+
+    .item-card:hover, .suggested-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(109, 74, 255, 0.18);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .shiny-text {
+        animation: none !important;
+        background: none !important;
+        color: inherit !important;
+      }
+      .item-card:hover, .suggested-card:hover {
+        transform: none !important;
+      }
+      .add-dropdown.open, .creation-header, .paneSlideIn {
+        animation: none !important;
+        transition: none !important;
+      }
     }
 
     /* ── ADD DROPDOWN ── */

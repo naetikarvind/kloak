@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Download, Terminal, Sparkles, ExternalLink, Check, ShieldAlert, Cpu } from 'lucide-react';
 import { KloakLogo } from './KloakLogo';
 import { ChromeIcon, AppleIcon } from './Icons';
+import { SpotlightCard, ShinyText, MagnetButton } from './reactbits';
 
 export const DownloadsSection: React.FC = () => {
   return (
@@ -20,7 +21,7 @@ export const DownloadsSection: React.FC = () => {
           </p>
         </div>
 
-        {/* Cards Grid */}
+        {/* Cards Grid with React Bits Spotlight Cards */}
         <div
           style={{
             display: 'grid',
@@ -31,13 +32,13 @@ export const DownloadsSection: React.FC = () => {
           }}
         >
           {/* 1. macOS DMG Card */}
-          <div
-            className="glass-panel download-card"
+          <SpotlightCard
+            className="download-card"
+            spotlightColor="rgba(59, 130, 246, 0.28)"
             style={{
               border: '1px solid rgba(59, 130, 246, 0.3)',
               background: 'linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, rgba(15, 22, 38, 0.75) 100%)',
               position: 'relative',
-              overflow: 'hidden',
             }}
           >
             {/* Top Recommended Tag */}
@@ -54,6 +55,7 @@ export const DownloadsSection: React.FC = () => {
                 padding: '3px 10px',
                 borderRadius: '9999px',
                 letterSpacing: '0.6px',
+                zIndex: 3,
               }}
             >
               Recommended
@@ -78,7 +80,9 @@ export const DownloadsSection: React.FC = () => {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Kloak for macOS</h3>
-                  <p style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 600 }}>v1.0.0 Universal DMG (4.9 MB)</p>
+                  <p style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 600 }}>
+                    <ShinyText text="v1.0.0 Universal DMG (4.9 MB)" speed={3.5} />
+                  </p>
                 </div>
               </div>
 
@@ -112,13 +116,15 @@ export const DownloadsSection: React.FC = () => {
 
             {/* Pinned Footer */}
             <div className="download-card-footer">
-              <a
-                href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
-                className="download-card-btn download-btn-mac"
-              >
-                <Download size={18} />
-                <span>Download for macOS</span>
-              </a>
+              <MagnetButton magnetStrength={6} style={{ width: '100%' }}>
+                <a
+                  href="https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg"
+                  className="download-card-btn download-btn-mac"
+                >
+                  <Download size={18} />
+                  <span>Download for macOS</span>
+                </a>
+              </MagnetButton>
 
               <a
                 href="https://github.com/naetikarvind/kloak/releases/tag/v1.0.0"
@@ -130,16 +136,16 @@ export const DownloadsSection: React.FC = () => {
                 <ExternalLink size={12} />
               </a>
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* 2. Chrome Web Store Card */}
-          <div
-            className="glass-panel download-card"
+          <SpotlightCard
+            className="download-card"
+            spotlightColor="rgba(16, 185, 129, 0.28)"
             style={{
               border: '1px solid rgba(16, 185, 129, 0.3)',
               background: 'linear-gradient(180deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 22, 38, 0.75) 100%)',
               position: 'relative',
-              overflow: 'hidden',
             }}
           >
             <div className="download-card-body">
@@ -161,7 +167,9 @@ export const DownloadsSection: React.FC = () => {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Chrome Extension</h3>
-                  <p style={{ fontSize: '13px', color: '#34d399', fontWeight: 600 }}>v1.1.0 Web Store Official</p>
+                  <p style={{ fontSize: '13px', color: '#34d399', fontWeight: 600 }}>
+                    <ShinyText text="v1.1.0 Web Store Official" speed={3.5} />
+                  </p>
                 </div>
               </div>
 
@@ -191,15 +199,17 @@ export const DownloadsSection: React.FC = () => {
 
             {/* Pinned Footer */}
             <div className="download-card-footer">
-              <a
-                href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="download-card-btn download-btn-chrome"
-              >
-                <ChromeIcon size={18} />
-                <span>Add to Chrome</span>
-              </a>
+              <MagnetButton magnetStrength={6} style={{ width: '100%' }}>
+                <a
+                  href="https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="download-card-btn download-btn-chrome"
+                >
+                  <ChromeIcon size={18} />
+                  <span>Add to Chrome</span>
+                </a>
+              </MagnetButton>
 
               <a
                 href="https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.1.0.zip"
@@ -209,16 +219,16 @@ export const DownloadsSection: React.FC = () => {
                 <Download size={12} />
               </a>
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* 3. Raycast & CLI Card */}
-          <div
-            className="glass-panel download-card"
+          <SpotlightCard
+            className="download-card"
+            spotlightColor="rgba(168, 85, 247, 0.28)"
             style={{
               border: '1px solid rgba(255, 255, 255, 0.1)',
               background: 'linear-gradient(180deg, rgba(139, 92, 246, 0.08) 0%, rgba(15, 22, 38, 0.75) 100%)',
               position: 'relative',
-              overflow: 'hidden',
             }}
           >
             <div className="download-card-body">
@@ -270,15 +280,17 @@ export const DownloadsSection: React.FC = () => {
 
             {/* Pinned Footer */}
             <div className="download-card-footer">
-              <a
-                href="https://github.com/naetikarvind/kloak/tree/main/packages/raycast-extension"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="download-card-btn download-btn-raycast"
-              >
-                <ExternalLink size={17} />
-                <span>View on Raycast</span>
-              </a>
+              <MagnetButton magnetStrength={6} style={{ width: '100%' }}>
+                <a
+                  href="https://github.com/naetikarvind/kloak/tree/main/packages/raycast-extension"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="download-card-btn download-btn-raycast"
+                >
+                  <ExternalLink size={17} />
+                  <span>View on Raycast</span>
+                </a>
+              </MagnetButton>
 
               <a
                 href="https://github.com/naetikarvind/kloak"
@@ -290,7 +302,7 @@ export const DownloadsSection: React.FC = () => {
                 <Terminal size={12} />
               </a>
             </div>
-          </div>
+          </SpotlightCard>
         </div>
       </div>
 

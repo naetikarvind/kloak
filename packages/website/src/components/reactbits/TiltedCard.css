@@ -1,0 +1,32 @@
+.reactbits-tilted-card-perspective {
+  perspective: 1000px;
+}
+
+.reactbits-tilted-card-transform {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.4, 1);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.reactbits-tilted-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity 0.25s ease-out;
+  mix-blend-mode: overlay;
+  z-index: 10;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactbits-tilted-card-transform {
+    transform: none !important;
+    transition: none !important;
+  }
+  .reactbits-tilted-glare {
+    display: none !important;
+  }
+}

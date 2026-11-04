@@ -1,0 +1,37 @@
+.reactbits-shiny-text {
+  color: #b5b5b5a4;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 1) 50%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  display: inline-block;
+  animation: reactbits-shine var(--animation-duration, 4s) linear infinite;
+}
+
+.reactbits-shiny-text.disabled {
+  animation: none;
+  background: none;
+  color: inherit;
+}
+
+@keyframes reactbits-shine {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactbits-shiny-text {
+    animation: none !important;
+    background: none !important;
+    color: inherit !important;
+  }
+}

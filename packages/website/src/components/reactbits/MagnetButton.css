@@ -1,0 +1,12 @@
+.reactbits-magnet-wrap {
+  display: inline-flex;
+  transition: transform 0.22s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reactbits-magnet-wrap {
+    transform: none !important;
+    transition: none !important;
+  }
+}

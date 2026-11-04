@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Cpu, Lock, Terminal, RefreshCw, EyeOff, CheckCircle2, Cloud } from 'lucide-react';
+import { SpotlightCard, TiltedCard, ShinyText } from './reactbits';
 
 export const ArchitectureSection: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -173,9 +174,10 @@ await fs.promises.writeFile(
           })}
         </div>
 
-        {/* Pillar Detail Box */}
-        <div
-          className="glass-panel architecture-grid"
+        {/* Pillar Detail Box with React Bits SpotlightCard */}
+        <SpotlightCard
+          className="architecture-grid"
+          spotlightColor="rgba(168, 85, 247, 0.22)"
           style={{
             padding: '36px',
             border: '1px solid rgba(255, 255, 255, 0.12)',
@@ -189,7 +191,7 @@ await fs.promises.writeFile(
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 10px', borderRadius: '6px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase', marginBottom: '14px' }}>
               <Icon size={14} />
-              {current.badge}
+              <ShinyText text={current.badge} speed={3.5} />
             </div>
 
             <h3 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>
@@ -210,32 +212,34 @@ await fs.promises.writeFile(
             </ul>
           </div>
 
-          {/* Right Column: Code Snippet */}
-          <div
-            style={{
-              background: 'rgba(5, 7, 13, 0.95)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '12px',
-              padding: '20px',
-              overflow: 'hidden',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '12.5px',
-              lineHeight: 1.6,
-              color: '#cbd5e1',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }} />
-              <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '6px' }}>architecture-spec.ts</span>
-            </div>
+          {/* Right Column: Code Snippet with TiltedCard */}
+          <TiltedCard maxAngle={4} scale={1.01} glareEnable={true}>
+            <div
+              style={{
+                background: 'rgba(5, 7, 13, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                padding: '20px',
+                overflow: 'hidden',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12.5px',
+                lineHeight: 1.6,
+                color: '#cbd5e1',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: '8px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text-dim)', marginLeft: '6px' }}>architecture-spec.ts</span>
+              </div>
 
-            <pre style={{ overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
-              <code>{current.code}</code>
-            </pre>
-          </div>
-        </div>
+              <pre style={{ overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+                <code>{current.code}</code>
+              </pre>
+            </div>
+          </TiltedCard>
+        </SpotlightCard>
       </div>
 
       <style>{`

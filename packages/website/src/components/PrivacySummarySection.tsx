@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, EyeOff, Lock, FileText, CheckCircle2, ArrowRight } from 'lucide-react';
+import { SpotlightCard } from './reactbits';
 
 export const PrivacySummarySection: React.FC = () => {
   const commitments = [
@@ -71,8 +72,9 @@ export const PrivacySummarySection: React.FC = () => {
             }}
           >
             {commitments.map((c, i) => (
-              <div
+              <SpotlightCard
                 key={i}
+                spotlightColor="rgba(16, 185, 129, 0.2)"
                 style={{
                   padding: '20px',
                   borderRadius: '12px',
@@ -87,7 +89,7 @@ export const PrivacySummarySection: React.FC = () => {
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   {c.desc}
                 </p>
-              </div>
+              </SpotlightCard>
             ))}
           </div>
         </div>
