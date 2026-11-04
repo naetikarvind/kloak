@@ -41,27 +41,33 @@ export const DownloadsSection: React.FC = () => {
               position: 'relative',
             }}
           >
-            {/* Top Recommended Tag */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-                color: '#fff',
-                fontSize: '11px',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                padding: '3px 10px',
-                borderRadius: '9999px',
-                letterSpacing: '0.6px',
-                zIndex: 3,
-              }}
-            >
-              Recommended
-            </div>
-
             <div className="download-card-body">
+              {/* Category / Status Pill */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                    color: '#ffffff',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    padding: '4px 10px',
+                    borderRadius: '9999px',
+                    letterSpacing: '0.6px',
+                    boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                  }}
+                >
+                  <Sparkles size={12} color="#ffffff" />
+                  <span>Recommended</span>
+                </span>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-dim)', fontWeight: 600 }}>
+                  macOS Native
+                </span>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
                 <div
                   style={{
@@ -149,6 +155,32 @@ export const DownloadsSection: React.FC = () => {
             }}
           >
             <div className="download-card-body">
+              {/* Category / Status Pill */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    color: '#34d399',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    padding: '4px 10px',
+                    borderRadius: '9999px',
+                    letterSpacing: '0.6px',
+                  }}
+                >
+                  <Check size={12} color="#10b981" />
+                  <span>Official Companion</span>
+                </span>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-dim)', fontWeight: 600 }}>
+                  Browser Extension
+                </span>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
                 <div
                   style={{
@@ -232,6 +264,32 @@ export const DownloadsSection: React.FC = () => {
             }}
           >
             <div className="download-card-body">
+              {/* Category / Status Pill */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    background: 'rgba(168, 85, 247, 0.15)',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    color: '#c084fc',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    padding: '4px 10px',
+                    borderRadius: '9999px',
+                    letterSpacing: '0.6px',
+                  }}
+                >
+                  <Terminal size={12} color="#a855f7" />
+                  <span>Developer Tools</span>
+                </span>
+                <span style={{ fontSize: '11.5px', color: 'var(--text-dim)', fontWeight: 600 }}>
+                  CLI &amp; Quick Action
+                </span>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
                 <div
                   style={{
@@ -313,6 +371,12 @@ export const DownloadsSection: React.FC = () => {
           height: 100% !important;
           padding: 32px !important;
           box-sizing: border-box !important;
+        }
+        .download-card .reactbits-spotlight-content {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+          flex: 1 1 auto !important;
         }
         .download-card-body {
           flex: 1 1 auto !important;
