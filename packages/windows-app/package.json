@@ -2,6 +2,7 @@
   "name": "@kloak/windows-app",
   "version": "1.0.0",
   "description": "Kloak Password Manager — Windows Desktop Application",
+  "author": "Kloak Security Team",
   "private": true,
   "main": "dist/electron/main.js",
   "scripts": {
@@ -9,8 +10,8 @@
     "build": "vite build && tsc -p tsconfig.electron.json",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:renderer": "vite build",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
+    "pack": "electron-builder --win --dir",
+    "dist": "electron-builder --win",
     "preview": "electron ."
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "wait-on": "^7.0.0"
   },
   "build": {
+    "electronVersion": "31.7.7",
     "appId": "app.kloak.windows",
     "productName": "Kloak Password Manager",
     "icon": "public/icon.ico",
@@ -39,7 +41,16 @@
       "output": "release"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {

@@ -37,6 +37,8 @@ kloak-backup-*
 
 # Compiled app bundles and build outputs
 dist/
+release/
+packages/windows-app/release/
 scripts/render-icon
 
 # Raycast extension build output
