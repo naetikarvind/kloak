@@ -1928,24 +1928,104 @@
   window.addEventListener("load", pushActiveUrl);
   window.addEventListener("focus", pushActiveUrl);
   function isVisible(el) {
-    return el.offsetParent !== null && el.getBoundingClientRect().height > 0 && window.getComputedStyle(el).visibility !== "hidden" && window.getComputedStyle(el).display !== "none";
+    if (!el || el.offsetParent === null) return false;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+    const style = window.getComputedStyle(el);
+    return style.visibility !== "hidden" && style.display !== "none" && style.opacity !== "0";
   }
   function isSearchOrNonCredentialInput(input) {
-    const type = (input.type || "").toLowerCase();
-    const nonCredentialTypes = ["search", "number", "date", "datetime-local", "time", "file", "range", "color", "checkbox", "radio", "submit", "button", "reset", "image", "hidden"];
+    if (!input) return true;
+    const type = (input.type || "text").toLowerCase();
+    const nonCredentialTypes = [
+      "search",
+      "number",
+      "date",
+      "datetime-local",
+      "time",
+      "month",
+      "week",
+      "file",
+      "range",
+      "color",
+      "checkbox",
+      "radio",
+      "submit",
+      "button",
+      "reset",
+      "image",
+      "hidden"
+    ];
     if (nonCredentialTypes.includes(type)) return true;
+    if (type === "password") return false;
     const role = (input.getAttribute("role") || "").toLowerCase();
-    if (role === "search" || role === "searchbox") return true;
-    const autocomplete = (input.autocomplete || "").toLowerCase();
-    if (autocomplete === "off" && input.name === "q") return true;
-    if (["postal-code", "country", "street-address", "cc-csc", "cc-exp"].includes(autocomplete)) return true;
-    const nameIdPlaceholder = ((input.name || "") + " " + (input.id || "") + " " + (input.placeholder || "") + " " + (input.getAttribute("aria-label") || "")).toLowerCase();
-    if (/user|login|email|pass|auth|usr|uid|uname|admission|roll|student/i.test(nameIdPlaceholder)) {
-      return false;
+    if (role === "search" || role === "searchbox" || role === "combobox") return true;
+    const inputMode = (input.getAttribute("inputmode") || "").toLowerCase();
+    if (inputMode === "search") return true;
+    const form = input.form || input.closest("form");
+    if (form) {
+      const formRole = (form.getAttribute("role") || "").toLowerCase();
+      const formAction = (form.getAttribute("action") || "").toLowerCase();
+      const formNameId = ((form.name || "") + " " + (form.id || "") + " " + (form.className || "")).toLowerCase();
+      if (formRole === "search" || formAction.includes("search") || formAction.includes("/find") || /\b(search|query|lookup)\b/i.test(formNameId)) {
+        return true;
+      }
     }
-    const pattern = /search|query|find|filter|coupon|promo|discount|voucher|postal|zipcode|captcha|sms|cvv|cvc|comment|chat|quantity|amount|qty/i;
-    if (pattern.test(nameIdPlaceholder)) {
-      if (type !== "password") return true;
+    const searchContainer = input.closest('search, [role="search"], header, nav, [class*="search"], [id*="search"]');
+    if (searchContainer) {
+      const hasPasswordInContainer = searchContainer.querySelector('input[type="password"]') !== null;
+      if (!hasPasswordInContainer) return true;
+    }
+    const autocomplete = (input.autocomplete || "").toLowerCase();
+    const nonCredentialAutocompletes = [
+      "off",
+      "postal-code",
+      "country",
+      "country-name",
+      "street-address",
+      "address-line1",
+      "address-line2",
+      "address-level1",
+      "address-level2",
+      "cc-name",
+      "cc-number",
+      "cc-csc",
+      "cc-exp",
+      "cc-exp-month",
+      "cc-exp-year",
+      "bday",
+      "bday-day",
+      "bday-month",
+      "bday-year",
+      "sex",
+      "tel",
+      "tel-national",
+      "transaction-amount",
+      "transaction-currency",
+      "language",
+      "one-time-code"
+    ];
+    if (nonCredentialAutocompletes.includes(autocomplete)) {
+      if (autocomplete === "off") {
+        const qPattern = /^(q|s|k|query|search|keyword|term|filter)$/i;
+        if (qPattern.test(input.name || "") || qPattern.test(input.id || "")) return true;
+      } else {
+        return true;
+      }
+    }
+    const ariaAutocomplete = (input.getAttribute("aria-autocomplete") || "").toLowerCase();
+    if (ariaAutocomplete === "list" || ariaAutocomplete === "both") return true;
+    const name = (input.name || "").toLowerCase();
+    const id = (input.id || "").toLowerCase();
+    const placeholder = (input.placeholder || "").toLowerCase();
+    const ariaLabel = (input.getAttribute("aria-label") || "").toLowerCase();
+    const title = (input.title || "").toLowerCase();
+    const searchKeywords = /\b(search|query|find|filter|lookup|omnibox|prompt|chat|message|comment|coupon|promo|discount|voucher|quantity|qty|amount|price|subject|title|note|tags?|headline|caption|city|zip|zipcode|postal)\b/i;
+    if (searchKeywords.test(name) || searchKeywords.test(id) || searchKeywords.test(placeholder) || searchKeywords.test(ariaLabel) || searchKeywords.test(title)) {
+      return true;
+    }
+    if (/^(q|s|k|query|term|keyword|search_query)$/i.test(name) || /^(q|s|k|query|search)$/i.test(id)) {
+      return true;
     }
     return false;
   }
@@ -1956,15 +2036,27 @@
     const type = (input.type || "text").toLowerCase();
     const autocomplete = (input.autocomplete || "").toLowerCase();
     if (type === "password") return true;
-    if (["username", "email", "current-password", "new-password"].includes(autocomplete)) return true;
-    const allPasswords = Array.from(document.querySelectorAll('input[type="password"]')).filter((el) => isVisible(el));
-    if (allPasswords.length > 0) {
-      const textLike = ["text", "email", "tel", ""];
-      if (textLike.includes(type)) return true;
+    if (["username", "email", "current-password", "new-password"].includes(autocomplete)) {
+      return true;
     }
-    const identifierPattern = /user|email|login|account|identifier|admission|roll|uid|uname|member|student|id|usr/i;
-    const nameIdPlaceholder = (input.name || "") + " " + (input.id || "") + " " + (input.placeholder || "") + " " + (input.getAttribute("aria-label") || "") + " " + (input.className || "");
-    if (identifierPattern.test(nameIdPlaceholder)) {
+    if (type === "email") {
+      return true;
+    }
+    const form = input.form || input.closest("form") || input.closest('div[class*="login"], div[class*="auth"], div[class*="signin"], div[class*="signup"], div[id*="login"], div[id*="auth"]');
+    if (form) {
+      const passwordInSameContainer = form.querySelector('input[type="password"]');
+      if (passwordInSameContainer && isVisible(passwordInSameContainer)) {
+        if (["text", "email", "tel", ""].includes(type)) {
+          const nameId = ((input.name || "") + " " + (input.id || "")).toLowerCase();
+          if (!/^(firstname|lastname|fname|lname|first_name|last_name|phone|mobile)$/i.test(nameId)) {
+            return true;
+          }
+        }
+      }
+    }
+    const strictIdentifierPattern = /\b(user|username|user_name|user_id|userid|email|mail|login|login_id|loginid|account|account_name|member_id|student_id|roll_no|admission_no|identifier|usr|uname)\b/i;
+    const checkText = (input.name || "") + " " + (input.id || "") + " " + (input.placeholder || "") + " " + (input.getAttribute("aria-label") || "");
+    if (strictIdentifierPattern.test(checkText)) {
       return true;
     }
     return false;

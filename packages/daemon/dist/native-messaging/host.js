@@ -44,9 +44,19 @@ const os = __importStar(require("node:os"));
 const net = __importStar(require("node:net"));
 const childProcess = __importStar(require("node:child_process"));
 const core_1 = require("@kloak/core");
+const socket_server_1 = require("../ipc/socket-server");
 exports.NATIVE_HOST_NAME = 'app.kloak.native';
 const IPC_PORT = 53152;
 class NativeMessagingHost {
+    fallbackVault = null;
+    fallbackServer = null;
+    getFallbackServer() {
+        if (!this.fallbackServer) {
+            this.fallbackVault = new core_1.VaultManager();
+            this.fallbackServer = new socket_server_1.IpcSocketServer(this.fallbackVault);
+        }
+        return this.fallbackServer;
+    }
     run() {
         let inputBuffer = Buffer.alloc(0);
         process.stdin.on('data', async (chunk) => {
@@ -60,7 +70,7 @@ class NativeMessagingHost {
                 inputBuffer = inputBuffer.subarray(4 + messageLength);
                 try {
                     const request = JSON.parse(messageBytes.toString('utf-8'));
-                    await this.forwardToSwiftDaemon(request);
+                    await this.handleMessage(request);
                 }
                 catch (err) {
                     this.sendMessage({
@@ -75,39 +85,82 @@ class NativeMessagingHost {
             process.exit(0);
         });
     }
-    async forwardToSwiftDaemon(request) {
+    async handleMessage(request) {
+        // 1. Try to forward to running desktop app or daemon on 127.0.0.1:53152
+        const forwarded = await this.tryForwardToDaemon(request);
+        if (forwarded)
+            return;
+        // 2. Desktop app is NOT running!
+        // Handle the request directly using VaultManager and IpcSocketServer
+        try {
+            const server = this.getFallbackServer();
+            const response = await server.dispatch(request);
+            this.sendMessage(response);
+            // In the background, auto-spawn the standalone daemon so port 53152
+            // is up for subsequent HTTP requests, Raycast, and CLI
+            this.spawnBackgroundDaemon();
+        }
+        catch (err) {
+            this.sendMessage({
+                jsonrpc: '2.0',
+                id: request.id ?? null,
+                error: { code: -32000, message: err.message || 'Vault operation failed' }
+            });
+        }
+    }
+    async tryForwardToDaemon(request) {
         return new Promise((resolve) => {
             const client = new net.Socket();
             let responseData = '';
+            let isResolved = false;
+            client.setTimeout(250);
             client.connect(IPC_PORT, '127.0.0.1', () => {
                 client.write(JSON.stringify(request) + '\n');
             });
             client.on('data', (data) => {
                 responseData += data.toString();
                 try {
-                    // If we can parse it, it's complete
                     const parsed = JSON.parse(responseData);
                     this.sendMessage(parsed);
                     client.destroy();
-                    resolve();
+                    if (!isResolved) {
+                        isResolved = true;
+                        resolve(true);
+                    }
                 }
                 catch {
-                    // Wait for more data
+                    // Wait for full JSON payload
                 }
             });
-            client.on('error', (err) => {
-                this.sendMessage({
-                    jsonrpc: '2.0',
-                    id: request.id,
-                    error: { code: -32603, message: 'Swift IPC Daemon not running or unreachable: ' + err.message }
-                });
-                resolve();
+            client.on('error', () => {
+                client.destroy();
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve(false);
+                }
             });
             client.on('timeout', () => {
                 client.destroy();
-                resolve();
+                if (!isResolved) {
+                    isResolved = true;
+                    resolve(false);
+                }
             });
         });
+    }
+    spawnBackgroundDaemon() {
+        try {
+            const daemonScript = path.resolve(__dirname, '../index.js');
+            if (fs.existsSync(daemonScript)) {
+                const child = childProcess.spawn(process.execPath, [daemonScript], {
+                    detached: true,
+                    stdio: 'ignore',
+                    env: { ...process.env, KLOAK_VAULT_DIR: (0, core_1.getDefaultVaultDir)() }
+                });
+                child.unref();
+            }
+        }
+        catch { }
     }
     sendMessage(msg) {
         const jsonStr = JSON.stringify(msg);
@@ -116,26 +169,41 @@ class NativeMessagingHost {
         headerBuffer.writeUInt32LE(msgBuffer.length, 0);
         process.stdout.write(Buffer.concat([headerBuffer, msgBuffer]));
     }
-    static installManifests(extensionIds = ['gikdgameggdmlfnchmeejfmhdgfbmfcl']) {
+    static installManifests(extensionIds = ['gikdgameggdmlfnchmeejfmhdgfbmfcl', 'hajgkgmajepndkhjhcgjenjnfojlphod']) {
         const installedPaths = [];
         const hostScriptPath = path.resolve(__dirname, '../../dist/native-messaging/host.js');
         const nodePath = process.execPath;
+        const vaultDir = (0, core_1.getDefaultVaultDir)();
+        if (!fs.existsSync(vaultDir)) {
+            fs.mkdirSync(vaultDir, { recursive: true, mode: 0o700 });
+        }
         // Generate a platform-appropriate wrapper script (.cmd on Windows, .sh elsewhere)
         const isWindows = process.platform === 'win32';
         const wrapperScriptExt = isWindows ? '.cmd' : '.sh';
-        const wrapperScriptPath = path.join((0, core_1.getDefaultVaultDir)(), `kloak-native-bridge${wrapperScriptExt}`);
+        const wrapperScriptPath = path.join(vaultDir, `kloak-native-bridge${wrapperScriptExt}`);
         const wrapperScript = isWindows
             ? `@echo off\r\n"${nodePath}" "${hostScriptPath}" %*\r\n`
-            : `#!/bin/sh\nexec "${nodePath}" "${hostScriptPath}" "$@"\n`;
+            : `#!/bin/sh\nexport PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:$PATH"\nNODE_BIN="$(which node 2>/dev/null || echo "${nodePath}")"\nexec "$NODE_BIN" "${hostScriptPath}" "$@"\n`;
         const wrapperMode = isWindows ? undefined : 0o755;
         fs.writeFileSync(wrapperScriptPath, wrapperScript, isWindows ? { encoding: 'utf-8' } : { mode: wrapperMode });
+        if (!isWindows) {
+            try {
+                fs.chmodSync(wrapperScriptPath, 0o755);
+            }
+            catch { }
+        }
+        const allExtensionIds = Array.from(new Set([
+            'gikdgameggdmlfnchmeejfmhdgfbmfcl', // Unpacked / dev extension ID
+            'hajgkgmajepndkhjhcgjenjnfojlphod', // Official Chrome Web Store ID
+            ...extensionIds
+        ]));
         const chromeManifest = {
             name: exports.NATIVE_HOST_NAME,
             description: 'Kloak Password Manager Native Messaging Host',
             path: wrapperScriptPath,
             type: 'stdio',
             allowed_origins: [
-                ...extensionIds.map(id => `chrome-extension://${id}/`)
+                ...allExtensionIds.map(id => `chrome-extension://${id}/`)
             ]
         };
         const firefoxManifest = {
@@ -203,6 +271,8 @@ class NativeMessagingHost {
             { dir: path.join(os.homedir(), 'Library/Application Support/Google/Chrome/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Microsoft Edge/NativeMessagingHosts'), manifest: chromeManifest },
+            { dir: path.join(os.homedir(), 'Library/Application Support/Arc/User Data/NativeMessagingHosts'), manifest: chromeManifest },
+            { dir: path.join(os.homedir(), 'Library/Application Support/Chromium/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Mozilla/NativeMessagingHosts'), manifest: firefoxManifest }
         ];
         for (const target of targetDirs) {

@@ -1117,6 +1117,8 @@
             resolve(null);
           } else if (response.result !== void 0) {
             resolve(response.result);
+          } else if (response.error) {
+            resolve({ __error: response.error.message || "Host error" });
           } else {
             resolve(null);
           }
@@ -1126,6 +1128,9 @@
       }
     });
     if (nativeResult !== null && nativeResult !== void 0) {
+      if (nativeResult.__error) {
+        throw new Error(nativeResult.__error);
+      }
       return nativeResult;
     }
     try {

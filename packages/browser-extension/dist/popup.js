@@ -3827,10 +3827,8 @@ ${notes}`;
         chrome.runtime.sendMessage({ type: "GET_STATUS" }, (statusRes) => {
           if (statusRes && statusRes.isUnlocked && retryCount < 2) {
             setTimeout(() => loadLogins(retryCount + 1), 300);
-          } else if (statusRes && !statusRes.isUnlocked) {
-            showUnlockView();
           } else {
-            showUnlockView("Cannot connect to Kloak Desktop App or Daemon.");
+            showUnlockView();
           }
         });
       }

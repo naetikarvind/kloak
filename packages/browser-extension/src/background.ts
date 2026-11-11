@@ -126,6 +126,8 @@ async function sendNativeRequest(method: string, params: any = {}): Promise<any>
           resolve(null);
         } else if (response.result !== undefined) {
           resolve(response.result);
+        } else if (response.error) {
+          resolve({ __error: response.error.message || 'Host error' });
         } else {
           resolve(null);
         }
@@ -136,6 +138,9 @@ async function sendNativeRequest(method: string, params: any = {}): Promise<any>
   });
 
   if (nativeResult !== null && nativeResult !== undefined) {
+    if (nativeResult.__error) {
+      throw new Error(nativeResult.__error);
+    }
     return nativeResult;
   }
 

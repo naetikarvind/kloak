@@ -4,8 +4,13 @@
  */
 export declare const NATIVE_HOST_NAME = "app.kloak.native";
 export declare class NativeMessagingHost {
+    private fallbackVault;
+    private fallbackServer;
+    private getFallbackServer;
     run(): void;
-    private forwardToSwiftDaemon;
+    private handleMessage;
+    private tryForwardToDaemon;
+    private spawnBackgroundDaemon;
     private sendMessage;
     static installManifests(extensionIds?: string[]): string[];
 }
