@@ -2361,16 +2361,16 @@
   .kloak-popup {
     position: fixed;
     background: #14121F;
-    border: 1px solid rgba(109, 74, 255, 0.4);
-    border-radius: 10px;
-    box-shadow: 0 16px 40px rgba(0,0,0,0.65), 0 0 20px rgba(109, 74, 255, 0.18);
+    border: 1px solid rgba(109, 74, 255, 0.45);
+    border-radius: 12px;
+    box-shadow: 0 16px 44px rgba(0,0,0,0.7), 0 0 24px rgba(109, 74, 255, 0.2);
     color: #FFFFFF;
     z-index: 2147483647;
     font-size: 12px;
-    backdrop-filter: blur(20px);
+    backdrop-filter: blur(24px);
     overflow: hidden;
     animation: kloakPop 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 285px;
+    width: 330px;
     transition: top 0.12s ease, left 0.12s ease;
   }
 
@@ -2404,7 +2404,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 7px 10px;
+    padding: 8px 12px;
     background: #1C1929;
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
@@ -2412,7 +2412,7 @@
   .kloak-brand {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     font-size: 10px;
     font-weight: 700;
     color: #A5A1B2;
@@ -2421,8 +2421,8 @@
   }
 
   .kloak-brand-icon {
-    width: 12px;
-    height: 12px;
+    width: 13px;
+    height: 13px;
     fill: #6D4AFF;
   }
 
@@ -2431,10 +2431,10 @@
     border: none;
     color: #9E9AA8;
     cursor: pointer;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1;
-    padding: 2px 4px;
-    border-radius: 3px;
+    padding: 2px 6px;
+    border-radius: 4px;
     transition: all 0.15s;
   }
   .kloak-close-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.12); }
@@ -2442,13 +2442,16 @@
   .kloak-body {
     display: flex;
     flex-direction: column;
-    max-height: 380px;
+    max-height: 420px;
     overflow-y: auto;
+    padding: 8px;
+    gap: 7px;
   }
 
   .kloak-section {
     display: flex;
     flex-direction: column;
+    gap: 6px;
   }
 
   .kloak-section-title {
@@ -2457,15 +2460,14 @@
     color: #7A758B;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 6px 10px 3px 10px;
+    padding: 2px 2px 4px 2px;
   }
 
   .kloak-notice-badge {
-    margin: 6px 10px 0 10px;
-    padding: 4px 8px;
+    padding: 5px 9px;
     background: rgba(16, 185, 129, 0.12);
     border: 1px solid rgba(16, 185, 129, 0.35);
-    border-radius: 5px;
+    border-radius: 6px;
     color: #34D399;
     font-size: 10px;
     font-weight: 600;
@@ -2474,182 +2476,249 @@
     gap: 4px;
   }
 
-  /* \u2500\u2500 Compact Account Items with Circumference Risk Gauge \u2500\u2500 */
-  .kloak-card {
-    padding: 7px 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+  /* \u2500\u2500 Modern Credential Tile Design \u2500\u2500 */
+  .kloak-tile {
+    background: #1C1A29;
+    border: 1px solid rgba(109, 74, 255, 0.28);
+    border-radius: 10px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    background: transparent;
-    transition: all 0.16s ease;
+    gap: 8px;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
     cursor: pointer;
-    border-radius: 6px;
-    margin: 2px 4px;
     outline: none;
   }
-  .kloak-card:hover, .kloak-card:focus-visible {
-    background: rgba(109, 74, 255, 0.12);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+  .kloak-tile:hover, .kloak-tile:focus-visible {
+    background: #232034;
+    border-color: #7E5EFF;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 16px rgba(109, 74, 255, 0.28);
+    transform: translateY(-1px);
   }
 
-  .kloak-card-top {
+  /* Tile Top Row: Identity + Fill Action */
+  .kloak-tile-top {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
   }
-
-  .kloak-item-avatar {
-    width: 24px;
-    height: 24px;
-    border-radius: 5px;
+  .kloak-tile-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
   }
-
-  .kloak-item-info {
+  .kloak-tile-info {
     flex: 1;
     overflow: hidden;
     min-width: 0;
   }
-  .kloak-item-username {
-    font-size: 11px;
-    font-weight: 600;
+  .kloak-tile-username {
+    font-size: 12px;
+    font-weight: 700;
     color: #FFFFFF;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .kloak-item-title-row {
+  .kloak-tile-meta-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    margin-top: 1px;
   }
-  .kloak-item-title {
-    font-size: 9px;
-    color: #9E9AA8;
+  .kloak-tile-domain {
+    font-size: 9.5px;
+    color: #A5A1B2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .kloak-tile-2fa-badge {
+    font-size: 8px;
+    font-weight: 700;
+    color: #10B981;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 1px 4px;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
 
-  /* Circumference Ring Gauge & Tooltip */
-  .kloak-risk-circumference-wrap {
+  .kloak-tile-fill-btn {
+    background: linear-gradient(135deg, #6D4AFF 0%, #7E5EFF 100%);
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    transition: all 0.16s ease;
+    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.4);
+  }
+  .kloak-tile-fill-btn:hover {
+    background: linear-gradient(135deg, #7C5CFF 0%, #8F72FF 100%);
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(109, 74, 255, 0.6);
+  }
+  .kloak-tile-fill-btn.filled-success {
+    background: #10B981 !important;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5) !important;
+  }
+
+  /* \u2500\u2500 Security & Risk Health Sub-Tile (Circumference Ring + Stats) \u2500\u2500 */
+  .kloak-tile-risk-card {
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 7px;
+    padding: 7px 9px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kloak-tile-gauge-box {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    position: relative;
-    cursor: help;
   }
-  .kloak-risk-tooltip {
-    display: none;
-    position: absolute;
-    bottom: calc(100% + 6px);
-    right: 0;
-    background: #1C1929;
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 9px;
-    color: #E2E2E8;
-    width: 175px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.75);
-    z-index: 1000;
-    pointer-events: none;
-    line-height: 1.35;
+  .kloak-tile-risk-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
   }
-  .kloak-risk-circumference-wrap:hover .kloak-risk-tooltip {
-    display: block;
-  }
-
-  .kloak-btn-fill {
-    background: #6D4AFF;
-    color: #FFFFFF;
-    border: none;
-    border-radius: 5px;
-    padding: 4px 10px;
-    font-size: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.16s ease;
-    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.35);
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    flex-shrink: 0;
-  }
-  .kloak-btn-fill:hover {
-    background: #7E5EFF;
-    transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(109, 74, 255, 0.45);
-  }
-  .kloak-btn-fill.filled-success {
-    background: #10B981 !important;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5) !important;
-  }
-
-  .kloak-pwd-row {
+  .kloak-tile-risk-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(0,0,0,0.25);
-    border-radius: 5px;
-    padding: 3px 6px;
-    font-size: 10px;
+    gap: 6px;
   }
-  .kloak-pwd-label {
-    color: #7A758B;
+  .kloak-tile-risk-title {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.2px;
+  }
+  .kloak-tile-risk-pill {
     font-size: 8px;
     font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
     text-transform: uppercase;
+    letter-spacing: 0.3px;
   }
-  .kloak-pwd-value {
+  .kloak-tile-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .kloak-tile-chip {
+    font-size: 9px;
+    padding: 2px 5px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: #C3C0CD;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+  }
+  .kloak-tile-chip.alert {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #FFA5A5;
+  }
+  .kloak-tile-chip.success {
+    background: rgba(16, 185, 129, 0.16);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #34D399;
+  }
+
+  /* \u2500\u2500 Password Bar with Peek & Copy \u2500\u2500 */
+  .kloak-tile-pwd-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: 6px;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+  .kloak-tile-pwd-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+  .kloak-tile-pwd-label {
+    font-size: 8px;
+    font-weight: 700;
+    color: #7A758B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .kloak-tile-pwd-val {
     font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 10px;
     color: #D1CFDA;
     letter-spacing: 0.5px;
-    max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10px;
+    max-width: 120px;
   }
-  .kloak-pwd-value.revealed {
+  .kloak-tile-pwd-val.revealed {
     color: #00D2B4;
     letter-spacing: 0;
   }
-
-  .kloak-pwd-actions {
+  .kloak-tile-pwd-actions {
     display: flex;
     align-items: center;
     gap: 3px;
   }
-
-  .kloak-mini-btn {
-    background: transparent;
-    border: none;
-    color: #9E9AA8;
+  .kloak-tile-action-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #D1CFDA;
     cursor: pointer;
-    padding: 1px 3px;
-    border-radius: 3px;
-    font-size: 11px;
-    display: flex;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 600;
+    display: inline-flex;
     align-items: center;
+    gap: 3px;
     transition: all 0.15s;
   }
-  .kloak-mini-btn:hover {
+  .kloak-tile-action-btn:hover {
     color: #FFFFFF;
-    background: rgba(255,255,255,0.12);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+  .kloak-tile-action-btn.copied {
+    color: #34D399;
+    border-color: #10B981;
+    background: rgba(16, 185, 129, 0.18);
   }
 
-  /* \u2500\u2500 Compact Password Generator Button \u2500\u2500 */
+  /* \u2500\u2500 Action Tiles \u2500\u2500 */
   .kloak-gen-btn-box {
-    padding: 6px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    background: rgba(109, 74, 255, 0.04);
+    padding: 0;
   }
 
   .kloak-btn-generator {
@@ -2950,8 +3019,8 @@
     if (passwordInputs.some((p) => (p.autocomplete || "").toLowerCase() === "new-password" || (p.name || "").toLowerCase().includes("confirm") || (p.id || "").toLowerCase().includes("confirm"))) return true;
     return false;
   }
-  function calculatePopupPosition(rect, estimatedHeight = 200) {
-    const popupWidth = 285;
+  function calculatePopupPosition(rect, estimatedHeight = 280) {
+    const popupWidth = 330;
     let left = rect.left;
     if (left + popupWidth > window.innerWidth - 10) {
       left = window.innerWidth - popupWidth - 10;
@@ -2966,7 +3035,7 @@
   function updateActivePopupPosition() {
     if (!activePopup || !currentTargetInput) return;
     const rect = currentTargetInput.getBoundingClientRect();
-    const height = activePopup.offsetHeight || 200;
+    const height = activePopup.offsetHeight || 280;
     const { top, left } = calculatePopupPosition(rect, height);
     activePopup.style.top = `${top}px`;
     activePopup.style.left = `${left}px`;
@@ -2982,7 +3051,7 @@
     container.className = "kloak-popup";
     const rect = input.getBoundingClientRect();
     const isSignup = isRegistrationOrSignupPage();
-    const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 240 : 180);
+    const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 320 : 180);
     container.style.top = `${top}px`;
     container.style.left = `${left}px`;
     if (!root.querySelector("style")) {
@@ -3016,67 +3085,82 @@
       savedSection.className = "kloak-section";
       savedSection.innerHTML = `<div class="kloak-section-title">Saved Login${items.length > 1 ? "s" : ""}</div>`;
       items.forEach((item, idx) => {
-        const card = document.createElement("div");
-        card.className = "kloak-card";
-        card.tabIndex = 0;
+        const tile = document.createElement("div");
+        tile.className = "kloak-tile";
+        tile.tabIndex = 0;
         const itemId = item.id || `item-${idx}`;
         const isRevealed = !!isRevealingPasswordMap[itemId];
         const displayPassword = item.password || "";
         const maskedPassword = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
         const risk = evaluateCredentialRisk(item, items);
-        const circumferenceGaugeHtml = renderCircumferenceSvg(risk.score, risk.color, 26, 2.5);
-        card.innerHTML = `
-        <div class="kloak-card-top">
-          <div class="kloak-item-avatar"></div>
-          <div class="kloak-item-info">
-            <div class="kloak-item-username" title="${item.username || "No Username"}">${item.username || "No Username"}</div>
-            <div class="kloak-item-title-row">
-              <span class="kloak-item-title">${item.title || hostname}</span>
-              ${item.totpSecret ? '<span style="color: #10B981; font-weight: 700; font-size: 8px;">\u2022 2FA</span>' : ""}
+        const circumferenceGaugeHtml = renderCircumferenceSvg(risk.score, risk.color, 38, 3.2);
+        const pillLabel = risk.riskLevel === "low" ? "LOW RISK" : risk.riskLevel === "medium" ? "MEDIUM RISK" : "HIGH RISK";
+        const pillBg = risk.riskLevel === "low" ? "rgba(16, 185, 129, 0.16)" : risk.riskLevel === "medium" ? "rgba(245, 158, 11, 0.16)" : "rgba(239, 68, 68, 0.16)";
+        const pillBorder = risk.riskLevel === "low" ? "rgba(16, 185, 129, 0.35)" : risk.riskLevel === "medium" ? "rgba(245, 158, 11, 0.35)" : "rgba(239, 68, 68, 0.35)";
+        const uniqueChipHtml = risk.isReused ? `<span class="kloak-tile-chip alert">\u26A0\uFE0F Reused (${risk.reusedCount + 1} sites)</span>` : `<span class="kloak-tile-chip success">\u2713 Unique password</span>`;
+        const twoFaChipHtml = risk.has2FA ? `<span class="kloak-tile-chip success">\u{1F6E1}\uFE0F 2FA Active</span>` : `<span class="kloak-tile-chip alert">\u26A0\uFE0F No 2FA</span>`;
+        tile.innerHTML = `
+        <div class="kloak-tile-top">
+          <div class="kloak-tile-avatar"></div>
+          <div class="kloak-tile-info">
+            <div class="kloak-tile-username" title="${item.username || "No Username"}">${item.username || "No Username"}</div>
+            <div class="kloak-tile-meta-row">
+              <span class="kloak-tile-domain" title="${item.title || hostname}">${item.title || hostname}</span>
+              ${item.totpSecret ? '<span class="kloak-tile-2fa-badge">2FA</span>' : ""}
             </div>
           </div>
-
-          <div class="kloak-risk-circumference-wrap" title="Security Score: ${risk.score}% (${risk.label})">
-            ${circumferenceGaugeHtml}
-            <div class="kloak-risk-tooltip">
-              <div style="font-weight: 700; color: ${risk.color}; margin-bottom: 2px;">${risk.label} (${risk.score}%)</div>
-              <div>\u2022 Entropy: ${risk.entropyBits} bits</div>
-              <div>\u2022 Status: ${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</div>
-              <div>\u2022 2FA: ${risk.has2FA ? "\u{1F6E1}\uFE0F Protected" : "\u26A0\uFE0F No 2FA"}</div>
-            </div>
-          </div>
-
-          <button class="kloak-btn-fill" id="fill-btn-${itemId}" title="1-Click Fill Credentials">
+          <button class="kloak-tile-fill-btn" id="fill-btn-${itemId}" title="1-Click Fill Credentials">
             <span>\u26A1</span>
             <span class="btn-fill-text">Fill</span>
           </button>
         </div>
 
-        <div class="kloak-pwd-row">
-          <span class="kloak-pwd-label">Pass</span>
-          <span class="kloak-pwd-value ${isRevealed ? "revealed" : ""}" id="pwd-val-${itemId}">
-            ${isRevealed ? displayPassword : maskedPassword}
-          </span>
-          <div class="kloak-pwd-actions">
-            <button class="kloak-mini-btn" id="reveal-btn-${itemId}" title="${isRevealed ? "Hide Password" : "Show Password"}">
+        <div class="kloak-tile-risk-card" title="Security Health: ${risk.score}% (${risk.label})">
+          <div class="kloak-tile-gauge-box">
+            ${circumferenceGaugeHtml}
+          </div>
+          <div class="kloak-tile-risk-body">
+            <div class="kloak-tile-risk-header">
+              <span class="kloak-tile-risk-title">Security & Risk Health</span>
+              <span class="kloak-tile-risk-pill" style="color: ${risk.color}; background: ${pillBg}; border: 1px solid ${pillBorder};">${pillLabel}</span>
+            </div>
+            <div class="kloak-tile-chips">
+              <span class="kloak-tile-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
+              ${uniqueChipHtml}
+              ${twoFaChipHtml}
+            </div>
+          </div>
+        </div>
+
+        <div class="kloak-tile-pwd-bar">
+          <div class="kloak-tile-pwd-left">
+            <span class="kloak-tile-pwd-label">Pass</span>
+            <span class="kloak-tile-pwd-val ${isRevealed ? "revealed" : ""}" id="pwd-val-${itemId}">
+              ${isRevealed ? displayPassword : maskedPassword}
+            </span>
+          </div>
+          <div class="kloak-tile-pwd-actions">
+            <button class="kloak-tile-action-btn" id="reveal-btn-${itemId}" title="${isRevealed ? "Hide Password" : "Show Password"}">
               ${isRevealed ? "\u{1F648}" : "\u{1F441}\uFE0F"}
             </button>
-            <button class="kloak-mini-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">
-              \u{1F4CB}
+            <button class="kloak-tile-action-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">
+              <span>\u{1F4CB}</span>
+              <span class="copy-text">Pass</span>
             </button>
-            <button class="kloak-mini-btn" id="copy-user-btn-${itemId}" title="Copy Username">
-              \u{1F464}
+            <button class="kloak-tile-action-btn" id="copy-user-btn-${itemId}" title="Copy Username">
+              <span>\u{1F464}</span>
+              <span class="copy-text">User</span>
             </button>
           </div>
         </div>
       `;
-        const avatarBox = card.querySelector(".kloak-item-avatar");
+        const avatarBox = tile.querySelector(".kloak-tile-avatar");
         if (avatarBox) {
-          renderFavicon(avatarBox, { item, size: 24 });
+          renderFavicon(avatarBox, { item, size: 28 });
         }
         const triggerFill = (e) => {
           e.stopPropagation();
-          const fillBtn = card.querySelector(`#fill-btn-${itemId}`);
+          const fillBtn = tile.querySelector(`#fill-btn-${itemId}`);
           const fillText = fillBtn?.querySelector(".btn-fill-text");
           if (fillBtn) {
             fillBtn.classList.add("filled-success");
@@ -3088,18 +3172,18 @@
             activePopup = null;
           }, 220);
         };
-        card.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", triggerFill);
-        card.querySelector(".kloak-item-info")?.addEventListener("click", triggerFill);
-        card.addEventListener("keydown", (e) => {
+        tile.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", triggerFill);
+        tile.querySelector(".kloak-tile-info")?.addEventListener("click", triggerFill);
+        tile.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
             triggerFill(e);
           }
         });
-        card.querySelector(`#reveal-btn-${itemId}`)?.addEventListener("click", (e) => {
+        tile.querySelector(`#reveal-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();
           isRevealingPasswordMap[itemId] = !isRevealingPasswordMap[itemId];
-          const valEl = card.querySelector(`#pwd-val-${itemId}`);
-          const btnEl = card.querySelector(`#reveal-btn-${itemId}`);
+          const valEl = tile.querySelector(`#pwd-val-${itemId}`);
+          const btnEl = tile.querySelector(`#reveal-btn-${itemId}`);
           if (isRevealingPasswordMap[itemId]) {
             valEl.textContent = displayPassword;
             valEl.classList.add("revealed");
@@ -3112,21 +3196,41 @@
             btnEl.title = "Show Password";
           }
         });
-        card.querySelector(`#copy-pwd-btn-${itemId}`)?.addEventListener("click", (e) => {
+        tile.querySelector(`#copy-pwd-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();
           if (displayPassword) {
             navigator.clipboard.writeText(displayPassword);
+            const btn = tile.querySelector(`#copy-pwd-btn-${itemId}`);
+            if (btn) {
+              btn.classList.add("copied");
+              const txt = btn.querySelector(".copy-text");
+              if (txt) txt.textContent = "Copied!";
+              setTimeout(() => {
+                btn.classList.remove("copied");
+                if (txt) txt.textContent = "Pass";
+              }, 1800);
+            }
             showToastNotification("\u{1F4CB} Password copied to clipboard!");
           }
         });
-        card.querySelector(`#copy-user-btn-${itemId}`)?.addEventListener("click", (e) => {
+        tile.querySelector(`#copy-user-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();
           if (item.username) {
             navigator.clipboard.writeText(item.username);
+            const btn = tile.querySelector(`#copy-user-btn-${itemId}`);
+            if (btn) {
+              btn.classList.add("copied");
+              const txt = btn.querySelector(".copy-text");
+              if (txt) txt.textContent = "Copied!";
+              setTimeout(() => {
+                btn.classList.remove("copied");
+                if (txt) txt.textContent = "User";
+              }, 1800);
+            }
             showToastNotification("\u{1F464} Username copied to clipboard!");
           }
         });
-        savedSection.appendChild(card);
+        savedSection.appendChild(tile);
       });
       bodyContainer.appendChild(savedSection);
     }
