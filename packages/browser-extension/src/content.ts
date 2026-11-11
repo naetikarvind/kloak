@@ -5,6 +5,7 @@
  */
 
 import { renderFavicon } from './favicon-service';
+import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
 
 interface FormContext {
   form: HTMLFormElement | null;
@@ -493,18 +494,23 @@ const POPUP_STYLES = `
     gap: 4px;
   }
 
-  /* ── Compact Account Items ── */
+  /* ── Compact Account Items with Circumference Risk Gauge ── */
   .kloak-card {
-    padding: 6px 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
     background: transparent;
-    transition: background 0.15s;
+    transition: all 0.16s ease;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 2px 4px;
+    outline: none;
   }
-  .kloak-card:hover {
-    background: rgba(109, 74, 255, 0.08);
+  .kloak-card:hover, .kloak-card:focus-visible {
+    background: rgba(109, 74, 255, 0.12);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
   }
 
   .kloak-card-top {
@@ -527,7 +533,7 @@ const POPUP_STYLES = `
   .kloak-item-info {
     flex: 1;
     overflow: hidden;
-    cursor: pointer;
+    min-width: 0;
   }
   .kloak-item-username {
     font-size: 11px;
@@ -537,9 +543,47 @@ const POPUP_STYLES = `
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .kloak-item-title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
   .kloak-item-title {
     font-size: 9px;
     color: #9E9AA8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Circumference Ring Gauge & Tooltip */
+  .kloak-risk-circumference-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    cursor: help;
+  }
+  .kloak-risk-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    background: #1C1929;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 9px;
+    color: #E2E2E8;
+    width: 175px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.75);
+    z-index: 1000;
+    pointer-events: none;
+    line-height: 1.35;
+  }
+  .kloak-risk-circumference-wrap:hover .kloak-risk-tooltip {
+    display: block;
   }
 
   .kloak-btn-fill {
@@ -547,16 +591,25 @@ const POPUP_STYLES = `
     color: #FFFFFF;
     border: none;
     border-radius: 5px;
-    padding: 3px 10px;
+    padding: 4px 10px;
     font-size: 10px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
-    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.3);
+    transition: all 0.16s ease;
+    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
   }
   .kloak-btn-fill:hover {
-    background: #7C5CFF;
-    transform: scale(1.02);
+    background: #7E5EFF;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(109, 74, 255, 0.45);
+  }
+  .kloak-btn-fill.filled-success {
+    background: #10B981 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5) !important;
   }
 
   .kloak-pwd-row {
@@ -1013,22 +1066,42 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
     items.forEach((item, idx) => {
       const card = document.createElement('div');
       card.className = 'kloak-card';
+      card.tabIndex = 0; // keyboard navigable
 
       const itemId = item.id || `item-${idx}`;
       const isRevealed = !!isRevealingPasswordMap[itemId];
-      const avatarLetter = (item.title || item.username || '?').charAt(0).toUpperCase();
-      const domainForIcon = item.urls?.[0] ? new URL(item.urls[0]).hostname : hostname;
       const displayPassword = item.password || '';
       const maskedPassword = '••••••••••••';
+
+      // Evaluate risk & generate circular circumference gauge
+      const risk = evaluateCredentialRisk(item, items);
+      const circumferenceGaugeHtml = renderCircumferenceSvg(risk.score, risk.color, 26, 2.5);
 
       card.innerHTML = `
         <div class="kloak-card-top">
           <div class="kloak-item-avatar"></div>
           <div class="kloak-item-info">
             <div class="kloak-item-username" title="${item.username || 'No Username'}">${item.username || 'No Username'}</div>
-            <div class="kloak-item-title">${item.title || hostname} ${item.totpSecret ? '<span style="color: #10B981; font-weight: 600;">• 2FA</span>' : ''}</div>
+            <div class="kloak-item-title-row">
+              <span class="kloak-item-title">${item.title || hostname}</span>
+              ${item.totpSecret ? '<span style="color: #10B981; font-weight: 700; font-size: 8px;">• 2FA</span>' : ''}
+            </div>
           </div>
-          <button class="kloak-btn-fill" id="fill-btn-${itemId}">Fill</button>
+
+          <div class="kloak-risk-circumference-wrap" title="Security Score: ${risk.score}% (${risk.label})">
+            ${circumferenceGaugeHtml}
+            <div class="kloak-risk-tooltip">
+              <div style="font-weight: 700; color: ${risk.color}; margin-bottom: 2px;">${risk.label} (${risk.score}%)</div>
+              <div>• Entropy: ${risk.entropyBits} bits</div>
+              <div>• Status: ${risk.isReused ? `⚠️ Reused on ${risk.reusedCount + 1} sites` : '✓ Unique password'}</div>
+              <div>• 2FA: ${risk.has2FA ? '🛡️ Protected' : '⚠️ No 2FA'}</div>
+            </div>
+          </div>
+
+          <button class="kloak-btn-fill" id="fill-btn-${itemId}" title="1-Click Fill Credentials">
+            <span>⚡</span>
+            <span class="btn-fill-text">Fill</span>
+          </button>
         </div>
 
         <div class="kloak-pwd-row">
@@ -1055,18 +1128,29 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
         renderFavicon(avatarBox, { item, size: 24 });
       }
 
-      card.querySelector(`#fill-btn-${itemId}`)?.addEventListener('click', (e) => {
+      // Smooth 1-Click Filling with Visual Checkmark Feedback
+      const triggerFill = (e: Event) => {
         e.stopPropagation();
+        const fillBtn = card.querySelector(`#fill-btn-${itemId}`) as HTMLElement;
+        const fillText = fillBtn?.querySelector('.btn-fill-text');
+        if (fillBtn) {
+          fillBtn.classList.add('filled-success');
+          if (fillText) fillText.textContent = 'Filled!';
+        }
         injectCredentials(item.username, item.password, input, item.totpSecret);
-        container.remove();
-        activePopup = null;
-      });
+        setTimeout(() => {
+          container.remove();
+          activePopup = null;
+        }, 220);
+      };
 
-      card.querySelector('.kloak-item-info')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        injectCredentials(item.username, item.password, input, item.totpSecret);
-        container.remove();
-        activePopup = null;
+      card.querySelector(`#fill-btn-${itemId}`)?.addEventListener('click', triggerFill);
+      card.querySelector('.kloak-item-info')?.addEventListener('click', triggerFill);
+
+      card.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') {
+          triggerFill(e);
+        }
       });
 
       card.querySelector(`#reveal-btn-${itemId}`)?.addEventListener('click', (e) => {

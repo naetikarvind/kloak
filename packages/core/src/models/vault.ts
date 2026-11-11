@@ -56,6 +56,11 @@ export interface OAuthDetails {
   codeChallenge?: string;
 }
 
+export interface PasswordHistoryEntry {
+  password: string;
+  changedAt: string; // ISO 8601
+}
+
 export interface VaultItem {
   id: string;
   type: ItemType;
@@ -75,6 +80,8 @@ export interface VaultItem {
   trashed: boolean;
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
+  passwordHistory?: PasswordHistoryEntry[];
+  importSource?: string;
 }
 
 export interface VaultFolder {

@@ -359,7 +359,13 @@ export class IpcSocketServer {
       }
 
       case 'vault.import':
-        return this.vaultManager.importData(params.content, params.format);
+        return this.vaultManager.importData(params.content, params.format, params.options);
+
+      case 'vault.autoMerge':
+        return this.vaultManager.autoMergeAllDuplicates();
+
+      case 'vault.getSecurityAudit':
+        return this.vaultManager.getSecurityAudit();
 
       case 'vault.export':
         return this.vaultManager.exportData(params.options);

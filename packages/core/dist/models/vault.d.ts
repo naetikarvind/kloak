@@ -49,6 +49,10 @@ export interface OAuthDetails {
     codeVerifier?: string;
     codeChallenge?: string;
 }
+export interface PasswordHistoryEntry {
+    password: string;
+    changedAt: string;
+}
 export interface VaultItem {
     id: string;
     type: ItemType;
@@ -68,6 +72,8 @@ export interface VaultItem {
     trashed: boolean;
     createdAt: string;
     updatedAt: string;
+    passwordHistory?: PasswordHistoryEntry[];
+    importSource?: string;
 }
 export interface VaultFolder {
     id: string;

@@ -1490,6 +1490,48 @@
           sendResponse({ success: true, item });
           break;
         }
+        case "IMPORT_PASSWORDS": {
+          try {
+            const res = await sendNativeRequest("vault.import", {
+              content: message.content,
+              format: message.format || "auto",
+              options: message.options || { autoMerge: true }
+            });
+            await refreshVaultState();
+            sendResponse({ success: true, result: res });
+          } catch (err) {
+            sendResponse({ success: false, error: err.message || "Import failed" });
+          }
+          break;
+        }
+        case "AUTO_MERGE_VAULT": {
+          try {
+            const res = await sendNativeRequest("vault.autoMerge", {});
+            await refreshVaultState();
+            sendResponse({ success: true, report: res });
+          } catch (err) {
+            sendResponse({ success: false, error: err.message || "Auto-merge failed" });
+          }
+          break;
+        }
+        case "GET_SECURITY_AUDIT": {
+          try {
+            const res = await sendNativeRequest("vault.getSecurityAudit", {});
+            sendResponse({ success: true, audit: res });
+          } catch (err) {
+            sendResponse({ success: false, error: err.message || "Security audit failed" });
+          }
+          break;
+        }
+        case "SEND_RPC": {
+          try {
+            const res = await sendNativeRequest(message.method, message.params);
+            sendResponse({ success: true, result: res });
+          } catch (err) {
+            sendResponse({ success: false, error: err.message });
+          }
+          break;
+        }
         case "CHECK_OR_PROMPT_SAVE": {
           const { url: urlStr, username, password } = message;
           if (!urlStr || !password) {

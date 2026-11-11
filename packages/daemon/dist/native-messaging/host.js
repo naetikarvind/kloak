@@ -234,6 +234,16 @@ class NativeMessagingHost {
                     browser: 'edge'
                 },
                 {
+                    dir: path.join(appData, 'Opera Software', 'Opera Stable', 'NativeMessagingHosts'),
+                    manifest: chromeManifest,
+                    browser: 'opera'
+                },
+                {
+                    dir: path.join(appData, 'Opera Software', 'Opera GX Stable', 'NativeMessagingHosts'),
+                    manifest: chromeManifest,
+                    browser: 'opera-gx'
+                },
+                {
                     dir: path.join(appData, 'Mozilla', 'NativeMessagingHosts'),
                     manifest: firefoxManifest,
                     browser: 'firefox'
@@ -271,6 +281,8 @@ class NativeMessagingHost {
             { dir: path.join(os.homedir(), 'Library/Application Support/Google/Chrome/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Microsoft Edge/NativeMessagingHosts'), manifest: chromeManifest },
+            { dir: path.join(os.homedir(), 'Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts'), manifest: chromeManifest },
+            { dir: path.join(os.homedir(), 'Library/Application Support/com.operasoftware.OperaGX/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Arc/User Data/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Chromium/NativeMessagingHosts'), manifest: chromeManifest },
             { dir: path.join(os.homedir(), 'Library/Application Support/Mozilla/NativeMessagingHosts'), manifest: firefoxManifest }

@@ -1909,6 +1909,144 @@
     return container;
   }
 
+  // src/risk-assessment.ts
+  function evaluatePasswordEntropy(password) {
+    if (!password) return 0;
+    let poolSize = 0;
+    if (/[a-z]/.test(password)) poolSize += 26;
+    if (/[A-Z]/.test(password)) poolSize += 26;
+    if (/[0-9]/.test(password)) poolSize += 10;
+    if (/[^a-zA-Z0-9]/.test(password)) poolSize += 33;
+    if (poolSize === 0) poolSize = 1;
+    return Math.round(password.length * Math.log2(poolSize));
+  }
+  function evaluateCredentialRisk(item, allItems2 = []) {
+    const pwd = item.password || "";
+    const reasons = [];
+    if (!pwd) {
+      return {
+        score: 10,
+        riskLevel: "high",
+        label: "High Risk",
+        color: "#EF4444",
+        entropyBits: 0,
+        isReused: false,
+        reusedCount: 0,
+        has2FA: !!item.totpSecret,
+        reasons: ["No password is set for this login"]
+      };
+    }
+    const entropy = evaluatePasswordEntropy(pwd);
+    let score = Math.round(Math.min(100, Math.max(10, entropy)));
+    if (pwd.length < 8) {
+      score = Math.min(score, 25);
+      reasons.push("Password length is under 8 characters (Critical)");
+    } else if (pwd.length < 12) {
+      score = Math.min(score, 60);
+      reasons.push("Password length is under 12 characters");
+    }
+    const weakPatterns = /^(password|123456|qwerty|admin|welcome|letmein|login|test)/i;
+    if (weakPatterns.test(pwd)) {
+      score = Math.min(score, 20);
+      reasons.push("Contains common predictable dictionary words");
+    }
+    let isReused = false;
+    let reusedCount = 0;
+    const currentDomain = (item.urls?.[0] || item.title || "").toLowerCase();
+    for (const other of allItems2) {
+      if (other.id === item.id) continue;
+      if (other.password && other.password === pwd) {
+        const otherDomain = (other.urls?.[0] || other.title || "").toLowerCase();
+        if (otherDomain !== currentDomain) {
+          isReused = true;
+          reusedCount++;
+        }
+      }
+    }
+    if (isReused) {
+      score = Math.max(15, score - 35);
+      reasons.push(`Password reused on ${reusedCount + 1} different online services`);
+    }
+    const has2FA = !!item.totpSecret;
+    if (has2FA) {
+      score = Math.min(100, score + 12);
+    } else {
+      reasons.push("Two-factor authentication (2FA) is not enabled");
+    }
+    score = Math.max(10, Math.min(100, score));
+    let riskLevel = "low";
+    let color = "#10B981";
+    let label = "Low Risk";
+    if (score < 50) {
+      riskLevel = "high";
+      color = "#EF4444";
+      label = "High Risk";
+    } else if (score < 80) {
+      riskLevel = "medium";
+      color = "#F59E0B";
+      label = "Medium Risk";
+    }
+    if (reasons.length === 0) {
+      reasons.push("Strong unique password with high cryptographic entropy");
+      if (has2FA) reasons.push("Hardware 2FA / TOTP protection enabled");
+    }
+    return {
+      score,
+      riskLevel,
+      label,
+      color,
+      entropyBits: entropy,
+      isReused,
+      reusedCount,
+      has2FA,
+      reasons
+    };
+  }
+  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - circumference * score / 100;
+    const center = size / 2;
+    const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
+    const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
+    return `
+    <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
+      <circle
+        class="kloak-gauge-bg"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="rgba(255,255,255,0.12)"
+        stroke-width="${stroke}"
+        fill="none"
+      />
+      <circle
+        class="kloak-gauge-bar"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="${color}"
+        stroke-width="${stroke}"
+        stroke-dasharray="${circumference.toFixed(2)}"
+        stroke-dashoffset="${offset.toFixed(2)}"
+        stroke-linecap="round"
+        fill="none"
+        transform="rotate(-90 ${center} ${center})"
+        style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
+      />
+      <text
+        x="${center}"
+        y="${textY}"
+        text-anchor="middle"
+        font-size="${fontSize}px"
+        font-weight="700"
+        fill="${color}"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      >${score}%</text>
+    </svg>
+  `;
+  }
+
   // src/popup.ts
   var allItems = [];
   var activeItem = null;
@@ -2126,6 +2264,7 @@
     setupFilters();
     setupUnlockView();
     setupLockBtn();
+    setupAccountRetrievalModal();
     const urlParams = new URLSearchParams(window.location.search);
     const requestedTab = urlParams.get("tab");
     const stored = await chrome.storage?.local?.get(["defaultTab"]);
@@ -3889,6 +4028,14 @@ ${notes}`;
       info.appendChild(subEl);
       row.appendChild(avatar);
       row.appendChild(info);
+      if (item.type === "login" && item.password) {
+        const risk = evaluateCredentialRisk(item, items);
+        const gaugeWrap = document.createElement("div");
+        gaugeWrap.className = "sidebar-risk-wrap";
+        gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
+        gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2);
+        row.appendChild(gaugeWrap);
+      }
       row.addEventListener("click", () => selectItem(item));
       container.appendChild(row);
     });
@@ -4022,6 +4169,43 @@ ${notes}`;
     if (userVal) userVal.textContent = username;
     const emailVal = document.getElementById("email-val");
     if (emailVal) emailVal.textContent = email;
+    if (item.type === "login" && item.password) {
+      const risk = evaluateCredentialRisk(item, allItems);
+      const riskCard = document.createElement("div");
+      riskCard.className = "card risk-detail-card";
+      const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
+      riskCard.innerHTML = `
+      <div class="risk-card-inner">
+        <div class="risk-gauge-container">
+          ${circumferenceSvg}
+        </div>
+        <div class="risk-info-column">
+          <div class="risk-header-row">
+            <span class="risk-title">Security & Risk Health</span>
+            <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
+              ${risk.label}
+            </span>
+          </div>
+          <div class="risk-chips-wrap">
+            <span class="risk-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
+            <span class="risk-chip ${risk.isReused ? "alert" : ""}">${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</span>
+            <span class="risk-chip ${risk.has2FA ? "success" : ""}">${risk.has2FA ? "\u{1F6E1}\uFE0F 2FA Active" : "\u26A0\uFE0F No 2FA"}</span>
+          </div>
+          ${item.passwordHistory && item.passwordHistory.length > 0 ? `
+            <div class="risk-history-info">
+              <span>\u{1F552} ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? "s" : ""} archived in history</span>
+            </div>
+          ` : ""}
+          ${item.importSource ? `
+            <div class="risk-source-info">
+              <span>\u{1F4E5} Source: <strong>${item.importSource}</strong></span>
+            </div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+      container.appendChild(riskCard);
+    }
     if (item.totpSecret) {
       const totpCard = document.createElement("div");
       totpCard.className = "totp-container";
@@ -4469,5 +4653,183 @@ ${notes}`;
     }
     const code = Math.abs(hash % 1e6);
     return code.toString().padStart(6, "0");
+  }
+  function setupAccountRetrievalModal() {
+    const modal = document.getElementById("account-retrieve-modal");
+    const btnOpenHeader = document.getElementById("btn-retrieve-accounts");
+    const menuRetrieve = document.getElementById("menu-retrieve-accounts");
+    const btnClose = document.getElementById("btn-close-retrieve-modal");
+    const btnDone = document.getElementById("btn-merge-report-done");
+    if (!modal) return;
+    const openModal = () => {
+      modal.style.display = "flex";
+      document.getElementById("add-dropdown")?.classList.remove("open");
+      switchTab("google");
+      const reportPanel = document.getElementById("merge-report-panel");
+      if (reportPanel) reportPanel.style.display = "none";
+    };
+    const closeModal = () => {
+      modal.style.display = "none";
+    };
+    btnOpenHeader?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openModal();
+    });
+    menuRetrieve?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openModal();
+    });
+    btnClose?.addEventListener("click", closeModal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeModal();
+    });
+    btnDone?.addEventListener("click", async () => {
+      closeModal();
+      await loadLogins();
+    });
+    const tabs = modal.querySelectorAll(".modal-tab");
+    const panels = {
+      google: document.getElementById("panel-google"),
+      microsoft: document.getElementById("panel-microsoft"),
+      opera: document.getElementById("panel-opera"),
+      apple: document.getElementById("panel-apple"),
+      universal: document.getElementById("panel-universal")
+    };
+    function switchTab(tabKey) {
+      tabs.forEach((t) => {
+        const isMatch = t.getAttribute("data-tab") === tabKey;
+        t.classList.toggle("active", isMatch);
+      });
+      Object.keys(panels).forEach((k) => {
+        if (panels[k]) {
+          panels[k].style.display = k === tabKey ? "flex" : "none";
+        }
+      });
+      const reportPanel = document.getElementById("merge-report-panel");
+      if (reportPanel) reportPanel.style.display = "none";
+    }
+    tabs.forEach((t) => {
+      t.addEventListener("click", () => {
+        const tabKey = t.getAttribute("data-tab") || "google";
+        switchTab(tabKey);
+      });
+    });
+    document.getElementById("btn-open-google-passwords")?.addEventListener("click", () => {
+      chrome.tabs.create({ url: "https://passwords.google.com" });
+    });
+    document.getElementById("btn-open-ms-passwords")?.addEventListener("click", () => {
+      chrome.tabs.create({ url: "https://account.microsoft.com" });
+    });
+    document.getElementById("btn-open-opera-passwords")?.addEventListener("click", () => {
+      chrome.tabs.create({ url: "https://auth.opera.com" });
+    });
+    const setupDropZone = (dropZoneId, fileInputId, browseBtnId, format) => {
+      const dropZone = document.getElementById(dropZoneId);
+      const fileInput = document.getElementById(fileInputId);
+      const browseBtn = document.getElementById(browseBtnId);
+      if (!dropZone || !fileInput) return;
+      browseBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+      dropZone.addEventListener("click", () => {
+        fileInput.click();
+      });
+      dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+      });
+      dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+      });
+      dropZone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+          processFile(files[0], format);
+        }
+      });
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files && fileInput.files.length > 0) {
+          processFile(fileInput.files[0], format);
+        }
+      });
+    };
+    setupDropZone("drop-zone-google", "file-input-google", "btn-browse-google", "google-csv");
+    setupDropZone("drop-zone-microsoft", "file-input-microsoft", "btn-browse-microsoft", "microsoft-csv");
+    setupDropZone("drop-zone-opera", "file-input-opera", "btn-browse-opera", "opera-csv");
+    setupDropZone("drop-zone-apple", "file-input-apple", "btn-browse-apple", "apple-csv");
+    setupDropZone("drop-zone-universal", "file-input-universal", "btn-browse-universal", "auto");
+    async function processFile(file, format) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const content = e.target?.result;
+        if (!content) return;
+        chrome.runtime.sendMessage(
+          {
+            type: "IMPORT_PASSWORDS",
+            content,
+            format,
+            options: { autoMerge: true }
+          },
+          async (response) => {
+            if (response?.success && response.result?.mergeReport) {
+              displayMergeReport(response.result.mergeReport);
+            } else if (response?.success) {
+              displayMergeReport({
+                totalProcessed: response.result.imported || 1,
+                exactDuplicatesMerged: 0,
+                updatedPasswordsMerged: 0,
+                newItemsAdded: response.result.imported || 1,
+                reusedPasswordGroups: []
+              });
+            } else {
+              alert("Import error: " + (response?.error || "Failed to parse file"));
+            }
+          }
+        );
+      };
+      reader.readAsText(file);
+    }
+    function displayMergeReport(report) {
+      Object.keys(panels).forEach((k) => {
+        if (panels[k]) panels[k].style.display = "none";
+      });
+      const reportPanel = document.getElementById("merge-report-panel");
+      const statsGrid = document.getElementById("report-stats-grid");
+      if (!reportPanel || !statsGrid) return;
+      statsGrid.innerHTML = `
+      <div class="report-stat-card">
+        <div class="report-stat-num" style="color: #6D4AFF;">${report.totalProcessed || report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged}</div>
+        <div class="report-stat-label">Total Accounts Processed</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-num" style="color: #10B981;">${report.exactDuplicatesMerged || 0}</div>
+        <div class="report-stat-label">Exact Duplicates Auto-Merged</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-num" style="color: #00D2B4;">${report.updatedPasswordsMerged || 0}</div>
+        <div class="report-stat-label">Updated Passwords Merged (History Kept)</div>
+      </div>
+      <div class="report-stat-card">
+        <div class="report-stat-num" style="color: #FF884D;">${report.newItemsAdded || 0}</div>
+        <div class="report-stat-label">New Accounts Added to Vault</div>
+      </div>
+    `;
+      if (report.reusedPasswordGroups && report.reusedPasswordGroups.length > 0) {
+        statsGrid.innerHTML += `
+        <div class="report-stat-card" style="grid-column: span 2; border-color: rgba(245, 74, 74, 0.4); background: rgba(245, 74, 74, 0.08);">
+          <div class="report-stat-num" style="color: #EF4444; font-size: 13px;">
+            \u26A0\uFE0F ${report.reusedPasswordGroups.length} Reused Password Groups Detected
+          </div>
+          <div class="report-stat-label" style="color: #FF9B9B;">
+            Identical passwords used across different services. Consider updating with generated passwords.
+          </div>
+        </div>
+      `;
+      }
+      reportPanel.style.display = "flex";
+    }
   }
 })();

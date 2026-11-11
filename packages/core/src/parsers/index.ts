@@ -16,6 +16,11 @@ import { parseGenericCsv, ColumnMapping } from './generic-csv.js';
 
 export type SupportedImportFormat =
   | 'auto'
+  | 'google-csv'
+  | 'microsoft-csv'
+  | 'opera-csv'
+  | 'edge-csv'
+  | 'firefox-csv'
   | 'bitwarden-json'
   | 'bitwarden-csv'
   | '1password-1pux'
@@ -101,17 +106,22 @@ export function importFromContent(
 
   // Explicit format specified
   switch (format) {
+    case 'google-csv':
+    case 'microsoft-csv':
+    case 'opera-csv':
+    case 'edge-csv':
+    case 'chrome-csv': return parseChromeCsv(trimmed);
     case 'bitwarden-json': return parseBitwardenJson(trimmed);
     case 'bitwarden-csv': return parseBitwardenCsv(trimmed);
     case '1password-1pux': return parseOnePassword1Pux(trimmed);
     case '1password-1pif': return parseOnePassword1Pif(trimmed);
     case 'lastpass-csv': return parseLastPassCsv(trimmed);
     case 'apple-csv': return parseApplePasswordsCsv(trimmed);
-    case 'chrome-csv': return parseChromeCsv(trimmed);
     case 'keepass-xml': return parseKeePassXml(trimmed);
     case 'keepass-csv': return parseKeePassCsv(trimmed);
     case 'proton-csv': return parseProtonPassCsv(trimmed);
     case 'dashlane-csv': return parseDashlaneCsv(trimmed);
+    case 'firefox-csv':
     case 'generic-csv': return parseGenericCsv(trimmed, customMapping);
     default: return parseGenericCsv(trimmed, customMapping);
   }
@@ -119,6 +129,7 @@ export function importFromContent(
 
 export * from './types.js';
 export * from './export.js';
+export * from './merger.js';
 export * from './bitwarden.js';
 export * from './onepassword.js';
 export * from './apple.js';

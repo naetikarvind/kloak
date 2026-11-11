@@ -5,7 +5,16 @@
  */
 import { VaultItem, VaultSettings, VaultStatus, VaultFolder } from '../models/vault.js';
 import { SupportedImportFormat } from '../parsers/index.js';
+import { MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
 import { ExportOptions, ExportResult } from '../parsers/export.js';
+export interface ImportOptions {
+    autoMerge?: boolean;
+}
+export interface ImportDataResult {
+    imported: number;
+    warnings: string[];
+    mergeReport?: MergeReport;
+}
 export declare function getDefaultVaultDir(): string;
 export declare const DEFAULT_VAULT_DIR: string;
 export declare const DEFAULT_VAULT_PATH: string;
@@ -62,9 +71,15 @@ export declare class VaultManager {
     addFolder(name: string): VaultFolder;
     getSettings(): VaultSettings;
     updateSettings(settings: Partial<VaultSettings>): VaultSettings;
-    importData(content: string, format?: SupportedImportFormat): {
-        imported: number;
-        warnings: string[];
+    importData(content: string, format?: SupportedImportFormat, options?: ImportOptions): ImportDataResult;
+    autoMergeAllDuplicates(): MergeReport;
+    getSecurityAudit(): {
+        report: MergeReport;
+        riskSummary: Array<{
+            id: string;
+            risk: ItemRiskAssessment;
+        }>;
+        overallScore: number;
     };
     exportData(options: ExportOptions): ExportResult;
     private ensureUnlocked;

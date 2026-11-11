@@ -91,23 +91,29 @@ function importFromContent(content, format = 'auto', customMapping) {
     }
     // Explicit format specified
     switch (format) {
+        case 'google-csv':
+        case 'microsoft-csv':
+        case 'opera-csv':
+        case 'edge-csv':
+        case 'chrome-csv': return (0, chrome_js_1.parseChromeCsv)(trimmed);
         case 'bitwarden-json': return (0, bitwarden_js_1.parseBitwardenJson)(trimmed);
         case 'bitwarden-csv': return (0, bitwarden_js_1.parseBitwardenCsv)(trimmed);
         case '1password-1pux': return (0, onepassword_js_1.parseOnePassword1Pux)(trimmed);
         case '1password-1pif': return (0, onepassword_js_1.parseOnePassword1Pif)(trimmed);
         case 'lastpass-csv': return (0, lastpass_js_1.parseLastPassCsv)(trimmed);
         case 'apple-csv': return (0, apple_js_1.parseApplePasswordsCsv)(trimmed);
-        case 'chrome-csv': return (0, chrome_js_1.parseChromeCsv)(trimmed);
         case 'keepass-xml': return (0, keepass_js_1.parseKeePassXml)(trimmed);
         case 'keepass-csv': return (0, keepass_js_1.parseKeePassCsv)(trimmed);
         case 'proton-csv': return (0, proton_js_1.parseProtonPassCsv)(trimmed);
         case 'dashlane-csv': return (0, dashlane_js_1.parseDashlaneCsv)(trimmed);
+        case 'firefox-csv':
         case 'generic-csv': return (0, generic_csv_js_1.parseGenericCsv)(trimmed, customMapping);
         default: return (0, generic_csv_js_1.parseGenericCsv)(trimmed, customMapping);
     }
 }
 __exportStar(require("./types.js"), exports);
 __exportStar(require("./export.js"), exports);
+__exportStar(require("./merger.js"), exports);
 __exportStar(require("./bitwarden.js"), exports);
 __exportStar(require("./onepassword.js"), exports);
 __exportStar(require("./apple.js"), exports);

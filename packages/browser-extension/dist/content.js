@@ -1906,6 +1906,144 @@
     return container;
   }
 
+  // src/risk-assessment.ts
+  function evaluatePasswordEntropy(password) {
+    if (!password) return 0;
+    let poolSize = 0;
+    if (/[a-z]/.test(password)) poolSize += 26;
+    if (/[A-Z]/.test(password)) poolSize += 26;
+    if (/[0-9]/.test(password)) poolSize += 10;
+    if (/[^a-zA-Z0-9]/.test(password)) poolSize += 33;
+    if (poolSize === 0) poolSize = 1;
+    return Math.round(password.length * Math.log2(poolSize));
+  }
+  function evaluateCredentialRisk(item, allItems = []) {
+    const pwd = item.password || "";
+    const reasons = [];
+    if (!pwd) {
+      return {
+        score: 10,
+        riskLevel: "high",
+        label: "High Risk",
+        color: "#EF4444",
+        entropyBits: 0,
+        isReused: false,
+        reusedCount: 0,
+        has2FA: !!item.totpSecret,
+        reasons: ["No password is set for this login"]
+      };
+    }
+    const entropy = evaluatePasswordEntropy(pwd);
+    let score = Math.round(Math.min(100, Math.max(10, entropy)));
+    if (pwd.length < 8) {
+      score = Math.min(score, 25);
+      reasons.push("Password length is under 8 characters (Critical)");
+    } else if (pwd.length < 12) {
+      score = Math.min(score, 60);
+      reasons.push("Password length is under 12 characters");
+    }
+    const weakPatterns = /^(password|123456|qwerty|admin|welcome|letmein|login|test)/i;
+    if (weakPatterns.test(pwd)) {
+      score = Math.min(score, 20);
+      reasons.push("Contains common predictable dictionary words");
+    }
+    let isReused = false;
+    let reusedCount = 0;
+    const currentDomain = (item.urls?.[0] || item.title || "").toLowerCase();
+    for (const other of allItems) {
+      if (other.id === item.id) continue;
+      if (other.password && other.password === pwd) {
+        const otherDomain = (other.urls?.[0] || other.title || "").toLowerCase();
+        if (otherDomain !== currentDomain) {
+          isReused = true;
+          reusedCount++;
+        }
+      }
+    }
+    if (isReused) {
+      score = Math.max(15, score - 35);
+      reasons.push(`Password reused on ${reusedCount + 1} different online services`);
+    }
+    const has2FA = !!item.totpSecret;
+    if (has2FA) {
+      score = Math.min(100, score + 12);
+    } else {
+      reasons.push("Two-factor authentication (2FA) is not enabled");
+    }
+    score = Math.max(10, Math.min(100, score));
+    let riskLevel = "low";
+    let color = "#10B981";
+    let label = "Low Risk";
+    if (score < 50) {
+      riskLevel = "high";
+      color = "#EF4444";
+      label = "High Risk";
+    } else if (score < 80) {
+      riskLevel = "medium";
+      color = "#F59E0B";
+      label = "Medium Risk";
+    }
+    if (reasons.length === 0) {
+      reasons.push("Strong unique password with high cryptographic entropy");
+      if (has2FA) reasons.push("Hardware 2FA / TOTP protection enabled");
+    }
+    return {
+      score,
+      riskLevel,
+      label,
+      color,
+      entropyBits: entropy,
+      isReused,
+      reusedCount,
+      has2FA,
+      reasons
+    };
+  }
+  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - circumference * score / 100;
+    const center = size / 2;
+    const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
+    const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
+    return `
+    <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
+      <circle
+        class="kloak-gauge-bg"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="rgba(255,255,255,0.12)"
+        stroke-width="${stroke}"
+        fill="none"
+      />
+      <circle
+        class="kloak-gauge-bar"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="${color}"
+        stroke-width="${stroke}"
+        stroke-dasharray="${circumference.toFixed(2)}"
+        stroke-dashoffset="${offset.toFixed(2)}"
+        stroke-linecap="round"
+        fill="none"
+        transform="rotate(-90 ${center} ${center})"
+        style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
+      />
+      <text
+        x="${center}"
+        y="${textY}"
+        text-anchor="middle"
+        font-size="${fontSize}px"
+        font-weight="700"
+        fill="${color}"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+      >${score}%</text>
+    </svg>
+  `;
+  }
+
   // src/content.ts
   var shadowHost = null;
   var shadowRoot = null;
@@ -2336,18 +2474,23 @@
     gap: 4px;
   }
 
-  /* \u2500\u2500 Compact Account Items \u2500\u2500 */
+  /* \u2500\u2500 Compact Account Items with Circumference Risk Gauge \u2500\u2500 */
   .kloak-card {
-    padding: 6px 10px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
     background: transparent;
-    transition: background 0.15s;
+    transition: all 0.16s ease;
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 2px 4px;
+    outline: none;
   }
-  .kloak-card:hover {
-    background: rgba(109, 74, 255, 0.08);
+  .kloak-card:hover, .kloak-card:focus-visible {
+    background: rgba(109, 74, 255, 0.12);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.35);
   }
 
   .kloak-card-top {
@@ -2370,7 +2513,7 @@
   .kloak-item-info {
     flex: 1;
     overflow: hidden;
-    cursor: pointer;
+    min-width: 0;
   }
   .kloak-item-username {
     font-size: 11px;
@@ -2380,9 +2523,47 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .kloak-item-title-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
   .kloak-item-title {
     font-size: 9px;
     color: #9E9AA8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Circumference Ring Gauge & Tooltip */
+  .kloak-risk-circumference-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+    cursor: help;
+  }
+  .kloak-risk-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    right: 0;
+    background: #1C1929;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 9px;
+    color: #E2E2E8;
+    width: 175px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.75);
+    z-index: 1000;
+    pointer-events: none;
+    line-height: 1.35;
+  }
+  .kloak-risk-circumference-wrap:hover .kloak-risk-tooltip {
+    display: block;
   }
 
   .kloak-btn-fill {
@@ -2390,16 +2571,25 @@
     color: #FFFFFF;
     border: none;
     border-radius: 5px;
-    padding: 3px 10px;
+    padding: 4px 10px;
     font-size: 10px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s;
-    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.3);
+    transition: all 0.16s ease;
+    box-shadow: 0 1px 4px rgba(109, 74, 255, 0.35);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
   }
   .kloak-btn-fill:hover {
-    background: #7C5CFF;
-    transform: scale(1.02);
+    background: #7E5EFF;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(109, 74, 255, 0.45);
+  }
+  .kloak-btn-fill.filled-success {
+    background: #10B981 !important;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5) !important;
   }
 
   .kloak-pwd-row {
@@ -2828,20 +3018,38 @@
       items.forEach((item, idx) => {
         const card = document.createElement("div");
         card.className = "kloak-card";
+        card.tabIndex = 0;
         const itemId = item.id || `item-${idx}`;
         const isRevealed = !!isRevealingPasswordMap[itemId];
-        const avatarLetter = (item.title || item.username || "?").charAt(0).toUpperCase();
-        const domainForIcon = item.urls?.[0] ? new URL(item.urls[0]).hostname : hostname;
         const displayPassword = item.password || "";
         const maskedPassword = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
+        const risk = evaluateCredentialRisk(item, items);
+        const circumferenceGaugeHtml = renderCircumferenceSvg(risk.score, risk.color, 26, 2.5);
         card.innerHTML = `
         <div class="kloak-card-top">
           <div class="kloak-item-avatar"></div>
           <div class="kloak-item-info">
             <div class="kloak-item-username" title="${item.username || "No Username"}">${item.username || "No Username"}</div>
-            <div class="kloak-item-title">${item.title || hostname} ${item.totpSecret ? '<span style="color: #10B981; font-weight: 600;">\u2022 2FA</span>' : ""}</div>
+            <div class="kloak-item-title-row">
+              <span class="kloak-item-title">${item.title || hostname}</span>
+              ${item.totpSecret ? '<span style="color: #10B981; font-weight: 700; font-size: 8px;">\u2022 2FA</span>' : ""}
+            </div>
           </div>
-          <button class="kloak-btn-fill" id="fill-btn-${itemId}">Fill</button>
+
+          <div class="kloak-risk-circumference-wrap" title="Security Score: ${risk.score}% (${risk.label})">
+            ${circumferenceGaugeHtml}
+            <div class="kloak-risk-tooltip">
+              <div style="font-weight: 700; color: ${risk.color}; margin-bottom: 2px;">${risk.label} (${risk.score}%)</div>
+              <div>\u2022 Entropy: ${risk.entropyBits} bits</div>
+              <div>\u2022 Status: ${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</div>
+              <div>\u2022 2FA: ${risk.has2FA ? "\u{1F6E1}\uFE0F Protected" : "\u26A0\uFE0F No 2FA"}</div>
+            </div>
+          </div>
+
+          <button class="kloak-btn-fill" id="fill-btn-${itemId}" title="1-Click Fill Credentials">
+            <span>\u26A1</span>
+            <span class="btn-fill-text">Fill</span>
+          </button>
         </div>
 
         <div class="kloak-pwd-row">
@@ -2866,17 +3074,26 @@
         if (avatarBox) {
           renderFavicon(avatarBox, { item, size: 24 });
         }
-        card.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", (e) => {
+        const triggerFill = (e) => {
           e.stopPropagation();
+          const fillBtn = card.querySelector(`#fill-btn-${itemId}`);
+          const fillText = fillBtn?.querySelector(".btn-fill-text");
+          if (fillBtn) {
+            fillBtn.classList.add("filled-success");
+            if (fillText) fillText.textContent = "Filled!";
+          }
           injectCredentials(item.username, item.password, input, item.totpSecret);
-          container.remove();
-          activePopup = null;
-        });
-        card.querySelector(".kloak-item-info")?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          injectCredentials(item.username, item.password, input, item.totpSecret);
-          container.remove();
-          activePopup = null;
+          setTimeout(() => {
+            container.remove();
+            activePopup = null;
+          }, 220);
+        };
+        card.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", triggerFill);
+        card.querySelector(".kloak-item-info")?.addEventListener("click", triggerFill);
+        card.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            triggerFill(e);
+          }
         });
         card.querySelector(`#reveal-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();

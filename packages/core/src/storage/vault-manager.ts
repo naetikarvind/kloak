@@ -24,7 +24,18 @@ import {
   zeroizeBuffer
 } from '../crypto/cipher.js';
 import { importFromContent, SupportedImportFormat } from '../parsers/index.js';
+import { autoMergeVaultItems, calculateItemRisk, MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
 import { exportVault, ExportOptions, ExportResult } from '../parsers/export.js';
+
+export interface ImportOptions {
+  autoMerge?: boolean;
+}
+
+export interface ImportDataResult {
+  imported: number;
+  warnings: string[];
+  mergeReport?: MergeReport;
+}
 
 export function getDefaultVaultDir(): string {
   if (process.platform === 'win32') {
@@ -328,13 +339,28 @@ export class VaultManager {
     return this.decryptedPayload!.settings;
   }
 
-  // --- Import / Export ---
+  // --- Import / Export & Smart Merge ---
 
-  public importData(content: string, format: SupportedImportFormat = 'auto'): { imported: number; warnings: string[] } {
+  public importData(
+    content: string,
+    format: SupportedImportFormat = 'auto',
+    options: ImportOptions = { autoMerge: true }
+  ): ImportDataResult {
     this.ensureUnlocked();
     const result = importFromContent(content, format);
-    let imported = 0;
 
+    if (options.autoMerge !== false) {
+      const { mergedItems, report } = autoMergeVaultItems(this.decryptedPayload!.items, result.items);
+      this.decryptedPayload!.items = mergedItems;
+      this.save();
+      return {
+        imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged,
+        warnings: result.warnings,
+        mergeReport: report
+      };
+    }
+
+    let imported = 0;
     for (const item of result.items) {
       this.decryptedPayload!.items.push({
         ...item,
@@ -349,6 +375,36 @@ export class VaultManager {
     return {
       imported,
       warnings: result.warnings
+    };
+  }
+
+  public autoMergeAllDuplicates(): MergeReport {
+    this.ensureUnlocked();
+    const { mergedItems, report } = autoMergeVaultItems(this.decryptedPayload!.items, []);
+    this.decryptedPayload!.items = mergedItems;
+    this.save();
+    return report;
+  }
+
+  public getSecurityAudit(): {
+    report: MergeReport;
+    riskSummary: Array<{ id: string; risk: ItemRiskAssessment }>;
+    overallScore: number;
+  } {
+    this.ensureUnlocked();
+    const items = this.decryptedPayload!.items.filter(i => !i.trashed);
+    const { report } = autoMergeVaultItems(items, []);
+    const riskSummary = items.map(item => ({
+      id: item.id,
+      risk: calculateItemRisk(item, items)
+    }));
+    const totalScore = riskSummary.reduce((acc, curr) => acc + curr.risk.score, 0);
+    const overallScore = riskSummary.length > 0 ? Math.round(totalScore / riskSummary.length) : 100;
+
+    return {
+      report,
+      riskSummary,
+      overallScore
     };
   }
 

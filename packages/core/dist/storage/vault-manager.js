@@ -46,6 +46,7 @@ const os = __importStar(require("node:os"));
 const crypto = __importStar(require("node:crypto"));
 const cipher_js_1 = require("../crypto/cipher.js");
 const index_js_1 = require("../parsers/index.js");
+const merger_js_1 = require("../parsers/merger.js");
 const export_js_1 = require("../parsers/export.js");
 function getDefaultVaultDir() {
     if (process.platform === 'win32') {
@@ -327,10 +328,20 @@ class VaultManager {
         this.resetAutoLockTimer();
         return this.decryptedPayload.settings;
     }
-    // --- Import / Export ---
-    importData(content, format = 'auto') {
+    // --- Import / Export & Smart Merge ---
+    importData(content, format = 'auto', options = { autoMerge: true }) {
         this.ensureUnlocked();
         const result = (0, index_js_1.importFromContent)(content, format);
+        if (options.autoMerge !== false) {
+            const { mergedItems, report } = (0, merger_js_1.autoMergeVaultItems)(this.decryptedPayload.items, result.items);
+            this.decryptedPayload.items = mergedItems;
+            this.save();
+            return {
+                imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged,
+                warnings: result.warnings,
+                mergeReport: report
+            };
+        }
         let imported = 0;
         for (const item of result.items) {
             this.decryptedPayload.items.push({
@@ -345,6 +356,29 @@ class VaultManager {
         return {
             imported,
             warnings: result.warnings
+        };
+    }
+    autoMergeAllDuplicates() {
+        this.ensureUnlocked();
+        const { mergedItems, report } = (0, merger_js_1.autoMergeVaultItems)(this.decryptedPayload.items, []);
+        this.decryptedPayload.items = mergedItems;
+        this.save();
+        return report;
+    }
+    getSecurityAudit() {
+        this.ensureUnlocked();
+        const items = this.decryptedPayload.items.filter(i => !i.trashed);
+        const { report } = (0, merger_js_1.autoMergeVaultItems)(items, []);
+        const riskSummary = items.map(item => ({
+            id: item.id,
+            risk: (0, merger_js_1.calculateItemRisk)(item, items)
+        }));
+        const totalScore = riskSummary.reduce((acc, curr) => acc + curr.risk.score, 0);
+        const overallScore = riskSummary.length > 0 ? Math.round(totalScore / riskSummary.length) : 100;
+        return {
+            report,
+            riskSummary,
+            overallScore
         };
     }
     exportData(options) {
