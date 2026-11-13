@@ -10,6 +10,7 @@ import {
   getAllKnownServiceNames,
   ServiceDomainInfo
 } from './service-domain-service';
+import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
 
 let allItems: any[] = [];
 let activeItem: any = null;
@@ -2118,6 +2119,15 @@ function renderSidebarList(items: any[]) {
     row.appendChild(avatar);
     row.appendChild(info);
 
+    if (item.type === 'login' && item.password) {
+      const risk = evaluateCredentialRisk(item, items);
+      const gaugeWrap = document.createElement('div');
+      gaugeWrap.className = 'sidebar-risk-wrap';
+      gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
+      gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2, false);
+      row.appendChild(gaugeWrap);
+    }
+
     row.addEventListener('click', () => selectItem(item));
     container.appendChild(row);
   });
@@ -2270,6 +2280,47 @@ function renderDetailPane(item: any) {
   if (userVal) userVal.textContent = username;
   const emailVal = document.getElementById('email-val');
   if (emailVal) emailVal.textContent = email;
+
+  // Security Risk & Health Assessment Card with Circular Circumference Gauge
+  if (item.type === 'login' && item.password) {
+    const risk = evaluateCredentialRisk(item, allItems);
+    const riskCard = document.createElement('div');
+    riskCard.className = 'card risk-detail-card';
+
+    const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5, false);
+
+    riskCard.innerHTML = `
+      <div class="risk-card-inner">
+        <div class="risk-gauge-container">
+          ${circumferenceSvg}
+        </div>
+        <div class="risk-info-column">
+          <div class="risk-header-row">
+            <span class="risk-title">Security & Risk Health</span>
+            <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
+              ${risk.label}
+            </span>
+          </div>
+          <div class="risk-chips-wrap">
+            <span class="risk-chip">🔐 ${risk.entropyBits} bits entropy</span>
+            <span class="risk-chip ${risk.isReused ? 'alert' : ''}">${risk.isReused ? `⚠️ Reused on ${risk.reusedCount + 1} sites` : '✓ Unique password'}</span>
+            <span class="risk-chip ${risk.has2FA ? 'success' : ''}">${risk.has2FA ? '🛡️ 2FA Active' : '⚠️ No 2FA'}</span>
+          </div>
+          ${item.passwordHistory && item.passwordHistory.length > 0 ? `
+            <div class="risk-history-info">
+              <span>🕒 ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? 's' : ''} archived in history</span>
+            </div>
+          ` : ''}
+          ${item.importSource ? `
+            <div class="risk-source-info">
+              <span>📥 Source: <strong>${item.importSource}</strong></span>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+    container.appendChild(riskCard);
+  }
 
   // Card 2: 2FA Live Authenticator
   if (item.totpSecret) {
