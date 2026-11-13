@@ -1091,7 +1091,7 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
   }
 
   // ── SAVE ACTION ──
-  document.getElementById('btn-save-create')?.addEventListener('click', () => {
+  document.getElementById('btn-save-create')?.addEventListener('click', async () => {
     if (addTotpInterval) { clearInterval(addTotpInterval); addTotpInterval = null; }
 
     const title = (document.getElementById('field-title') as HTMLInputElement)?.value || 'Untitled';
@@ -1186,6 +1186,8 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
     } else if (type === 'note') {
       newItem.type = 'secure_note';
     }
+
+    await saveVaultItemDirect(newItem);
 
     chrome.runtime.sendMessage({ type: 'ADD_ITEM', item: newItem }, (res) => {
       if (res?.success) {
@@ -1874,6 +1876,83 @@ async function lockVaultDirect(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function saveVaultItemDirect(item: any): Promise<boolean> {
+  const normalizedItem = {
+    id: item.id,
+    type: item.type || 'login',
+    title: item.title || 'Untitled',
+    username: item.username || '',
+    password: item.password || '',
+    urls: Array.isArray(item.urls) ? item.urls : [],
+    notes: item.notes || '',
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    favorite: Boolean(item.favorite),
+    trashed: Boolean(item.trashed),
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    ...(item.totpSecret ? { totpSecret: item.totpSecret } : {}),
+    ...(Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {})
+  };
+
+  try {
+    // 1. Try vault.saveItem directly to local daemon / macOS app
+    let res = await fetch('http://127.0.0.1:53152/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'vault.saveItem',
+        params: { item: normalizedItem }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.error && data.result) {
+        return true;
+      }
+    }
+
+    // 2. Fallback: Try vault.updateItem
+    res = await fetch('http://127.0.0.1:53152/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'vault.updateItem',
+        params: { id: normalizedItem.id, updates: normalizedItem, item: normalizedItem }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.error && data.result) {
+        return true;
+      }
+    }
+
+    // 3. Fallback: Try vault.addItem
+    res = await fetch('http://127.0.0.1:53152/rpc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method: 'vault.addItem',
+        params: { item: normalizedItem }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.error && data.result) {
+        return true;
+      }
+    }
+  } catch {}
+
+  return false;
 }
 
 function showUnlockView(statusMessage?: string) {
@@ -2962,7 +3041,7 @@ function enterEditMode(item: any) {
   });
 
   // Save Edit Handler
-  document.getElementById('btn-save-edit')?.addEventListener('click', () => {
+  document.getElementById('btn-save-edit')?.addEventListener('click', async () => {
     const saveBtn = document.getElementById('btn-save-edit') as HTMLButtonElement | null;
     if (saveBtn) {
       saveBtn.disabled = true;
@@ -2995,16 +3074,26 @@ function enterEditMode(item: any) {
 
     const updated = {
       ...item,
+      id: item.id,
+      type: item.type || 'login',
       title: titleVal.trim() || item.title || 'Untitled',
       username: userVal.trim(),
       password: pwdVal,
       totpSecret: totpVal.trim().replace(/\s+/g, '') || undefined,
       urls: urls.length > 0 ? urls : (item.urls || []),
       notes: notesVal.trim(),
-      passwordHistory,
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      favorite: Boolean(item.favorite),
+      trashed: Boolean(item.trashed),
+      createdAt: item.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      ...(passwordHistory.length > 0 ? { passwordHistory } : {})
     };
 
+    // 1. Direct persistent save to local daemon / macOS app on 127.0.0.1:53152
+    await saveVaultItemDirect(updated);
+
+    // 2. Also update background worker state & native host
     chrome.runtime.sendMessage({ type: 'UPDATE_ITEM', item: updated }, (res) => {
       const savedItem = (res && res.item) ? { ...updated, ...res.item } : updated;
       const idx = allItems.findIndex(i => i.id === item.id);
@@ -3014,6 +3103,7 @@ function enterEditMode(item: any) {
         allItems.push(savedItem);
       }
       activeItem = savedItem;
+      isEditing = false;
       renderSidebarList(allItems);
       renderDetailPane(savedItem);
       showToast('✓ Password updated successfully');

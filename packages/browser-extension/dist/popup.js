@@ -3283,7 +3283,7 @@
         else expInput.value = v;
       });
     }
-    document.getElementById("btn-save-create")?.addEventListener("click", () => {
+    document.getElementById("btn-save-create")?.addEventListener("click", async () => {
       if (addTotpInterval) {
         clearInterval(addTotpInterval);
         addTotpInterval = null;
@@ -3381,6 +3381,7 @@ ${notes}`;
       } else if (type === "note") {
         newItem.type = "secure_note";
       }
+      await saveVaultItemDirect(newItem);
       chrome.runtime.sendMessage({ type: "ADD_ITEM", item: newItem }, (res) => {
         if (res?.success) {
           const created = res.item || newItem;
@@ -4003,6 +4004,76 @@ ${notes}`;
     } catch {
       return false;
     }
+  }
+  async function saveVaultItemDirect(item) {
+    const normalizedItem = {
+      id: item.id,
+      type: item.type || "login",
+      title: item.title || "Untitled",
+      username: item.username || "",
+      password: item.password || "",
+      urls: Array.isArray(item.urls) ? item.urls : [],
+      notes: item.notes || "",
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      favorite: Boolean(item.favorite),
+      trashed: Boolean(item.trashed),
+      createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+      ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
+    };
+    try {
+      let res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.saveItem",
+          params: { item: normalizedItem }
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.error && data.result) {
+          return true;
+        }
+      }
+      res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.updateItem",
+          params: { id: normalizedItem.id, updates: normalizedItem, item: normalizedItem }
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.error && data.result) {
+          return true;
+        }
+      }
+      res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.addItem",
+          params: { item: normalizedItem }
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.error && data.result) {
+          return true;
+        }
+      }
+    } catch {
+    }
+    return false;
   }
   function showUnlockView(statusMessage) {
     const unlockView = document.getElementById("unlock-view");
@@ -4956,7 +5027,7 @@ ${notes}`;
     document.getElementById("btn-cancel-edit")?.addEventListener("click", () => {
       renderDetailPane(item);
     });
-    document.getElementById("btn-save-edit")?.addEventListener("click", () => {
+    document.getElementById("btn-save-edit")?.addEventListener("click", async () => {
       const saveBtn = document.getElementById("btn-save-edit");
       if (saveBtn) {
         saveBtn.disabled = true;
@@ -4984,15 +5055,22 @@ ${notes}`;
       }
       const updated = {
         ...item,
+        id: item.id,
+        type: item.type || "login",
         title: titleVal.trim() || item.title || "Untitled",
         username: userVal.trim(),
         password: pwdVal,
         totpSecret: totpVal.trim().replace(/\s+/g, "") || void 0,
         urls: urls.length > 0 ? urls : item.urls || [],
         notes: notesVal.trim(),
-        passwordHistory: passwordHistory2,
-        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        favorite: Boolean(item.favorite),
+        trashed: Boolean(item.trashed),
+        createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        ...passwordHistory2.length > 0 ? { passwordHistory: passwordHistory2 } : {}
       };
+      await saveVaultItemDirect(updated);
       chrome.runtime.sendMessage({ type: "UPDATE_ITEM", item: updated }, (res) => {
         const savedItem = res && res.item ? { ...updated, ...res.item } : updated;
         const idx = allItems.findIndex((i) => i.id === item.id);
@@ -5002,6 +5080,7 @@ ${notes}`;
           allItems.push(savedItem);
         }
         activeItem = savedItem;
+        isEditing = false;
         renderSidebarList(allItems);
         renderDetailPane(savedItem);
         showToast("\u2713 Password updated successfully");

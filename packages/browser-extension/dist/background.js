@@ -1144,6 +1144,9 @@
         if (data && data.result !== void 0) {
           return data.result;
         }
+        if (data && data.error) {
+          return { __error: data.error.message || "RPC Error" };
+        }
       }
     } catch {
     }
@@ -1562,26 +1565,48 @@
             sendResponse({ success: false, error: "Invalid item data" });
             break;
           }
+          const normalizedItem = {
+            id: item.id,
+            type: item.type || "login",
+            title: item.title || "Untitled",
+            username: item.username || "",
+            password: item.password || "",
+            urls: Array.isArray(item.urls) ? item.urls : [],
+            notes: item.notes || "",
+            tags: Array.isArray(item.tags) ? item.tags : [],
+            favorite: Boolean(item.favorite),
+            trashed: Boolean(item.trashed),
+            createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+            ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
+          };
           try {
-            const res = await sendNativeRequest("vault.updateItem", {
-              id: item.id,
-              updates: item,
-              item
-            });
-            const index = cachedItems.findIndex((i) => i.id === item.id);
-            if (index !== -1) {
-              cachedItems[index] = { ...cachedItems[index], ...item };
-            } else {
-              cachedItems.push(item);
+            let res = await sendNativeRequest("vault.saveItem", { item: normalizedItem });
+            if (!res || res.__error) {
+              res = await sendNativeRequest("vault.updateItem", {
+                id: normalizedItem.id,
+                updates: normalizedItem,
+                item: normalizedItem
+              });
             }
-            sendResponse({ success: true, item: res || item });
+            if (!res || res.__error) {
+              res = await sendNativeRequest("vault.addItem", { item: normalizedItem });
+            }
+            const index = cachedItems.findIndex((i) => i.id === normalizedItem.id);
+            if (index !== -1) {
+              cachedItems[index] = { ...cachedItems[index], ...normalizedItem };
+            } else {
+              cachedItems.push(normalizedItem);
+            }
+            sendResponse({ success: true, item: normalizedItem });
           } catch (err) {
             console.warn("[Kloak] Failed to update item in native host, updating local cache:", err);
-            const index = cachedItems.findIndex((i) => i.id === item.id);
+            const index = cachedItems.findIndex((i) => i.id === normalizedItem.id);
             if (index !== -1) {
-              cachedItems[index] = { ...cachedItems[index], ...item };
+              cachedItems[index] = { ...cachedItems[index], ...normalizedItem };
             }
-            sendResponse({ success: true, warning: err.message, item });
+            sendResponse({ success: true, warning: err.message, item: normalizedItem });
           }
           break;
         }
@@ -1591,17 +1616,33 @@
             sendResponse({ success: false, error: "Invalid item" });
             break;
           }
-          if (!item.id) {
-            item.id = `item-${Date.now()}`;
-          }
+          const normalizedItem = {
+            id: item.id || `item-${Date.now()}`,
+            type: item.type || "login",
+            title: item.title || "Untitled",
+            username: item.username || "",
+            password: item.password || "",
+            urls: Array.isArray(item.urls) ? item.urls : [],
+            notes: item.notes || "",
+            tags: Array.isArray(item.tags) ? item.tags : [],
+            favorite: Boolean(item.favorite),
+            trashed: Boolean(item.trashed),
+            createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+            ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+            ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
+          };
           try {
-            const res = await sendNativeRequest("vault.addItem", { item });
-            cachedItems.push(res || item);
-            sendResponse({ success: true, item: res || item });
+            let res = await sendNativeRequest("vault.saveItem", { item: normalizedItem });
+            if (!res || res.__error) {
+              res = await sendNativeRequest("vault.addItem", { item: normalizedItem });
+            }
+            cachedItems.push(normalizedItem);
+            sendResponse({ success: true, item: normalizedItem });
           } catch (err) {
             console.warn("[Kloak] Failed to add item to native host, caching locally:", err);
-            cachedItems.push(item);
-            sendResponse({ success: true, item });
+            cachedItems.push(normalizedItem);
+            sendResponse({ success: true, item: normalizedItem });
           }
           break;
         }

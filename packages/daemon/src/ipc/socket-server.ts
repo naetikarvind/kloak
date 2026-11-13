@@ -284,6 +284,18 @@ export class IpcSocketServer {
       case 'vault.addItem':
         return this.vaultManager.addItem(params.item);
 
+      case 'vault.saveItem': {
+        const item = params.item || params;
+        if (!item || !item.id) {
+          throw new Error('Item and Item ID are required for vault.saveItem');
+        }
+        try {
+          return this.vaultManager.updateItem(item.id, item);
+        } catch {
+          return this.vaultManager.addItem(item);
+        }
+      }
+
       case 'vault.updateItem': {
         const id = params.id || params.item?.id;
         const updates = params.updates || params.item;

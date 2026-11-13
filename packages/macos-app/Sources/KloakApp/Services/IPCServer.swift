@@ -98,6 +98,16 @@ public enum AnyCodableValue: Codable, Sendable {
         if case .int(let i) = self { return i }
         return nil
     }
+
+    public var dictionaryValue: [String: AnyCodableValue]? {
+        if case .dictionary(let d) = self { return d }
+        return nil
+    }
+
+    public var arrayValue: [AnyCodableValue]? {
+        if case .array(let a) = self { return a }
+        return nil
+    }
 }
 
 @MainActor
