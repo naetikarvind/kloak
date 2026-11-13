@@ -167,12 +167,25 @@ const MagnetButton: React.FC<{ children: React.ReactNode; strength?: number; onC
 
 // ── Options Main App ────────────────────────────────────────────────────────
 
+type OptionsTab = 'autofill' | 'security' | 'generator' | 'connection';
+
+const TABS: { id: OptionsTab; label: string; icon: string; subtitle: string }[] = [
+  { id: 'autofill', label: 'Autofill & Browser', icon: '⚡', subtitle: 'Manage in-page autofill, save prompts, and phishing defense' },
+  { id: 'security', label: 'Vault & Security', icon: '🛡️', subtitle: 'Auto-lock timers, hardware security keys, and local encryption' },
+  { id: 'generator', label: 'Password Generator', icon: '🔑', subtitle: 'Default password rules, entropy strength, and live test' },
+  { id: 'connection', label: 'Desktop Connection', icon: '🔌', subtitle: 'Status of local communication with the Kloak desktop application' },
+];
+
 const OptionsApp: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'bridge' | 'generator' | 'security' | 'autofill'>('bridge');
-  const [nativeStatus, setNativeStatus] = useState<string>('Connecting...');
+  const [activeTab, setActiveTab] = useState<OptionsTab>('autofill');
+  const [nativeStatus, setNativeStatus] = useState<string>('Checking connection...');
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [phishingDefense, setPhishingDefense] = useState<boolean>(true);
   const [autoSavePrompts, setAutoSavePrompts] = useState<boolean>(true);
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(15);
+  const [bentoAutofill, setBentoAutofill] = useState<boolean>(true);
+  const [totpAutofill, setTotpAutofill] = useState<boolean>(true);
+  const [hardwareKeyRegistered, setHardwareKeyRegistered] = useState<boolean>(false);
 
   // Generator state
   const [pwLength, setPwLength] = useState<number>(20);
@@ -202,22 +215,35 @@ const OptionsApp: React.FC = () => {
   // Load preferences from chrome.storage
   useEffect(() => {
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.get(['kloak_phishing_shield', 'kloak_auto_save', 'kloak_autolock'], (items) => {
+      chrome.storage.local.get([
+        'kloak_phishing_shield',
+        'kloak_auto_save',
+        'kloak_autolock',
+        'kloak_bento_autofill',
+        'kloak_totp_autofill',
+        'kloak_hardware_key',
+      ], (items) => {
         if (items.kloak_phishing_shield !== undefined) setPhishingDefense(items.kloak_phishing_shield);
         if (items.kloak_auto_save !== undefined) setAutoSavePrompts(items.kloak_auto_save);
         if (items.kloak_autolock !== undefined) setAutoLockMinutes(items.kloak_autolock);
+        if (items.kloak_bento_autofill !== undefined) setBentoAutofill(items.kloak_bento_autofill);
+        if (items.kloak_totp_autofill !== undefined) setTotpAutofill(items.kloak_totp_autofill);
+        if (items.kloak_hardware_key) setHardwareKeyRegistered(true);
       });
 
       // Test background connectivity
       chrome.runtime.sendMessage({ type: 'PING' }, (resp) => {
         if (chrome.runtime.lastError || !resp) {
-          setNativeStatus('Extension Worker Standby (Port Fallback Active)');
+          setNativeStatus('Kloak Desktop Standby (Make sure Kloak App is running)');
+          setIsConnected(false);
         } else {
-          setNativeStatus('Native Messaging Bridge Connected (app.kloak.native)');
+          setNativeStatus('Connected to Kloak Desktop App (Local IPC active)');
+          setIsConnected(true);
         }
       });
     } else {
-      setNativeStatus('Native Messaging Daemon Active (Simulated)');
+      setNativeStatus('Running in standalone mode');
+      setIsConnected(true);
     }
   }, []);
 
@@ -233,6 +259,23 @@ const OptionsApp: React.FC = () => {
     chrome.storage?.local?.set({ kloak_auto_save: next });
   };
 
+  const handleToggleBento = () => {
+    const next = !bentoAutofill;
+    setBentoAutofill(next);
+    chrome.storage?.local?.set({ kloak_bento_autofill: next });
+  };
+
+  const handleToggleTotp = () => {
+    const next = !totpAutofill;
+    setTotpAutofill(next);
+    chrome.storage?.local?.set({ kloak_totp_autofill: next });
+  };
+
+  const handleAutoLockChange = (mins: number) => {
+    setAutoLockMinutes(mins);
+    chrome.storage?.local?.set({ kloak_autolock: mins });
+  };
+
   const handleCopy = () => {
     if (!genPassword) return;
     navigator.clipboard.writeText(genPassword);
@@ -240,8 +283,10 @@ const OptionsApp: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const currentTabObj = TABS.find((t) => t.id === activeTab) || TABS[0];
+
   return (
-    <div style={{ maxWidth: '840px', margin: '0 auto', padding: '48px 20px', width: '100%' }}>
+    <div style={{ maxWidth: '860px', margin: '0 auto', padding: '40px 24px', width: '100%' }}>
       {/* Global CSS for Animations */}
       <style>{`
         @keyframes kloak-shine {
@@ -259,7 +304,7 @@ const OptionsApp: React.FC = () => {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '36px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div
             style={{
@@ -279,86 +324,285 @@ const OptionsApp: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.5px' }}>Kloak Extension Hub</h1>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>Kloak Extension Settings</h1>
             <p style={{ fontSize: '13px', color: '#9E9AA8' }}>
-              Local-first zero-knowledge autofill companion • <ShinyText text="v1.1.0 Web Store Official" />
+              Organized preferences for autofill, security, and passwords • <ShinyText text="v1.1.0" />
             </p>
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', padding: '4px', borderRadius: '10px' }}>
-          {(['bridge', 'generator', 'security', 'autofill'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '8px',
-                border: 'none',
-                background: activeTab === t ? '#6D4AFF' : 'transparent',
-                color: activeTab === t ? '#ffffff' : '#9E9AA8',
-                fontSize: '12.5px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                textTransform: 'capitalize',
-              }}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Status Pill */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+          border: `1px solid ${isConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+          padding: '6px 12px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: 600,
+          color: isConnected ? '#34d399' : '#fbbf24',
+        }}>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            background: isConnected ? '#10b981' : '#f59e0b',
+            boxShadow: `0 0 8px ${isConnected ? '#10b981' : '#f59e0b'}`,
+          }} />
+          {isConnected ? 'Kloak App Connected' : 'App Standby'}
         </div>
       </div>
 
-      {/* Tab 1: Bridge Diagnostics */}
-      {activeTab === 'bridge' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <SpotlightCard spotlightColor="rgba(16, 185, 129, 0.25)">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', boxShadow: '0 0 10px #10b981' }} />
-                <h2 style={{ fontSize: '18px', fontWeight: 700 }}>Native Messaging Host</h2>
+      {/* Categorized Tab Bar */}
+      <div style={{
+        display: 'flex',
+        gap: '6px',
+        background: 'rgba(255, 255, 255, 0.04)',
+        padding: '5px',
+        borderRadius: '12px',
+        marginBottom: '28px',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
+      }}>
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              flex: 1,
+              padding: '10px 14px',
+              borderRadius: '9px',
+              border: 'none',
+              background: activeTab === t.id ? '#6D4AFF' : 'transparent',
+              color: activeTab === t.id ? '#ffffff' : '#9E9AA8',
+              fontSize: '13px',
+              fontWeight: activeTab === t.id ? 700 : 500,
+              cursor: 'pointer',
+              transition: 'all 0.18s ease',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <span>{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Category Subtitle */}
+      <div style={{ marginBottom: '20px' }}>
+        <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#f8fafc', marginBottom: '4px' }}>
+          {currentTabObj.label}
+        </h2>
+        <p style={{ fontSize: '13px', color: '#9E9AA8' }}>
+          {currentTabObj.subtitle}
+        </p>
+      </div>
+
+      {/* Tab 1: Autofill & Browser */}
+      {activeTab === 'autofill' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <SpotlightCard spotlightColor="rgba(109, 74, 255, 0.2)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14.5px', marginBottom: '4px' }}>Japanese Bento Autofill Popup</div>
+                <div style={{ fontSize: '12.5px', color: '#9E9AA8', maxWidth: '580px' }}>
+                  Displays an elegant tile-based Bento popup on login and signup fields for fast 1-click password filling.
+                </div>
               </div>
-              <span style={{ fontSize: '12px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '3px 10px', borderRadius: '9999px', fontWeight: 700 }}>
-                RFC 1918 HARDENED
-              </span>
-            </div>
-            <p style={{ color: '#9E9AA8', fontSize: '14px', lineHeight: 1.6, marginBottom: '16px' }}>
-              {nativeStatus}
-            </p>
-            <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px 16px', borderRadius: '10px', fontFamily: 'monospace', fontSize: '12.5px', color: '#cbd5e1' }}>
-              Host target: <strong>app.kloak.native</strong> • Direct binary stdio JSON-RPC stream (Zero open TCP ports)
+              <button
+                onClick={handleToggleBento}
+                style={{
+                  background: bentoAutofill ? '#6D4AFF' : '#272535',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '7px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                {bentoAutofill ? 'Enabled' : 'Disabled'}
+              </button>
             </div>
           </SpotlightCard>
 
+          <SpotlightCard spotlightColor="rgba(16, 185, 129, 0.2)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14.5px', marginBottom: '4px' }}>Prompt to Save New Passwords</div>
+                <div style={{ fontSize: '12.5px', color: '#9E9AA8', maxWidth: '580px' }}>
+                  Shows a smooth bottom banner when you submit a new login or changed password, allowing you to save it instantly to your vault.
+                </div>
+              </div>
+              <button
+                onClick={handleToggleAutoSave}
+                style={{
+                  background: autoSavePrompts ? '#10b981' : '#272535',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '7px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                {autoSavePrompts ? 'Active' : 'Muted'}
+              </button>
+            </div>
+          </SpotlightCard>
+
+          <SpotlightCard spotlightColor="rgba(244, 63, 94, 0.2)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14.5px', marginBottom: '4px' }}>Phishing & Lookalike Website Shield</div>
+                <div style={{ fontSize: '12.5px', color: '#9E9AA8', maxWidth: '580px' }}>
+                  Protects against deceptive homograph attacks (e.g. Cyrillic lookalikes) and fake login domains. Alerts and pauses autofill if a domain looks suspicious.
+                </div>
+              </div>
+              <button
+                onClick={handleTogglePhishing}
+                style={{
+                  background: phishingDefense ? '#10b981' : '#272535',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '7px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                {phishingDefense ? 'Protected' : 'Off'}
+              </button>
+            </div>
+          </SpotlightCard>
+
+          <SpotlightCard spotlightColor="rgba(56, 189, 248, 0.2)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '14.5px', marginBottom: '4px' }}>Instant 2FA TOTP Code Filler</div>
+                <div style={{ fontSize: '12.5px', color: '#9E9AA8', maxWidth: '580px' }}>
+                  Automatically detects two-factor authentication verification input fields and fills the 6-digit one-time code from your vault.
+                </div>
+              </div>
+              <button
+                onClick={handleToggleTotp}
+                style={{
+                  background: totpAutofill ? '#38bdf8' : '#272535',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '7px 16px',
+                  borderRadius: '20px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                }}
+              >
+                {totpAutofill ? 'Auto-Fill' : 'Manual'}
+              </button>
+            </div>
+          </SpotlightCard>
+        </div>
+      )}
+
+      {/* Tab 2: Vault & Security */}
+      {activeTab === 'security' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <SpotlightCard spotlightColor="rgba(109, 74, 255, 0.25)">
-            <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '10px' }}>Local Vault Architecture</h2>
-            <p style={{ color: '#9E9AA8', fontSize: '14px', lineHeight: 1.6, marginBottom: '14px' }}>
-              Kloak does not connect to any external cloud, auth proxy, or telemetry server. All vault encryption happens on your host system with authenticated AES-256-GCM and Argon2id.
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Auto-Lock Inactivity Timer</h3>
+            <p style={{ color: '#9E9AA8', fontSize: '13px', lineHeight: 1.5, marginBottom: '16px' }}>
+              Choose how quickly Kloak locks itself when you step away from your computer to keep your passwords secure.
             </p>
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 600 }}>
-                AES-256-GCM Authenticated
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {[
+                { label: '1 Minute', value: 1 },
+                { label: '5 Minutes', value: 5 },
+                { label: '15 Minutes (Default)', value: 15 },
+                { label: '30 Minutes', value: 30 },
+                { label: '1 Hour', value: 60 },
+                { label: 'Never', value: 0 },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleAutoLockChange(opt.value)}
+                  style={{
+                    background: autoLockMinutes === opt.value ? '#6D4AFF' : 'rgba(255,255,255,0.06)',
+                    color: autoLockMinutes === opt.value ? '#ffffff' : '#cbd5e1',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </SpotlightCard>
+
+          <SpotlightCard spotlightColor="rgba(16, 185, 129, 0.25)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 700 }}>Hardware Security Key (FIDO2 / YubiKey)</h3>
+              <span style={{
+                fontSize: '11px',
+                padding: '3px 9px',
+                borderRadius: '12px',
+                background: hardwareKeyRegistered ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.08)',
+                color: hardwareKeyRegistered ? '#34d399' : '#9E9AA8',
+                fontWeight: 700,
+              }}>
+                {hardwareKeyRegistered ? '✓ Registered' : 'Optional'}
               </span>
-              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 600 }}>
-                Strict eTLD+1 Domain Isolation
+            </div>
+            <p style={{ color: '#9E9AA8', fontSize: '13px', lineHeight: 1.5, marginBottom: '14px' }}>
+              Unlock your vault with a single physical touch on your YubiKey or FIDO2 hardware security key. Fast, hardware-backed, and phishing-proof.
+            </p>
+            <div style={{ fontSize: '12.5px', color: '#cbd5e1', background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
+              💡 To register or change your hardware key, click the <strong>Key icon</strong> in the extension popup header.
+            </div>
+          </SpotlightCard>
+
+          <SpotlightCard spotlightColor="rgba(56, 189, 248, 0.2)">
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Local Zero-Knowledge Architecture</h3>
+            <p style={{ color: '#9E9AA8', fontSize: '13px', lineHeight: 1.6, marginBottom: '14px' }}>
+              Kloak has zero cloud servers, zero ads, and zero telemetry. All credentials remain encrypted on your local machine with authenticated AES-256-GCM and Argon2id.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                100% Local-First
               </span>
-              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 600 }}>
-                Shadow DOM Injected UI
+              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                Argon2id Key Derivation
+              </span>
+              <span style={{ background: 'rgba(109, 74, 255, 0.15)', color: '#B098FF', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>
+                Zero Cloud Tracking
               </span>
             </div>
           </SpotlightCard>
         </div>
       )}
 
-      {/* Tab 2: Crypto Playground */}
+      {/* Tab 3: Password Generator */}
       {activeTab === 'generator' && (
         <SpotlightCard spotlightColor="rgba(56, 189, 248, 0.25)">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 700 }}>In-Extension Password Generator</h2>
-            <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700 }}>
-              CSPRNG ENTROPY: ~{Math.round(pwLength * 5.95)} BITS
+            <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Custom Password Generator</h3>
+            <span style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 700, background: 'rgba(56, 189, 248, 0.12)', padding: '3px 10px', borderRadius: '12px' }}>
+              ENTROPY: ~{Math.round(pwLength * 5.95)} BITS
             </span>
           </div>
 
@@ -436,7 +680,7 @@ const OptionsApp: React.FC = () => {
           </div>
 
           {/* Checkboxes */}
-          <div style={{ display: 'flex', gap: '20px' }}>
+          <div style={{ display: 'flex', gap: '24px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
@@ -459,68 +703,58 @@ const OptionsApp: React.FC = () => {
         </SpotlightCard>
       )}
 
-      {/* Tab 3: Security & Phishing Shield */}
-      {activeTab === 'security' && (
-        <SpotlightCard spotlightColor="rgba(244, 63, 94, 0.25)">
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>URL Phishing &amp; Lookalike Shield</h2>
-          <p style={{ color: '#9E9AA8', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
-            Protects against homograph attacks (e.g. Cyrillic letters looking identical to Latin characters) and malicious lookalike subdomains (e.g. <code>paypal.com.scam-site.ru</code>).
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '14px' }}>Active Phishing Detection</div>
-              <div style={{ fontSize: '12px', color: '#9E9AA8' }}>Warns and halts autofill if domain mismatch or spoof is detected</div>
-            </div>
-            <button
-              onClick={handleTogglePhishing}
-              style={{
-                background: phishingDefense ? '#10b981' : '#272535',
-                color: '#ffffff',
-                border: 'none',
-                padding: '6px 14px',
-                borderRadius: '20px',
+      {/* Tab 4: Desktop Connection */}
+      {activeTab === 'connection' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <SpotlightCard spotlightColor="rgba(16, 185, 129, 0.25)">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  background: isConnected ? '#10b981' : '#f59e0b',
+                  boxShadow: `0 0 10px ${isConnected ? '#10b981' : '#f59e0b'}`,
+                }} />
+                <h3 style={{ fontSize: '16px', fontWeight: 700 }}>Kloak Desktop Bridge</h3>
+              </div>
+              <span style={{
+                fontSize: '11px',
+                background: isConnected ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                color: isConnected ? '#34d399' : '#fbbf24',
+                padding: '3px 10px',
+                borderRadius: '9999px',
                 fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              {phishingDefense ? 'Enabled' : 'Disabled'}
-            </button>
-          </div>
-        </SpotlightCard>
-      )}
-
-      {/* Tab 4: Autofill & Save Rules */}
-      {activeTab === 'autofill' && (
-        <SpotlightCard spotlightColor="rgba(168, 85, 247, 0.25)">
-          <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '8px' }}>Auto Password Saver &amp; Prompts</h2>
-          <p style={{ color: '#9E9AA8', fontSize: '14px', lineHeight: 1.6, marginBottom: '20px' }}>
-            When you enter credentials into a login or signup form on the web, Kloak automatically detects the submission and offers a non-intrusive bottom banner to save or update your vault.
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: '14px' }}>Prompt to Save New Logins</div>
-              <div style={{ fontSize: '12px', color: '#9E9AA8' }}>Shows smooth slide-up save banner on form submissions</div>
+              }}>
+                {isConnected ? 'ONLINE' : 'STANDBY'}
+              </span>
             </div>
-            <button
-              onClick={handleToggleAutoSave}
-              style={{
-                background: autoSavePrompts ? '#6D4AFF' : '#272535',
-                color: '#ffffff',
-                border: 'none',
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-              }}
-            >
-              {autoSavePrompts ? 'Active' : 'Muted'}
-            </button>
-          </div>
-        </SpotlightCard>
+            <p style={{ color: '#9E9AA8', fontSize: '13.5px', lineHeight: 1.6, marginBottom: '16px' }}>
+              {nativeStatus}
+            </p>
+            <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px 16px', borderRadius: '10px', fontSize: '12px', color: '#cbd5e1' }}>
+              Communication uses direct local Native Messaging (<code>app.kloak.native</code>) with zero external ports or cloud proxies.
+            </div>
+          </SpotlightCard>
+
+          <SpotlightCard spotlightColor="rgba(109, 74, 255, 0.2)">
+            <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '6px' }}>Extension Information</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', color: '#9E9AA8', marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
+                <span>Version</span>
+                <strong style={{ color: '#ffffff' }}>1.1.0</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '8px' }}>
+                <span>Target</span>
+                <strong style={{ color: '#ffffff' }}>Chrome Manifest V3 / Web Store Official</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Developer</span>
+                <strong style={{ color: '#ffffff' }}>Kloak Open Source</strong>
+              </div>
+            </div>
+          </SpotlightCard>
+        </div>
       )}
     </div>
   );

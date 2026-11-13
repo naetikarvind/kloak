@@ -32,20 +32,72 @@ public struct SettingsView: View {
     @ObservedObject private var autofillService = AccessibilityAutofillService.shared
     @ObservedObject private var iCloudService = ICloudSyncService.shared
 
-    public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                securitySection
-                iCloudSyncSection
-                accessibilityAutofillSection
-                connectedAccountsSection
-                offlineModeSection
-                ipcSection
-                changePasswordSection
-                updatesSection
-                developerModeSection
+    // MARK: - Organized Settings Tabs
+    public enum SettingsTab: String, CaseIterable, Identifiable {
+        case security = "Security & Vault"
+        case autofill = "Autofill & System"
+        case sync = "Sync & Accounts"
+        case advanced = "Updates & Advanced"
+
+        public var id: String { rawValue }
+
+        public var icon: String {
+            switch self {
+            case .security: return "shield.lefthalf.filled"
+            case .autofill: return "bolt.horizontal.fill"
+            case .sync: return "icloud.fill"
+            case .advanced: return "slider.horizontal.3"
             }
-            .padding(16)
+        }
+
+        public var subtitle: String {
+            switch self {
+            case .security: return "Auto-lock timeout, Touch ID, master password & local storage"
+            case .autofill: return "System hotkeys, browser extensions & smart domain matching"
+            case .sync: return "iCloud multi-device sync & private email alias shielding"
+            case .advanced: return "Software updates, release channels & developer diagnostics"
+            }
+        }
+    }
+
+    @State private var activeCategory: SettingsTab = .security
+
+    public var body: some View {
+        VStack(spacing: 0) {
+            // Category Navigation Bar
+            categoryTabBar
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+
+            Divider().opacity(0.12)
+
+            // Content for the active category
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    categoryHeader
+
+                    switch activeCategory {
+                    case .security:
+                        securitySection
+                        changePasswordSection
+                        offlineModeSection
+
+                    case .autofill:
+                        accessibilityAutofillSection
+                        ipcSection
+
+                    case .sync:
+                        iCloudSyncSection
+                        connectedAccountsSection
+
+                    case .advanced:
+                        updatesSection
+                        developerModeSection
+                    }
+                }
+                .padding(20)
+            }
         }
         .onAppear {
             autofillService.checkAccessibilityPermission()
@@ -62,6 +114,65 @@ public struct SettingsView: View {
         .onDisappear {
             stopRecordingMonitor()
         }
+    }
+
+    // MARK: - Navigation Tabs Bar & Header
+    @ViewBuilder
+    private var categoryTabBar: some View {
+        HStack(spacing: 8) {
+            ForEach(SettingsTab.allCases) { tab in
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        activeCategory = tab
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(tab.rawValue)
+                            .font(.system(size: 12, weight: activeCategory == tab ? .semibold : .medium))
+                    }
+                    .foregroundColor(activeCategory == tab ? .white : .secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        activeCategory == tab
+                            ? LiquidGlassTheme.primaryAccent.opacity(0.24)
+                            : Color.white.opacity(0.04)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(
+                                activeCategory == tab
+                                    ? LiquidGlassTheme.primaryAccent.opacity(0.6)
+                                    : Color.white.opacity(0.08),
+                                lineWidth: 1
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var categoryHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: activeCategory.icon)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                Text(activeCategory.rawValue)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            Text(activeCategory.subtitle)
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+        }
+        .padding(.bottom, 2)
     }
 
     // MARK: - Section 1: Security Preferences
@@ -624,7 +735,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var offlineModeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Standalone Offline Mode", systemImage: "shield.checkered")
+            Label("Local Vault Storage & Keychain Mirror", systemImage: "shield.checkered")
                 .font(.system(size: 14, weight: .bold))
 
             VStack(alignment: .leading, spacing: 12) {
@@ -678,7 +789,7 @@ public struct SettingsView: View {
     @ViewBuilder
     private var ipcSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("Browser & Raycast Extension API", systemImage: "puzzlepiece.extension.fill")
+            Label("Browser & Extension Integration", systemImage: "puzzlepiece.extension.fill")
                 .font(.system(size: 14, weight: .bold))
 
             VStack(alignment: .leading, spacing: 10) {
@@ -687,7 +798,7 @@ public struct SettingsView: View {
                         .fill(IPCServer.shared.isRunning ? LiquidGlassTheme.emeraldAccent : LiquidGlassTheme.amberAccent)
                         .frame(width: 10, height: 10)
 
-                    Text("JSON-RPC IPC API: Active (Port \(IPCServer.defaultPort) • Socket ~/.kloak/kloak.sock)")
+                    Text(IPCServer.shared.isRunning ? "Local Extension Bridge: Connected & Active" : "Local Extension Bridge: Standby")
                         .font(.system(size: 12, weight: .medium))
                 }
 
@@ -696,11 +807,11 @@ public struct SettingsView: View {
                         .fill(LiquidGlassTheme.emeraldAccent)
                         .frame(width: 10, height: 10)
 
-                    Text("Chrome Native Messaging Host: app.kloak.native")
+                    Text("Chrome Native Messaging Host: app.kloak.native (Active)")
                         .font(.system(size: 12, weight: .medium))
                 }
 
-                Text("Enables autofill, search, 2FA generation, and quick-access directly inside Chrome, Arc, Brave, and Raycast.")
+                Text("Enables autofill, search, 2FA generation, and quick-access directly inside Chrome, Arc, Brave, and Raycast without any cloud dependencies.")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
