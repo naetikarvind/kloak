@@ -3,7 +3,7 @@
  * Handles local persistence, auto-lock timeouts, in-memory key zeroing,
  * fuzzy search, phishing-resistant URL matching, and CRUD operations.
  */
-import { VaultItem, VaultSettings, VaultStatus, VaultFolder } from '../models/vault.js';
+import { VaultItem, VaultSettings, VaultStatus, VaultFolder, HardwareKeyConfig, HardwareKeyCredential } from '../models/vault.js';
 import { SupportedImportFormat } from '../parsers/index.js';
 import { MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
 import { ExportOptions, ExportResult } from '../parsers/export.js';
@@ -51,6 +51,26 @@ export declare class VaultManager {
      * Locks the vault immediately, wiping keys and secrets from memory.
      */
     lock(): void;
+    /**
+     * Unlocks the vault using a registered hardware security key (FIDO2 / YubiKey).
+     */
+    unlockWithHardwareKey(hardwareSecret: string | Buffer): void;
+    /**
+     * Unlocks the vault using both master password and hardware security key (dual-factor).
+     */
+    unlockWithPasswordAndHardware(masterPassword: string, hardwareSecret: string | Buffer): void;
+    /**
+     * Registers a hardware security key to the currently unlocked vault.
+     */
+    registerHardwareKey(credential: HardwareKeyCredential, hardwareSecret: string | Buffer, mode?: 'hardware_only' | 'password_plus_hardware', masterPassword?: string): void;
+    /**
+     * Removes all hardware key configurations from the vault.
+     */
+    removeHardwareKey(): void;
+    /**
+     * Retrieves the current hardware key configuration.
+     */
+    getHardwareKeyConfig(): HardwareKeyConfig | undefined;
     /**
      * Updates master password by re-wrapping the vault key without touching payload.
      */

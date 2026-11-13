@@ -14,14 +14,20 @@ import {
   VaultPayload,
   VaultSettings,
   VaultStatus,
-  VaultFolder
+  VaultFolder,
+  HardwareKeyConfig,
+  HardwareKeyCredential
 } from '../models/vault.js';
 import {
   initializeVault,
   unlockVault,
   saveVaultPayload,
   changeMasterPassword,
-  zeroizeBuffer
+  zeroizeBuffer,
+  unlockVaultWithHardwareKey,
+  unlockVaultWithPasswordAndHardwareKey,
+  registerHardwareKeyToVault,
+  removeHardwareKeyFromVault
 } from '../crypto/cipher.js';
 import { importFromContent, SupportedImportFormat } from '../parsers/index.js';
 import { autoMergeVaultItems, calculateItemRisk, MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
@@ -99,7 +105,10 @@ export class VaultManager {
       folderCount: this.decryptedPayload ? this.decryptedPayload.folders.length : 0,
       vaultPath: this.vaultPath,
       lastUnlockedAt: this.decryptedPayload ? new Date(this.lastActivityTime).toISOString() : undefined,
-      autoLockMinutes: this.decryptedPayload?.settings.autoLockMinutes ?? DEFAULT_SETTINGS.autoLockMinutes
+      autoLockMinutes: this.decryptedPayload?.settings.autoLockMinutes ?? DEFAULT_SETTINGS.autoLockMinutes,
+      hardwareKeyEnabled: this.vaultFile?.header.hardwareKey?.enabled ?? false,
+      hardwareKeyMode: this.vaultFile?.header.hardwareKey?.mode,
+      hardwareKeyCount: this.vaultFile?.header.hardwareKey?.credentials?.length ?? 0
     };
   }
 
@@ -161,6 +170,88 @@ export class VaultManager {
       this.activeVaultKey = null;
     }
     this.decryptedPayload = null;
+  }
+
+  /**
+   * Unlocks the vault using a registered hardware security key (FIDO2 / YubiKey).
+   */
+  public unlockWithHardwareKey(hardwareSecret: string | Buffer): void {
+    if (!this.vaultFile) {
+      this.loadVaultFileFromDisk();
+      if (!this.vaultFile) {
+        throw new Error('No vault found. Please create a new vault first.');
+      }
+    }
+
+    const { payload, vaultKey } = unlockVaultWithHardwareKey(this.vaultFile, hardwareSecret);
+    this.decryptedPayload = payload;
+    this.activeVaultKey = vaultKey;
+    this.resetAutoLockTimer();
+  }
+
+  /**
+   * Unlocks the vault using both master password and hardware security key (dual-factor).
+   */
+  public unlockWithPasswordAndHardware(masterPassword: string, hardwareSecret: string | Buffer): void {
+    if (!this.vaultFile) {
+      this.loadVaultFileFromDisk();
+      if (!this.vaultFile) {
+        throw new Error('No vault found. Please create a new vault first.');
+      }
+    }
+
+    const { payload, vaultKey } = unlockVaultWithPasswordAndHardwareKey(this.vaultFile, masterPassword, hardwareSecret);
+    this.decryptedPayload = payload;
+    this.activeVaultKey = vaultKey;
+    this.resetAutoLockTimer();
+  }
+
+  /**
+   * Registers a hardware security key to the currently unlocked vault.
+   */
+  public registerHardwareKey(
+    credential: HardwareKeyCredential,
+    hardwareSecret: string | Buffer,
+    mode: 'hardware_only' | 'password_plus_hardware' = 'hardware_only',
+    masterPassword?: string
+  ): void {
+    this.ensureUnlocked();
+    if (!this.vaultFile || !this.activeVaultKey) {
+      throw new Error('Cannot register hardware key: vault is not unlocked.');
+    }
+
+    this.vaultFile = registerHardwareKeyToVault(
+      this.vaultFile,
+      this.activeVaultKey,
+      credential,
+      hardwareSecret,
+      mode,
+      masterPassword
+    );
+    this.writeVaultFileToDisk();
+  }
+
+  /**
+   * Removes all hardware key configurations from the vault.
+   */
+  public removeHardwareKey(): void {
+    this.ensureUnlocked();
+    if (!this.vaultFile) {
+      throw new Error('Cannot remove hardware key: vault is not unlocked.');
+    }
+
+    this.vaultFile = removeHardwareKeyFromVault(this.vaultFile);
+    this.writeVaultFileToDisk();
+  }
+
+  /**
+   * Retrieves the current hardware key configuration.
+   */
+  public getHardwareKeyConfig(): HardwareKeyConfig | undefined {
+    if (!this.vaultFile) {
+      this.loadVaultFileFromDisk();
+    }
+    return this.vaultFile?.header.hardwareKey;
   }
 
   /**

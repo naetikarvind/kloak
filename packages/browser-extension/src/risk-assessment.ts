@@ -128,13 +128,11 @@ export function evaluateCredentialRisk(item: any, allItems: any[] = []): Credent
  * @param size diameter in px (e.g. 28)
  * @param stroke stroke width in px (e.g. 2.5)
  */
-export function renderCircumferenceSvg(score: number, color: string, size = 28, stroke = 2.5, showText = false): string {
+export function renderCircumferenceSvg(score: number, color: string, size = 28, stroke = 2.5): string {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (circumference * score) / 100;
   const center = size / 2;
-  const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
-  const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
 
   return `
     <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
@@ -161,16 +159,6 @@ export function renderCircumferenceSvg(score: number, color: string, size = 28, 
         transform="rotate(-90 ${center} ${center})"
         style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
       />
-      ${showText ? `
-      <text
-        x="${center}"
-        y="${textY}"
-        text-anchor="middle"
-        font-size="${fontSize}px"
-        font-weight="700"
-        fill="${color}"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      >${score}%</text>` : ''}
     </svg>
   `;
 }

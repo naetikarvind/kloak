@@ -112,11 +112,28 @@ export interface EncryptedContainer {
     ciphertext: string;
     tag: string;
 }
+export interface HardwareKeyCredential {
+    id: string;
+    publicKey?: string;
+    algorithm?: number;
+    transports?: string[];
+    prfEnabled?: boolean;
+    name?: string;
+    registeredAt: string;
+}
+export interface HardwareKeyConfig {
+    enabled: boolean;
+    mode: 'hardware_only' | 'password_plus_hardware';
+    credentials: HardwareKeyCredential[];
+    wrappedHardwareKey?: EncryptedContainer;
+    salt: string;
+}
 export interface VaultHeader {
     kloakVersion: string;
     formatVersion: number;
     kdf: KdfParams;
     wrappedVaultKey: EncryptedContainer;
+    hardwareKey?: HardwareKeyConfig;
     createdAt: string;
 }
 export interface VaultFile {
@@ -131,5 +148,8 @@ export interface VaultStatus {
     vaultPath: string;
     lastUnlockedAt?: string;
     autoLockMinutes: number;
+    hardwareKeyEnabled?: boolean;
+    hardwareKeyMode?: 'hardware_only' | 'password_plus_hardware';
+    hardwareKeyCount?: number;
 }
 //# sourceMappingURL=vault.d.ts.map

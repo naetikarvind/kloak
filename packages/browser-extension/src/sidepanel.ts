@@ -4,6 +4,7 @@
  */
 
 import { renderFavicon } from './favicon-service';
+import { authenticateHardwareSecurityKey } from './webauthn-hardware-key';
 
 let cachedSideItems: any[] = [];
 
@@ -310,6 +311,53 @@ document.addEventListener('DOMContentLoaded', () => {
       if (submitBtn) submitBtn.disabled = false;
       if (submitBtnText) submitBtnText.textContent = 'Unlock Vault';
       if (spinner) spinner.style.display = 'none';
+    }
+  });
+
+  // Hardware Key Unlock
+  const sideHwBtn = document.getElementById('btn-side-unlock-hw');
+  const sideHwText = document.getElementById('side-hw-text');
+  sideHwBtn?.addEventListener('click', async () => {
+    if (unlockError) unlockError.style.display = 'none';
+    if (sideHwText) sideHwText.textContent = 'Touch Security Key...';
+
+    try {
+      const configRes: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'GET_HARDWARE_KEY_CONFIG' }, resolve);
+      });
+
+      const hwConfig = configRes?.hardwareKey;
+      const credIds = hwConfig?.credentials?.map((c: any) => c.id);
+      const saltHex = hwConfig?.salt || 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
+      const { hardwareSecret } = await authenticateHardwareSecurityKey({
+        credentialIds: credIds,
+        saltHex
+      });
+
+      const unlockRes: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          type: 'UNLOCK_VAULT_WITH_HARDWARE_KEY',
+          hardwareSecret
+        }, resolve);
+      });
+
+      if (unlockRes && unlockRes.success) {
+        if (pwdInput) pwdInput.value = '';
+        await loadVault();
+      } else {
+        if (unlockError) {
+          unlockError.textContent = unlockRes?.error || 'Hardware key verification failed.';
+          unlockError.style.display = 'block';
+        }
+      }
+    } catch (err: any) {
+      if (unlockError) {
+        unlockError.textContent = err.message || 'Hardware key authentication cancelled.';
+        unlockError.style.display = 'block';
+      }
+    } finally {
+      if (sideHwText) sideHwText.textContent = 'Unlock with Hardware Key';
     }
   });
 

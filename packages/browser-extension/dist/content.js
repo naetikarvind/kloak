@@ -1906,6 +1906,133 @@
     return container;
   }
 
+  // src/risk-assessment.ts
+  function evaluatePasswordEntropy(password) {
+    if (!password) return 0;
+    let poolSize = 0;
+    if (/[a-z]/.test(password)) poolSize += 26;
+    if (/[A-Z]/.test(password)) poolSize += 26;
+    if (/[0-9]/.test(password)) poolSize += 10;
+    if (/[^a-zA-Z0-9]/.test(password)) poolSize += 33;
+    if (poolSize === 0) poolSize = 1;
+    return Math.round(password.length * Math.log2(poolSize));
+  }
+  function evaluateCredentialRisk(item, allItems = []) {
+    const pwd = item.password || "";
+    const reasons = [];
+    if (!pwd) {
+      return {
+        score: 10,
+        riskLevel: "high",
+        label: "High Risk",
+        color: "#EF4444",
+        entropyBits: 0,
+        isReused: false,
+        reusedCount: 0,
+        has2FA: !!item.totpSecret,
+        reasons: ["No password is set for this login"]
+      };
+    }
+    const entropy = evaluatePasswordEntropy(pwd);
+    let score = Math.round(Math.min(100, Math.max(10, entropy)));
+    if (pwd.length < 8) {
+      score = Math.min(score, 25);
+      reasons.push("Password length is under 8 characters (Critical)");
+    } else if (pwd.length < 12) {
+      score = Math.min(score, 60);
+      reasons.push("Password length is under 12 characters");
+    }
+    const weakPatterns = /^(password|123456|qwerty|admin|welcome|letmein|login|test)/i;
+    if (weakPatterns.test(pwd)) {
+      score = Math.min(score, 20);
+      reasons.push("Contains common predictable dictionary words");
+    }
+    let isReused = false;
+    let reusedCount = 0;
+    const currentDomain = (item.urls?.[0] || item.title || "").toLowerCase();
+    for (const other of allItems) {
+      if (other.id === item.id) continue;
+      if (other.password && other.password === pwd) {
+        const otherDomain = (other.urls?.[0] || other.title || "").toLowerCase();
+        if (otherDomain !== currentDomain) {
+          isReused = true;
+          reusedCount++;
+        }
+      }
+    }
+    if (isReused) {
+      score = Math.max(15, score - 35);
+      reasons.push(`Password reused on ${reusedCount + 1} different online services`);
+    }
+    const has2FA = !!item.totpSecret;
+    if (has2FA) {
+      score = Math.min(100, score + 12);
+    } else {
+      reasons.push("Two-factor authentication (2FA) is not enabled");
+    }
+    score = Math.max(10, Math.min(100, score));
+    let riskLevel = "low";
+    let color = "#10B981";
+    let label = "Low Risk";
+    if (score < 50) {
+      riskLevel = "high";
+      color = "#EF4444";
+      label = "High Risk";
+    } else if (score < 80) {
+      riskLevel = "medium";
+      color = "#F59E0B";
+      label = "Medium Risk";
+    }
+    if (reasons.length === 0) {
+      reasons.push("Strong unique password with high cryptographic entropy");
+      if (has2FA) reasons.push("Hardware 2FA / TOTP protection enabled");
+    }
+    return {
+      score,
+      riskLevel,
+      label,
+      color,
+      entropyBits: entropy,
+      isReused,
+      reusedCount,
+      has2FA,
+      reasons
+    };
+  }
+  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
+    const radius = (size - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference - circumference * score / 100;
+    const center = size / 2;
+    return `
+    <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
+      <circle
+        class="kloak-gauge-bg"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="rgba(255,255,255,0.12)"
+        stroke-width="${stroke}"
+        fill="none"
+      />
+      <circle
+        class="kloak-gauge-bar"
+        cx="${center}"
+        cy="${center}"
+        r="${radius}"
+        stroke="${color}"
+        stroke-width="${stroke}"
+        stroke-dasharray="${circumference.toFixed(2)}"
+        stroke-dashoffset="${offset.toFixed(2)}"
+        stroke-linecap="round"
+        fill="none"
+        transform="rotate(-90 ${center} ${center})"
+        style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
+      />
+    </svg>
+  `;
+  }
+
   // src/content.ts
   var shadowHost = null;
   var shadowRoot = null;
@@ -2854,6 +2981,15 @@
         const displayPassword = item.password || "";
         const maskedPassword = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
         const hasTotp = !!item.totpSecret;
+        let riskGaugeHtml = "";
+        if (item.password) {
+          const risk = evaluateCredentialRisk(item, items);
+          riskGaugeHtml = `
+          <div class="kloak-bento-risk-ring" title="${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)" style="display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            ${renderCircumferenceSvg(risk.score, risk.color, 20, 2.2)}
+          </div>
+        `;
+        }
         card.innerHTML = `
         <div class="kloak-bento-card-top">
           <div class="kloak-bento-id-group">
@@ -2861,10 +2997,13 @@
             <span class="kloak-bento-title">${item.title || hostname}</span>
             <span class="kloak-bento-service-tag">\u2022 ${hostname}</span>
           </div>
-          <button class="kloak-bento-fill-all-btn" id="fill-all-btn-${itemId}" title="1-Click Fill All Credentials">
-            <span>\u26A1</span>
-            <span class="btn-fill-text">Fill All</span>
-          </button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${riskGaugeHtml}
+            <button class="kloak-bento-fill-all-btn" id="fill-all-btn-${itemId}" title="1-Click Fill All Credentials">
+              <span>\u26A1</span>
+              <span class="btn-fill-text">Fill All</span>
+            </button>
+          </div>
         </div>
 
         <div class="kloak-bento-inputs">

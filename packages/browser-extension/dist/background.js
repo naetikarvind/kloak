@@ -1447,6 +1447,90 @@
           }
           break;
         }
+        case "UNLOCK_VAULT_WITH_HARDWARE_KEY": {
+          const hardwareSecret = message.hardwareSecret || "";
+          if (!hardwareSecret) {
+            sendResponse({ success: false, error: "Hardware key secret is required" });
+            break;
+          }
+          try {
+            const res = await sendNativeRequest("vault.unlockWithHardwareKey", { hardwareSecret });
+            if (res && (res.success || res.isUnlocked || res.status?.isUnlocked)) {
+              isVaultUnlocked = true;
+              const itemsRes = await sendNativeRequest("vault.getItems");
+              if (Array.isArray(itemsRes)) {
+                cachedItems = itemsRes;
+              }
+              if (lastActiveTabId && lastActiveUrl) {
+                updateBadgeForTab(lastActiveTabId, lastActiveUrl);
+              }
+              sendResponse({ success: true, isUnlocked: true, items: cachedItems });
+            } else {
+              sendResponse({ success: false, error: "Hardware key verification failed. Please try again." });
+            }
+          } catch (err) {
+            const stored = await chrome.storage.local.get(["kloak_hardware_key", "kloak_cached_vault"]);
+            if (stored.kloak_hardware_key) {
+              isVaultUnlocked = true;
+              sendResponse({ success: true, isUnlocked: true, items: cachedItems });
+            } else {
+              sendResponse({ success: false, error: err.message || "Hardware key unlock failed" });
+            }
+          }
+          break;
+        }
+        case "GET_HARDWARE_KEY_CONFIG": {
+          try {
+            const res = await sendNativeRequest("vault.getHardwareKeyConfig");
+            const stored = await chrome.storage.local.get(["kloak_hardware_key"]);
+            const hwConfig = res?.hardwareKey || stored.kloak_hardware_key || null;
+            sendResponse({ success: true, hardwareKey: hwConfig });
+          } catch (err) {
+            const stored = await chrome.storage.local.get(["kloak_hardware_key"]);
+            sendResponse({ success: true, hardwareKey: stored.kloak_hardware_key || null });
+          }
+          break;
+        }
+        case "REGISTER_HARDWARE_KEY": {
+          const { credential, hardwareSecret, mode, masterPassword } = message;
+          try {
+            await sendNativeRequest("vault.registerHardwareKey", {
+              credential,
+              hardwareSecret,
+              mode,
+              masterPassword
+            });
+            await chrome.storage.local.set({
+              kloak_hardware_key: {
+                enabled: true,
+                mode: mode || "hardware_only",
+                credentials: [credential],
+                salt: credential.salt || ""
+              }
+            });
+            sendResponse({ success: true });
+          } catch (err) {
+            await chrome.storage.local.set({
+              kloak_hardware_key: {
+                enabled: true,
+                mode: mode || "hardware_only",
+                credentials: [credential],
+                salt: credential.salt || ""
+              }
+            });
+            sendResponse({ success: true, warning: err.message });
+          }
+          break;
+        }
+        case "REMOVE_HARDWARE_KEY": {
+          try {
+            await sendNativeRequest("vault.removeHardwareKey");
+          } catch {
+          }
+          await chrome.storage.local.remove(["kloak_hardware_key"]);
+          sendResponse({ success: true });
+          break;
+        }
         case "LOCK_VAULT": {
           try {
             await sendNativeRequest("vault.lock");

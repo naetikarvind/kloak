@@ -5,6 +5,7 @@
  */
 
 import { renderFavicon } from './favicon-service';
+import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
 
 interface FormContext {
   form: HTMLFormElement | null;
@@ -1077,6 +1078,16 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
       const maskedPassword = '••••••••••••';
       const hasTotp = !!item.totpSecret;
 
+      let riskGaugeHtml = '';
+      if (item.password) {
+        const risk = evaluateCredentialRisk(item, items);
+        riskGaugeHtml = `
+          <div class="kloak-bento-risk-ring" title="${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)" style="display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            ${renderCircumferenceSvg(risk.score, risk.color, 20, 2.2)}
+          </div>
+        `;
+      }
+
       card.innerHTML = `
         <div class="kloak-bento-card-top">
           <div class="kloak-bento-id-group">
@@ -1084,10 +1095,13 @@ function buildPopupUI(items: any[], input: HTMLInputElement) {
             <span class="kloak-bento-title">${item.title || hostname}</span>
             <span class="kloak-bento-service-tag">• ${hostname}</span>
           </div>
-          <button class="kloak-bento-fill-all-btn" id="fill-all-btn-${itemId}" title="1-Click Fill All Credentials">
-            <span>⚡</span>
-            <span class="btn-fill-text">Fill All</span>
-          </button>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            ${riskGaugeHtml}
+            <button class="kloak-bento-fill-all-btn" id="fill-all-btn-${itemId}" title="1-Click Fill All Credentials">
+              <span>⚡</span>
+              <span class="btn-fill-text">Fill All</span>
+            </button>
+          </div>
         </div>
 
         <div class="kloak-bento-inputs">

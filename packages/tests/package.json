@@ -5,7 +5,7 @@
   "scripts": {
     "build": "tsc",
     "pretest": "tsc",
-    "test": "tsc && node --test dist/crypto.test.js dist/generator.test.js dist/ipc.test.js dist/parsers.test.js dist/merger.test.js dist/totp.test.js dist/vault-manager.test.js"
+    "test": "tsc && node --test dist/crypto.test.js dist/generator.test.js dist/ipc.test.js dist/parsers.test.js dist/merger.test.js dist/totp.test.js dist/vault-manager.test.js dist/hardware-key.test.js"
   },
   "dependencies": {
     "@kloak/core": "file:../core",

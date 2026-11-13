@@ -2002,13 +2002,11 @@
       reasons
     };
   }
-  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5, showText = false) {
+  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - circumference * score / 100;
     const center = size / 2;
-    const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
-    const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
     return `
     <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
       <circle
@@ -2034,18 +2032,172 @@
         transform="rotate(-90 ${center} ${center})"
         style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
       />
-      ${showText ? `
-      <text
-        x="${center}"
-        y="${textY}"
-        text-anchor="middle"
-        font-size="${fontSize}px"
-        font-weight="700"
-        fill="${color}"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      >${score}%</text>` : ""}
     </svg>
   `;
+  }
+
+  // src/webauthn-hardware-key.ts
+  function isHardwareKeySupported() {
+    return typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined" && typeof navigator.credentials !== "undefined";
+  }
+  function bufferToBase64url(buffer) {
+    const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function base64urlToBuffer(base64url) {
+    let b64 = base64url.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4 !== 0) b64 += "=";
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+  function hexToUint8Array(hex) {
+    const clean = hex.trim().replace(/^0x/i, "");
+    const bytes = new Uint8Array(clean.length / 2);
+    for (let i = 0; i < clean.length; i += 2) {
+      bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16);
+    }
+    return bytes;
+  }
+  function uint8ArrayToHex(bytes) {
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  async function registerHardwareSecurityKey(options) {
+    if (!isHardwareKeySupported()) {
+      throw new Error("WebAuthn / FIDO2 Hardware Key is not supported in this browser environment.");
+    }
+    const saltBytes = options.saltHex ? hexToUint8Array(options.saltHex) : crypto.getRandomValues(new Uint8Array(32));
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const createOptions = {
+      publicKey: {
+        challenge,
+        rp: {
+          name: "Kloak Password Vault",
+          id: window.location.hostname || void 0
+        },
+        user: {
+          id: userId,
+          name: options.userName || "kloak-vault-owner",
+          displayName: options.userDisplayName || "Kloak Vault Key"
+        },
+        pubKeyCredParams: [
+          { alg: -7, type: "public-key" },
+          // ES256
+          { alg: -8, type: "public-key" },
+          // Ed25519
+          { alg: -257, type: "public-key" }
+          // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "cross-platform",
+          // Specifically requests USB / NFC Hardware Security Key (e.g. YubiKey)
+          userVerification: "preferred",
+          residentKey: "preferred"
+        },
+        timeout: 6e4,
+        extensions: {
+          prf: {
+            eval: {
+              first: saltBytes
+            }
+          }
+        }
+      }
+    };
+    const rawCredential = await navigator.credentials.create(createOptions);
+    if (!rawCredential) {
+      throw new Error("Hardware key enrollment cancelled or not detected.");
+    }
+    const credId = bufferToBase64url(rawCredential.rawId);
+    const extensions = rawCredential.getClientExtensionResults ? rawCredential.getClientExtensionResults() : {};
+    let hardwareSecret;
+    let prfEnabled = false;
+    if (extensions?.prf?.results?.first) {
+      const prfOutput = new Uint8Array(extensions.prf.results.first);
+      hardwareSecret = uint8ArrayToHex(prfOutput);
+      prfEnabled = true;
+    } else {
+      const attestationResp = rawCredential.response;
+      const clientData = new Uint8Array(attestationResp.clientDataJSON);
+      const rawIdBytes = new Uint8Array(rawCredential.rawId);
+      const combined = new Uint8Array(rawIdBytes.length + clientData.length + saltBytes.length);
+      combined.set(rawIdBytes, 0);
+      combined.set(clientData, rawIdBytes.length);
+      combined.set(saltBytes, rawIdBytes.length + clientData.length);
+      const digest = await crypto.subtle.digest("SHA-256", combined);
+      hardwareSecret = uint8ArrayToHex(new Uint8Array(digest));
+    }
+    const credential = {
+      id: credId,
+      name: options.keyName || "YubiKey / FIDO2 Security Key",
+      prfEnabled,
+      registeredAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    return { credential, hardwareSecret };
+  }
+  async function authenticateHardwareSecurityKey(options) {
+    if (!isHardwareKeySupported()) {
+      throw new Error("WebAuthn / FIDO2 is not supported in this browser.");
+    }
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const saltBytes = hexToUint8Array(options.saltHex);
+    const allowCredentials = options.credentialIds?.map((id) => ({
+      id: base64urlToBuffer(id),
+      type: "public-key",
+      transports: ["usb", "nfc", "ble", "internal"]
+    }));
+    const getOptions = {
+      publicKey: {
+        challenge,
+        rpId: window.location.hostname || void 0,
+        allowCredentials: allowCredentials && allowCredentials.length > 0 ? allowCredentials : void 0,
+        userVerification: "preferred",
+        timeout: 6e4,
+        extensions: {
+          prf: {
+            eval: {
+              first: saltBytes
+            }
+          }
+        }
+      }
+    };
+    const rawAssertion = await navigator.credentials.get(getOptions);
+    if (!rawAssertion) {
+      throw new Error("Hardware key touch not detected or prompt was cancelled.");
+    }
+    const credentialId = bufferToBase64url(rawAssertion.rawId);
+    const extensions = rawAssertion.getClientExtensionResults ? rawAssertion.getClientExtensionResults() : {};
+    let hardwareSecret;
+    if (extensions?.prf?.results?.first) {
+      const prfOutput = new Uint8Array(extensions.prf.results.first);
+      hardwareSecret = uint8ArrayToHex(prfOutput);
+    } else {
+      const authResp = rawAssertion.response;
+      const clientData = new Uint8Array(authResp.clientDataJSON);
+      const authData = new Uint8Array(authResp.authenticatorData);
+      const rawIdBytes = new Uint8Array(rawAssertion.rawId);
+      const combined = new Uint8Array(rawIdBytes.length + clientData.length + authData.length + saltBytes.length);
+      let offset = 0;
+      combined.set(rawIdBytes, offset);
+      offset += rawIdBytes.length;
+      combined.set(clientData, offset);
+      offset += clientData.length;
+      combined.set(authData, offset);
+      offset += authData.length;
+      combined.set(saltBytes, offset);
+      const digest = await crypto.subtle.digest("SHA-256", combined);
+      hardwareSecret = uint8ArrayToHex(new Uint8Array(digest));
+    }
+    return { hardwareSecret, credentialId };
   }
 
   // src/popup.ts
@@ -2266,6 +2418,7 @@
     setupUnlockView();
     setupLockBtn();
     setupAccountRetrievalModal();
+    setupHardwareKeyModal();
     const urlParams = new URLSearchParams(window.location.search);
     const requestedTab = urlParams.get("tab");
     const stored = await chrome.storage?.local?.get(["defaultTab"]);
@@ -3952,6 +4105,51 @@ ${notes}`;
         }
       });
     }
+    const hwKeyBtn = document.getElementById("btn-unlock-hardware-key");
+    const hwKeyText = document.getElementById("hw-key-btn-text");
+    if (hwKeyBtn) {
+      hwKeyBtn.addEventListener("click", async () => {
+        if (errorEl) errorEl.style.display = "none";
+        hwKeyBtn.classList.add("active");
+        if (hwKeyText) hwKeyText.textContent = "Touch your Security Key...";
+        try {
+          const configRes = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({ type: "GET_HARDWARE_KEY_CONFIG" }, resolve);
+          });
+          const hwConfig = configRes?.hardwareKey;
+          const credIds = hwConfig?.credentials?.map((c) => c.id);
+          const saltHex = hwConfig?.salt || "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90";
+          const { hardwareSecret } = await authenticateHardwareSecurityKey({
+            credentialIds: credIds,
+            saltHex
+          });
+          const unlockRes = await new Promise((resolve) => {
+            chrome.runtime.sendMessage({
+              type: "UNLOCK_VAULT_WITH_HARDWARE_KEY",
+              hardwareSecret
+            }, resolve);
+          });
+          if (unlockRes && unlockRes.success) {
+            hideUnlockView();
+            await loadLogins();
+            showToast("\u2713 Vault unlocked with Hardware Security Key");
+          } else {
+            if (errorEl) {
+              errorEl.textContent = unlockRes?.error || "Hardware key verification failed.";
+              errorEl.style.display = "block";
+            }
+          }
+        } catch (err) {
+          if (errorEl) {
+            errorEl.textContent = err.message || "Hardware key authentication cancelled.";
+            errorEl.style.display = "block";
+          }
+        } finally {
+          hwKeyBtn.classList.remove("active");
+          if (hwKeyText) hwKeyText.textContent = "Unlock with Hardware Key";
+        }
+      });
+    }
   }
   function setupLockBtn() {
     const lockBtn = document.getElementById("btn-lock");
@@ -4064,7 +4262,7 @@ ${notes}`;
         const gaugeWrap = document.createElement("div");
         gaugeWrap.className = "sidebar-risk-wrap";
         gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
-        gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2, false);
+        gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2);
         row.appendChild(gaugeWrap);
       }
       row.addEventListener("click", () => selectItem(item));
@@ -4204,7 +4402,7 @@ ${notes}`;
       const risk = evaluateCredentialRisk(item, allItems);
       const riskCard = document.createElement("div");
       riskCard.className = "card risk-detail-card";
-      const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5, false);
+      const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
       riskCard.innerHTML = `
       <div class="risk-card-inner">
         <div class="risk-gauge-container">
@@ -5027,5 +5225,132 @@ ${notes}`;
       }
       reportPanel.style.display = "flex";
     }
+  }
+  function setupHardwareKeyModal() {
+    const modal = document.getElementById("modal-hw-key");
+    const btnOpen = document.getElementById("btn-hardware-key-settings");
+    const btnClose = document.getElementById("btn-close-hw-modal");
+    const statusBadge = document.getElementById("hw-status-badge");
+    const statusDesc = document.getElementById("hw-status-desc");
+    const enrolledInfo = document.getElementById("hw-enrolled-info");
+    const enrolledName = document.getElementById("hw-enrolled-name");
+    const enrolledDate = document.getElementById("hw-enrolled-date");
+    const unlockModeSelect = document.getElementById("hw-unlock-mode");
+    const modalError = document.getElementById("hw-modal-error");
+    const btnRemove = document.getElementById("btn-remove-hw-key");
+    const btnRegister = document.getElementById("btn-register-hw-key");
+    if (!modal) return;
+    const showModal = () => {
+      modal.style.display = "flex";
+      refreshStatus();
+    };
+    const hideModal = () => {
+      modal.style.display = "none";
+      if (modalError) modalError.style.display = "none";
+    };
+    btnOpen?.addEventListener("click", showModal);
+    btnClose?.addEventListener("click", hideModal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) hideModal();
+    });
+    async function refreshStatus() {
+      if (modalError) modalError.style.display = "none";
+      try {
+        const res = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "GET_HARDWARE_KEY_CONFIG" }, resolve);
+        });
+        const config = res?.hardwareKey;
+        const isEnrolled = !!(config && config.enabled && config.credentials?.length > 0);
+        if (isEnrolled) {
+          if (statusBadge) {
+            statusBadge.textContent = "Active & Enrolled";
+            statusBadge.style.background = "rgba(16, 185, 129, 0.15)";
+            statusBadge.style.color = "#10B981";
+            statusBadge.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+          }
+          if (statusDesc) {
+            statusDesc.textContent = config.mode === "password_plus_hardware" ? "Vault requires BOTH Master Password and Hardware Key presence to unlock." : "Vault can be unlocked directly with a hardware key touch.";
+          }
+          if (enrolledInfo) enrolledInfo.style.display = "block";
+          if (enrolledName) enrolledName.textContent = config.credentials[0]?.name || "FIDO2 Security Key";
+          if (enrolledDate) enrolledDate.textContent = config.credentials[0]?.registeredAt ? new Date(config.credentials[0].registeredAt).toLocaleDateString() : "Active";
+          if (unlockModeSelect) unlockModeSelect.value = config.mode || "hardware_only";
+          if (btnRemove) btnRemove.style.display = "inline-block";
+          if (btnRegister) btnRegister.textContent = "Re-register Key";
+        } else {
+          if (statusBadge) {
+            statusBadge.textContent = "Not Configured";
+            statusBadge.style.background = "rgba(255, 255, 255, 0.08)";
+            statusBadge.style.color = "var(--text-muted)";
+            statusBadge.style.border = "1px solid var(--border)";
+          }
+          if (statusDesc) {
+            statusDesc.textContent = "No hardware key enrolled. Register a USB/NFC YubiKey or FIDO2 key to unlock your vault with a single touch.";
+          }
+          if (enrolledInfo) enrolledInfo.style.display = "none";
+          if (btnRemove) btnRemove.style.display = "none";
+          if (btnRegister) btnRegister.textContent = "Register Hardware Key";
+        }
+      } catch (err) {
+        if (modalError) {
+          modalError.textContent = err.message || "Failed to query hardware key status";
+          modalError.style.display = "block";
+        }
+      }
+    }
+    btnRegister?.addEventListener("click", async () => {
+      if (modalError) modalError.style.display = "none";
+      const originalText = btnRegister.textContent;
+      btnRegister.textContent = "Touch your Security Key...";
+      btnRegister.setAttribute("disabled", "true");
+      try {
+        const mode = unlockModeSelect?.value || "hardware_only";
+        const reg = await registerHardwareSecurityKey({
+          keyName: "Security Key (" + (navigator.platform || "Cross-Platform") + ")"
+        });
+        const res = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({
+            type: "REGISTER_HARDWARE_KEY",
+            credential: reg.credential,
+            hardwareSecret: reg.hardwareSecret,
+            mode
+          }, resolve);
+        });
+        if (res && res.success) {
+          showToast("\u2713 Hardware security key successfully registered!");
+          await refreshStatus();
+        } else {
+          throw new Error(res?.error || "Registration failed");
+        }
+      } catch (err) {
+        if (modalError) {
+          modalError.textContent = err.message || "Key registration cancelled or failed";
+          modalError.style.display = "block";
+        }
+      } finally {
+        btnRegister.removeAttribute("disabled");
+        btnRegister.textContent = originalText;
+      }
+    });
+    btnRemove?.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to remove the hardware security key from this vault?")) return;
+      if (modalError) modalError.style.display = "none";
+      try {
+        const res = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: "REMOVE_HARDWARE_KEY" }, resolve);
+        });
+        if (res && res.success) {
+          showToast("\u2713 Hardware key removed from vault");
+          await refreshStatus();
+        } else {
+          throw new Error(res?.error || "Failed to remove hardware key");
+        }
+      } catch (err) {
+        if (modalError) {
+          modalError.textContent = err.message || "Removal failed";
+          modalError.style.display = "block";
+        }
+      }
+    });
   }
 })();

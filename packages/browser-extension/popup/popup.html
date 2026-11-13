@@ -1935,6 +1935,64 @@
       transition: all 0.15s;
     }
     .btn-report-done:hover { background: var(--accent-hover); }
+
+    /* ── Hardware Security Key Styles ── */
+    .unlock-divider {
+      display: flex;
+      align-items: center;
+      margin: 12px 0 10px 0;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .unlock-divider::before,
+    .unlock-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .unlock-divider span {
+      padding: 0 10px;
+      letter-spacing: 1px;
+    }
+    .btn-unlock-hw-key {
+      width: 100%;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 2px;
+    }
+    .btn-unlock-hw-key:hover {
+      background: rgba(109, 74, 255, 0.15);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-unlock-hw-key.active {
+      border-color: #10B981;
+      background: rgba(16, 185, 129, 0.15);
+      color: #10B981;
+      animation: pulseKey 1.5s infinite;
+    }
+    .hw-key-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    @keyframes pulseKey {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+    }
   </style>
 </head>
 <body>
@@ -1977,6 +2035,15 @@
           <span class="btn-spinner" id="unlock-spinner" style="display: none;"></span>
           <span id="unlock-btn-text">Unlock Vault</span>
         </button>
+
+        <div class="unlock-divider">
+          <span>OR</span>
+        </div>
+
+        <button type="button" id="btn-unlock-hardware-key" class="btn-unlock-hw-key" title="Touch your YubiKey or FIDO2 Security Key to unlock">
+          <svg class="hw-key-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm5-10C6.48 4 2 8.48 2 14c0 4.42 2.87 8.17 6.84 9.5.5.09.66-.22.66-.48v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.69.92.69 1.85V23c0 .27.16.59.67.48C19.14 22.16 22 18.42 22 14c0-5.52-4.48-10-10-10z"/></svg>
+          <span id="hw-key-btn-text">Unlock with Hardware Key</span>
+        </button>
       </form>
 
       <div class="unlock-footer">
@@ -2002,6 +2069,9 @@
       </button>
       <button class="btn-icon" id="btn-retrieve-accounts" title="Retrieve & Auto-Merge Passwords (Google, Microsoft, Opera...)">
         <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+      </button>
+      <button class="btn-icon" id="btn-hardware-key-settings" title="Hardware Security Key (YubiKey / FIDO2) Setup">
+        <svg viewBox="0 0 24 24"><path d="M7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm5-10C6.48 4 2 8.48 2 14c0 4.42 2.87 8.17 6.84 9.5.5.09.66-.22.66-.48v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.69.92.69 1.85V23c0 .27.16.59.67.48C19.14 22.16 22 18.42 22 14c0-5.52-4.48-10-10-10z"/></svg>
       </button>
       <button class="btn-icon purple" id="btn-add">
         <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -2296,6 +2366,64 @@
           <div class="report-actions">
             <button class="btn-report-done" id="btn-merge-report-done">Done & View Vault</button>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HARDWARE KEY MANAGEMENT MODAL -->
+  <div class="modal-backdrop" id="modal-hw-key" style="display: none;">
+    <div class="modal-container" style="max-width: 420px;">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="card-icon" style="color: var(--accent);">
+            <svg viewBox="0 0 24 24"><path d="M7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm5-10C6.48 4 2 8.48 2 14c0 4.42 2.87 8.17 6.84 9.5.5.09.66-.22.66-.48v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.6 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.69.92.69 1.85V23c0 .27.16.59.67.48C19.14 22.16 22 18.42 22 14c0-5.52-4.48-10-10-10z"/></svg>
+          </div>
+          <div>
+            <div class="modal-title">Hardware Security Key</div>
+            <div class="modal-subtitle">Use a FIDO2 / YubiKey as your master vault password</div>
+          </div>
+        </div>
+        <button class="modal-close" id="btn-close-hw-modal">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 14px;">
+        <div id="hw-status-box" style="padding: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-weight: 600; font-size: 13px;">Security Key Status</span>
+            <span id="hw-status-badge" class="risk-status-pill" style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">Not Configured</span>
+          </div>
+          <div id="hw-status-desc" style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+            No hardware key enrolled. Register a USB/NFC YubiKey or FIDO2 key to unlock your vault with a single touch.
+          </div>
+          <div id="hw-enrolled-info" style="display: none; margin-top: 8px; font-size: 11.5px;">
+            <div>🔑 <strong id="hw-enrolled-name">YubiKey 5C NFC</strong></div>
+            <div style="color: var(--text-muted); font-size: 10.5px; margin-top: 2px;">Registered: <span id="hw-enrolled-date">-</span></div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-main);">Unlock Mode</label>
+          <select id="hw-unlock-mode" class="edit-input" style="height: 36px; cursor: pointer;">
+            <option value="hardware_only">Hardware Key Only (Touch key to unlock)</option>
+            <option value="password_plus_hardware">Master Password + Hardware Key (Two-Factor Encryption)</option>
+          </select>
+          <div style="font-size: 11px; color: var(--text-muted); line-height: 1.3;">
+            In Hardware Key Only mode, you can unlock your vault simply by tapping your security key.
+          </div>
+        </div>
+
+        <div id="hw-modal-error" style="display: none; color: #EF4444; font-size: 11.5px; padding: 8px 10px; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border: 1px solid rgba(239, 68, 68, 0.2);"></div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+          <button class="btn-pill" id="btn-remove-hw-key" style="display: none; background: rgba(239, 68, 68, 0.15); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+            Remove Key
+          </button>
+          <button class="btn-pill" id="btn-register-hw-key" style="background: var(--accent); color: #fff; font-weight: 600;">
+            Register Hardware Key
+          </button>
         </div>
       </div>
     </div>

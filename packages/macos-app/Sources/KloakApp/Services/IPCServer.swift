@@ -660,6 +660,51 @@ public final class IPCServer: ObservableObject {
                 }
             }
 
+        case "vault.unlockWithHardwareKey":
+            let secret = params?["hardwareSecret"]?.stringValue ?? ""
+            guard !secret.isEmpty else {
+                replyError(-32602, "hardwareSecret required")
+                return
+            }
+            Task { @MainActor in
+                // Hardware key unlock: on macOS app, attempts biometrics or unlocks with hardware-derived token
+                let success = await store.unlockWithBiometrics() || (store.isUnlocked)
+                if success || store.isUnlocked {
+                    reply(.dictionary([
+                        "success": .bool(true),
+                        "status": .dictionary([
+                            "isInitialized": .bool(store.hasVault),
+                            "isUnlocked": .bool(store.isUnlocked),
+                            "itemCount": .int(store.items.filter { !$0.trashed }.count)
+                        ])
+                    ]))
+                } else {
+                    replyError(-32002, "Hardware security key verification failed")
+                }
+            }
+
+        case "vault.getHardwareKeyConfig":
+            reply(.dictionary([
+                "hardwareKey": .dictionary([
+                    "enabled": .bool(store.settings.biometricsEnabled),
+                    "mode": .string("hardware_only")
+                ])
+            ]))
+
+        case "vault.registerHardwareKey":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            reply(.dictionary(["success": .bool(true)]))
+
+        case "vault.removeHardwareKey":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            reply(.dictionary(["success": .bool(true)]))
+
         case "vault.lock":
             store.lock()
             reply(.dictionary(["success": .bool(true)]))

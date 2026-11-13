@@ -126,11 +126,30 @@ export interface EncryptedContainer {
   tag: string; // Hex (128-bit GCM tag)
 }
 
+export interface HardwareKeyCredential {
+  id: string; // Base64URL or Hex credential ID
+  publicKey?: string; // Base64URL or Hex public key
+  algorithm?: number; // COSE algorithm (e.g. -7 for ES256, -8 for Ed25519)
+  transports?: string[]; // e.g. ['usb', 'nfc', 'ble', 'internal']
+  prfEnabled?: boolean; // Whether CTAP 2.1 PRF (hmac-secret) is active
+  name?: string; // Friendly name (e.g. "YubiKey 5C NFC", "Titan Key")
+  registeredAt: string; // ISO 8601
+}
+
+export interface HardwareKeyConfig {
+  enabled: boolean;
+  mode: 'hardware_only' | 'password_plus_hardware';
+  credentials: HardwareKeyCredential[];
+  wrappedHardwareKey?: EncryptedContainer; // Wrapped Vault Key encrypted using hardware secret
+  salt: string; // 32-byte hex salt for hardware PRF / challenge derivation
+}
+
 export interface VaultHeader {
   kloakVersion: string;
   formatVersion: number;
   kdf: KdfParams;
   wrappedVaultKey: EncryptedContainer;
+  hardwareKey?: HardwareKeyConfig;
   createdAt: string;
 }
 
@@ -147,4 +166,7 @@ export interface VaultStatus {
   vaultPath: string;
   lastUnlockedAt?: string;
   autoLockMinutes: number;
+  hardwareKeyEnabled?: boolean;
+  hardwareKeyMode?: 'hardware_only' | 'password_plus_hardware';
+  hardwareKeyCount?: number;
 }

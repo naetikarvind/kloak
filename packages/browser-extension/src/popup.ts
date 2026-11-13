@@ -11,6 +11,11 @@ import {
   ServiceDomainInfo
 } from './service-domain-service';
 import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
+import {
+  isHardwareKeySupported,
+  registerHardwareSecurityKey,
+  authenticateHardwareSecurityKey
+} from './webauthn-hardware-key';
 
 let allItems: any[] = [];
 let activeItem: any = null;
@@ -142,6 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupUnlockView();
   setupLockBtn();
   setupAccountRetrievalModal();
+  setupHardwareKeyModal();
 
   const urlParams = new URLSearchParams(window.location.search);
   const requestedTab = urlParams.get('tab');
@@ -1984,6 +1990,58 @@ function setupUnlockView() {
       }
     });
   }
+
+  const hwKeyBtn = document.getElementById('btn-unlock-hardware-key');
+  const hwKeyText = document.getElementById('hw-key-btn-text');
+
+  if (hwKeyBtn) {
+    hwKeyBtn.addEventListener('click', async () => {
+      if (errorEl) errorEl.style.display = 'none';
+      hwKeyBtn.classList.add('active');
+      if (hwKeyText) hwKeyText.textContent = 'Touch your Security Key...';
+
+      try {
+        const configRes: any = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'GET_HARDWARE_KEY_CONFIG' }, resolve);
+        });
+
+        const hwConfig = configRes?.hardwareKey;
+        const credIds = hwConfig?.credentials?.map((c: any) => c.id);
+        const saltHex = hwConfig?.salt || 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90';
+
+        const { hardwareSecret } = await authenticateHardwareSecurityKey({
+          credentialIds: credIds,
+          saltHex
+        });
+
+        const unlockRes: any = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({
+            type: 'UNLOCK_VAULT_WITH_HARDWARE_KEY',
+            hardwareSecret
+          }, resolve);
+        });
+
+        if (unlockRes && unlockRes.success) {
+          hideUnlockView();
+          await loadLogins();
+          showToast('✓ Vault unlocked with Hardware Security Key');
+        } else {
+          if (errorEl) {
+            errorEl.textContent = unlockRes?.error || 'Hardware key verification failed.';
+            errorEl.style.display = 'block';
+          }
+        }
+      } catch (err: any) {
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Hardware key authentication cancelled.';
+          errorEl.style.display = 'block';
+        }
+      } finally {
+        hwKeyBtn.classList.remove('active');
+        if (hwKeyText) hwKeyText.textContent = 'Unlock with Hardware Key';
+      }
+    });
+  }
 }
 
 function setupLockBtn() {
@@ -2124,7 +2182,7 @@ function renderSidebarList(items: any[]) {
       const gaugeWrap = document.createElement('div');
       gaugeWrap.className = 'sidebar-risk-wrap';
       gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
-      gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2, false);
+      gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2);
       row.appendChild(gaugeWrap);
     }
 
@@ -2287,7 +2345,7 @@ function renderDetailPane(item: any) {
     const riskCard = document.createElement('div');
     riskCard.className = 'card risk-detail-card';
 
-    const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5, false);
+    const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
 
     riskCard.innerHTML = `
       <div class="risk-card-inner">
@@ -3226,4 +3284,149 @@ function setupAccountRetrievalModal() {
 
     reportPanel.style.display = 'flex';
   }
+}
+
+// ── Hardware Security Key Management Modal ──
+function setupHardwareKeyModal() {
+  const modal = document.getElementById('modal-hw-key');
+  const btnOpen = document.getElementById('btn-hardware-key-settings');
+  const btnClose = document.getElementById('btn-close-hw-modal');
+  const statusBadge = document.getElementById('hw-status-badge');
+  const statusDesc = document.getElementById('hw-status-desc');
+  const enrolledInfo = document.getElementById('hw-enrolled-info');
+  const enrolledName = document.getElementById('hw-enrolled-name');
+  const enrolledDate = document.getElementById('hw-enrolled-date');
+  const unlockModeSelect = document.getElementById('hw-unlock-mode') as HTMLSelectElement;
+  const modalError = document.getElementById('hw-modal-error');
+  const btnRemove = document.getElementById('btn-remove-hw-key');
+  const btnRegister = document.getElementById('btn-register-hw-key');
+
+  if (!modal) return;
+
+  const showModal = () => {
+    modal.style.display = 'flex';
+    refreshStatus();
+  };
+
+  const hideModal = () => {
+    modal.style.display = 'none';
+    if (modalError) modalError.style.display = 'none';
+  };
+
+  btnOpen?.addEventListener('click', showModal);
+  btnClose?.addEventListener('click', hideModal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) hideModal();
+  });
+
+  async function refreshStatus() {
+    if (modalError) modalError.style.display = 'none';
+    try {
+      const res: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'GET_HARDWARE_KEY_CONFIG' }, resolve);
+      });
+
+      const config = res?.hardwareKey;
+      const isEnrolled = !!(config && config.enabled && config.credentials?.length > 0);
+
+      if (isEnrolled) {
+        if (statusBadge) {
+          statusBadge.textContent = 'Active & Enrolled';
+          statusBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+          statusBadge.style.color = '#10B981';
+          statusBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+        }
+        if (statusDesc) {
+          statusDesc.textContent = config.mode === 'password_plus_hardware'
+            ? 'Vault requires BOTH Master Password and Hardware Key presence to unlock.'
+            : 'Vault can be unlocked directly with a hardware key touch.';
+        }
+        if (enrolledInfo) enrolledInfo.style.display = 'block';
+        if (enrolledName) enrolledName.textContent = config.credentials[0]?.name || 'FIDO2 Security Key';
+        if (enrolledDate) enrolledDate.textContent = config.credentials[0]?.registeredAt ? new Date(config.credentials[0].registeredAt).toLocaleDateString() : 'Active';
+        if (unlockModeSelect) unlockModeSelect.value = config.mode || 'hardware_only';
+        if (btnRemove) btnRemove.style.display = 'inline-block';
+        if (btnRegister) btnRegister.textContent = 'Re-register Key';
+      } else {
+        if (statusBadge) {
+          statusBadge.textContent = 'Not Configured';
+          statusBadge.style.background = 'rgba(255, 255, 255, 0.08)';
+          statusBadge.style.color = 'var(--text-muted)';
+          statusBadge.style.border = '1px solid var(--border)';
+        }
+        if (statusDesc) {
+          statusDesc.textContent = 'No hardware key enrolled. Register a USB/NFC YubiKey or FIDO2 key to unlock your vault with a single touch.';
+        }
+        if (enrolledInfo) enrolledInfo.style.display = 'none';
+        if (btnRemove) btnRemove.style.display = 'none';
+        if (btnRegister) btnRegister.textContent = 'Register Hardware Key';
+      }
+    } catch (err: any) {
+      if (modalError) {
+        modalError.textContent = err.message || 'Failed to query hardware key status';
+        modalError.style.display = 'block';
+      }
+    }
+  }
+
+  btnRegister?.addEventListener('click', async () => {
+    if (modalError) modalError.style.display = 'none';
+    const originalText = btnRegister.textContent;
+    btnRegister.textContent = 'Touch your Security Key...';
+    btnRegister.setAttribute('disabled', 'true');
+
+    try {
+      const mode = (unlockModeSelect?.value || 'hardware_only') as 'hardware_only' | 'password_plus_hardware';
+      const reg = await registerHardwareSecurityKey({
+        keyName: 'Security Key (' + (navigator.platform || 'Cross-Platform') + ')'
+      });
+
+      const res: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          type: 'REGISTER_HARDWARE_KEY',
+          credential: reg.credential,
+          hardwareSecret: reg.hardwareSecret,
+          mode
+        }, resolve);
+      });
+
+      if (res && res.success) {
+        showToast('✓ Hardware security key successfully registered!');
+        await refreshStatus();
+      } else {
+        throw new Error(res?.error || 'Registration failed');
+      }
+    } catch (err: any) {
+      if (modalError) {
+        modalError.textContent = err.message || 'Key registration cancelled or failed';
+        modalError.style.display = 'block';
+      }
+    } finally {
+      btnRegister.removeAttribute('disabled');
+      btnRegister.textContent = originalText;
+    }
+  });
+
+  btnRemove?.addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to remove the hardware security key from this vault?')) return;
+    if (modalError) modalError.style.display = 'none';
+
+    try {
+      const res: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'REMOVE_HARDWARE_KEY' }, resolve);
+      });
+
+      if (res && res.success) {
+        showToast('✓ Hardware key removed from vault');
+        await refreshStatus();
+      } else {
+        throw new Error(res?.error || 'Failed to remove hardware key');
+      }
+    } catch (err: any) {
+      if (modalError) {
+        modalError.textContent = err.message || 'Removal failed';
+        modalError.style.display = 'block';
+      }
+    }
+  });
 }

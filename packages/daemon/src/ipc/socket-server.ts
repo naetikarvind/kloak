@@ -236,6 +236,32 @@ export class IpcSocketServer {
         this.vaultManager.unlock(params.masterPassword);
         return { success: true, status: this.vaultManager.getStatus() };
 
+      case 'vault.unlockWithHardwareKey':
+        if (!params.hardwareSecret) throw new Error('hardwareSecret is required for vault.unlockWithHardwareKey');
+        this.vaultManager.unlockWithHardwareKey(params.hardwareSecret);
+        return { success: true, status: this.vaultManager.getStatus() };
+
+      case 'vault.unlockWithPasswordAndHardware':
+        if (!params.masterPassword || !params.hardwareSecret) {
+          throw new Error('Both masterPassword and hardwareSecret are required for dual-factor unlock');
+        }
+        this.vaultManager.unlockWithPasswordAndHardware(params.masterPassword, params.hardwareSecret);
+        return { success: true, status: this.vaultManager.getStatus() };
+
+      case 'vault.registerHardwareKey':
+        if (!params.credential || !params.hardwareSecret) {
+          throw new Error('credential and hardwareSecret are required for vault.registerHardwareKey');
+        }
+        this.vaultManager.registerHardwareKey(params.credential, params.hardwareSecret, params.mode, params.masterPassword);
+        return { success: true, status: this.vaultManager.getStatus() };
+
+      case 'vault.removeHardwareKey':
+        this.vaultManager.removeHardwareKey();
+        return { success: true, status: this.vaultManager.getStatus() };
+
+      case 'vault.getHardwareKeyConfig':
+        return { hardwareKey: this.vaultManager.getHardwareKeyConfig() };
+
       case 'vault.lock':
         this.vaultManager.lock();
         return { success: true, status: this.vaultManager.getStatus() };

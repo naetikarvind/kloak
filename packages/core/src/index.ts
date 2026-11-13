@@ -4,6 +4,7 @@
 
 export * from './models/vault.js';
 export * from './crypto/cipher.js';
+export * from './crypto/hardware-key.js';
 export * from './crypto/totp.js';
 export * from './crypto/generator.js';
 export * from './crypto/oauth.js';

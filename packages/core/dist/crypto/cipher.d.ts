@@ -2,7 +2,7 @@
  * Kloak Core — Cryptography Engine
  * Authenticated AES-256-GCM encryption with two-key envelope hierarchy.
  */
-import { EncryptedContainer, VaultFile, VaultPayload } from '../models/vault.js';
+import { EncryptedContainer, HardwareKeyCredential, VaultFile, VaultPayload } from '../models/vault.js';
 export declare const CURRENT_FORMAT_VERSION = 1;
 export declare const CURRENT_KLOAK_VERSION = "1.0.0";
 export declare const DEFAULT_PBKDF2_ITERATIONS = 600000;
@@ -51,4 +51,26 @@ export declare function zeroizeBuffer(buffer: Buffer): void;
  * Calculates SHA-256 hash for integrity checks.
  */
 export declare function sha256Hex(data: string | Buffer): string;
+/**
+ * Unlocks a vault file using a hardware security key secret (FIDO2 / YubiKey).
+ */
+export declare function unlockVaultWithHardwareKey(vaultFile: VaultFile, hardwareSecret: Buffer | string): {
+    payload: VaultPayload;
+    vaultKey: Buffer;
+};
+/**
+ * Unlocks a vault file requiring BOTH Master Password and Hardware Key (dual-factor).
+ */
+export declare function unlockVaultWithPasswordAndHardwareKey(vaultFile: VaultFile, masterPassword: string, hardwareSecret: Buffer | string): {
+    payload: VaultPayload;
+    vaultKey: Buffer;
+};
+/**
+ * Registers or updates a hardware key configuration on an unlocked vault file.
+ */
+export declare function registerHardwareKeyToVault(vaultFile: VaultFile, vaultKey: Buffer, credential: HardwareKeyCredential, hardwareSecret: Buffer | string, mode?: 'hardware_only' | 'password_plus_hardware', masterPassword?: string): VaultFile;
+/**
+ * Removes hardware key capability from a vault file.
+ */
+export declare function removeHardwareKeyFromVault(vaultFile: VaultFile): VaultFile;
 //# sourceMappingURL=cipher.d.ts.map

@@ -4,7 +4,12 @@
  */
 
 import * as crypto from 'node:crypto';
-import { EncryptedContainer, KdfParams, VaultFile, VaultHeader, VaultPayload } from '../models/vault.js';
+import { EncryptedContainer, HardwareKeyConfig, HardwareKeyCredential, KdfParams, VaultFile, VaultHeader, VaultPayload } from '../models/vault.js';
+import {
+  generateHardwareKeySalt,
+  unwrapVaultKeyWithHardwareSecret,
+  wrapVaultKeyWithHardwareSecret
+} from './hardware-key.js';
 
 export const CURRENT_FORMAT_VERSION = 1;
 export const CURRENT_KLOAK_VERSION = '1.0.0';
@@ -192,3 +197,104 @@ export function zeroizeBuffer(buffer: Buffer): void {
 export function sha256Hex(data: string | Buffer): string {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
+
+/**
+ * Unlocks a vault file using a hardware security key secret (FIDO2 / YubiKey).
+ */
+export function unlockVaultWithHardwareKey(
+  vaultFile: VaultFile,
+  hardwareSecret: Buffer | string
+): { payload: VaultPayload; vaultKey: Buffer } {
+  const hw = vaultFile.header.hardwareKey;
+  if (!hw || !hw.enabled || !hw.wrappedHardwareKey) {
+    throw new Error('Hardware key is not registered or enabled for this vault.');
+  }
+  if (hw.mode === 'password_plus_hardware') {
+    throw new Error('This vault requires both Master Password and Hardware Key to unlock.');
+  }
+
+  const vaultKey = unwrapVaultKeyWithHardwareSecret(hw.wrappedHardwareKey, hardwareSecret, hw.salt);
+  try {
+    const decryptedPayloadBuf = decryptAesGcm(vaultKey, vaultFile.encryptedPayload);
+    const payload: VaultPayload = JSON.parse(decryptedPayloadBuf.toString('utf-8'));
+    return { payload, vaultKey };
+  } catch (err) {
+    zeroizeBuffer(vaultKey);
+    throw err;
+  }
+}
+
+/**
+ * Unlocks a vault file requiring BOTH Master Password and Hardware Key (dual-factor).
+ */
+export function unlockVaultWithPasswordAndHardwareKey(
+  vaultFile: VaultFile,
+  masterPassword: string,
+  hardwareSecret: Buffer | string
+): { payload: VaultPayload; vaultKey: Buffer } {
+  const hw = vaultFile.header.hardwareKey;
+  if (!hw || !hw.enabled || !hw.wrappedHardwareKey) {
+    throw new Error('Hardware key is not registered or enabled for this vault.');
+  }
+
+  const vaultKey = unwrapVaultKeyWithHardwareSecret(hw.wrappedHardwareKey, hardwareSecret, hw.salt, masterPassword);
+  try {
+    const decryptedPayloadBuf = decryptAesGcm(vaultKey, vaultFile.encryptedPayload);
+    const payload: VaultPayload = JSON.parse(decryptedPayloadBuf.toString('utf-8'));
+    return { payload, vaultKey };
+  } catch (err) {
+    zeroizeBuffer(vaultKey);
+    throw err;
+  }
+}
+
+/**
+ * Registers or updates a hardware key configuration on an unlocked vault file.
+ */
+export function registerHardwareKeyToVault(
+  vaultFile: VaultFile,
+  vaultKey: Buffer,
+  credential: HardwareKeyCredential,
+  hardwareSecret: Buffer | string,
+  mode: 'hardware_only' | 'password_plus_hardware' = 'hardware_only',
+  masterPassword?: string
+): VaultFile {
+  const salt = vaultFile.header.hardwareKey?.salt || generateHardwareKeySalt();
+  const wrappedHardwareKey = wrapVaultKeyWithHardwareSecret(
+    vaultKey,
+    hardwareSecret,
+    salt,
+    mode === 'password_plus_hardware' ? masterPassword : undefined
+  );
+
+  const existingCreds = vaultFile.header.hardwareKey?.credentials || [];
+  const credentials = [...existingCreds.filter(c => c.id !== credential.id), credential];
+
+  const hardwareKeyConfig: HardwareKeyConfig = {
+    enabled: true,
+    mode,
+    credentials,
+    wrappedHardwareKey,
+    salt
+  };
+
+  return {
+    ...vaultFile,
+    header: {
+      ...vaultFile.header,
+      hardwareKey: hardwareKeyConfig
+    }
+  };
+}
+
+/**
+ * Removes hardware key capability from a vault file.
+ */
+export function removeHardwareKeyFromVault(vaultFile: VaultFile): VaultFile {
+  const { hardwareKey, ...restHeader } = vaultFile.header;
+  return {
+    ...vaultFile,
+    header: restHeader as VaultHeader
+  };
+}
+

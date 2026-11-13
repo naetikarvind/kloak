@@ -19,6 +19,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./models/vault.js"), exports);
 __exportStar(require("./crypto/cipher.js"), exports);
+__exportStar(require("./crypto/hardware-key.js"), exports);
 __exportStar(require("./crypto/totp.js"), exports);
 __exportStar(require("./crypto/generator.js"), exports);
 __exportStar(require("./crypto/oauth.js"), exports);
