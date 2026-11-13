@@ -550,20 +550,47 @@ public final class IPCServer: ObservableObject {
                 "autoMaskUntrusted": .bool(store.settings.autoMaskUntrustedSites)
             ]))
 
-        case "vault.addItem", "vault.saveItem":
+        case "vault.addItem", "vault.saveItem", "vault.updateItem":
             guard store.isUnlocked else {
                 replyError(-32001, "Vault is locked")
                 return
             }
             store.recordUserActivity()
+
+            // 1. Try decoding full VaultItem from params["item"]
             if let itemDict = params?["item"],
                let encoded = try? JSONEncoder().encode(itemDict),
                let item = try? JSONDecoder().decode(VaultItem.self, from: encoded) {
                 store.saveItem(item)
                 reply(.dictionary(["success": .bool(true), "id": .string(item.id)]))
-            } else {
-                replyError(-32602, "Invalid item payload")
+                return
             }
+
+            // 2. Fallback: Find existing item by id and update its fields
+            let targetId: String? = {
+                if let id = params?["id"]?.stringValue, !id.isEmpty { return id }
+                if let itemDict = params?["item"]?.dictionaryValue, let id = itemDict["id"]?.stringValue, !id.isEmpty { return id }
+                return nil
+            }()
+
+            if let id = targetId, let idx = store.items.firstIndex(where: { $0.id == id }) {
+                var existing = store.items[idx]
+                let patchDict = (params?["updates"]?.dictionaryValue) ?? (params?["item"]?.dictionaryValue) ?? [:]
+                if let t = patchDict["title"]?.stringValue { existing.title = t }
+                if let u = patchDict["username"]?.stringValue { existing.username = u }
+                if let p = patchDict["password"]?.stringValue { existing.password = p }
+                if let totp = patchDict["totpSecret"]?.stringValue { existing.totpSecret = totp.isEmpty ? nil : totp }
+                if let n = patchDict["notes"]?.stringValue { existing.notes = n }
+                if let urls = patchDict["urls"]?.arrayValue {
+                    existing.urls = urls.compactMap { $0.stringValue }
+                }
+                existing.updatedAt = ISO8601DateFormatter().string(from: Date())
+                store.saveItem(existing)
+                reply(.dictionary(["success": .bool(true), "id": .string(existing.id)]))
+                return
+            }
+
+            replyError(-32602, "Invalid item payload")
 
         case "vault.toggleFavorite":
             guard store.isUnlocked else {

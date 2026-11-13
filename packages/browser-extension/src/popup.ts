@@ -10,7 +10,6 @@ import {
   getAllKnownServiceNames,
   ServiceDomainInfo
 } from './service-domain-service';
-import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
 
 let allItems: any[] = [];
 let activeItem: any = null;
@@ -1192,7 +1191,7 @@ function showAddForm(type: string, initialValues?: { title?: string; username?: 
   });
 }
 
-function updateStrengthMeter(pwd: string) {
+function updateStrengthMeter(pwd: string, prefix = 'str') {
   let score = 0;
   if (pwd.length >= 8) score++;
   if (pwd.length >= 14) score++;
@@ -1203,17 +1202,48 @@ function updateStrengthMeter(pwd: string) {
   const labels = ['Weak', 'Fair', 'Good', 'Strong'];
 
   for (let i = 1; i <= 4; i++) {
-    const seg = document.getElementById(`str-${i}`);
+    const seg = document.getElementById(`${prefix}-${i}`);
     if (seg) {
       seg.style.background = i <= score ? colors[score - 1] : '#312E40';
     }
   }
 
-  const lbl = document.getElementById('str-label');
+  const lbl = document.getElementById(`${prefix}-label`);
   if (lbl) {
     lbl.textContent = score > 0 ? labels[score - 1] : 'Very weak';
     lbl.style.color = score > 0 ? colors[score - 1] : 'var(--text-muted)';
   }
+}
+
+function showToast(msg: string) {
+  let toast = document.getElementById('kloak-popup-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'kloak-popup-toast';
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1E1B2E;
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      z-index: 99999;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => {
+    if (toast) toast.style.opacity = '0';
+  }, 2200);
 }
 
 function startAddTotpLivePreview(secret: string) {
@@ -2088,15 +2118,6 @@ function renderSidebarList(items: any[]) {
     row.appendChild(avatar);
     row.appendChild(info);
 
-    if (item.type === 'login' && item.password) {
-      const risk = evaluateCredentialRisk(item, items);
-      const gaugeWrap = document.createElement('div');
-      gaugeWrap.className = 'sidebar-risk-wrap';
-      gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
-      gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2);
-      row.appendChild(gaugeWrap);
-    }
-
     row.addEventListener('click', () => selectItem(item));
     container.appendChild(row);
   });
@@ -2250,47 +2271,6 @@ function renderDetailPane(item: any) {
   const emailVal = document.getElementById('email-val');
   if (emailVal) emailVal.textContent = email;
 
-  // Security Risk & Health Assessment Card with Circular Circumference Gauge
-  if (item.type === 'login' && item.password) {
-    const risk = evaluateCredentialRisk(item, allItems);
-    const riskCard = document.createElement('div');
-    riskCard.className = 'card risk-detail-card';
-
-    const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
-
-    riskCard.innerHTML = `
-      <div class="risk-card-inner">
-        <div class="risk-gauge-container">
-          ${circumferenceSvg}
-        </div>
-        <div class="risk-info-column">
-          <div class="risk-header-row">
-            <span class="risk-title">Security & Risk Health</span>
-            <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
-              ${risk.label}
-            </span>
-          </div>
-          <div class="risk-chips-wrap">
-            <span class="risk-chip">🔐 ${risk.entropyBits} bits entropy</span>
-            <span class="risk-chip ${risk.isReused ? 'alert' : ''}">${risk.isReused ? `⚠️ Reused on ${risk.reusedCount + 1} sites` : '✓ Unique password'}</span>
-            <span class="risk-chip ${risk.has2FA ? 'success' : ''}">${risk.has2FA ? '🛡️ 2FA Active' : '⚠️ No 2FA'}</span>
-          </div>
-          ${item.passwordHistory && item.passwordHistory.length > 0 ? `
-            <div class="risk-history-info">
-              <span>🕒 ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? 's' : ''} archived in history</span>
-            </div>
-          ` : ''}
-          ${item.importSource ? `
-            <div class="risk-source-info">
-              <span>📥 Source: <strong>${item.importSource}</strong></span>
-            </div>
-          ` : ''}
-        </div>
-      </div>
-    `;
-    container.appendChild(riskCard);
-  }
-
   // Card 2: 2FA Live Authenticator
   if (item.totpSecret) {
     const totpCard = document.createElement('div');
@@ -2381,7 +2361,7 @@ function renderDetailPane(item: any) {
   }
 
   // Metadata
-  if (item.createdAt || item.updatedAt) {
+  if (item.createdAt || item.updatedAt || item.importSource) {
     const metaCard = document.createElement('div');
     metaCard.className = 'card';
     if (item.createdAt) {
@@ -2394,6 +2374,12 @@ function renderDetailPane(item: any) {
       const row = document.createElement('div');
       row.className = 'meta-row';
       row.innerHTML = `<span>Modified</span><span>${new Date(item.updatedAt).toLocaleDateString()}</span>`;
+      metaCard.appendChild(row);
+    }
+    if (item.importSource) {
+      const row = document.createElement('div');
+      row.className = 'meta-row';
+      row.innerHTML = `<span>Import Source</span><span>${item.importSource}</span>`;
       metaCard.appendChild(row);
     }
     container.appendChild(metaCard);
@@ -2497,10 +2483,55 @@ function enterEditMode(item: any) {
           <input type="text" class="edit-input" id="edit-username" value="${escHtml(item.username || '')}">
         </div>
       </div>
-      <div class="card-row">
-        <div class="card-content">
-          <div class="card-label">Password</div>
-          <input type="text" class="edit-input" id="edit-password" value="${escHtml(item.password || '')}">
+      <div class="card-row" style="flex-direction: column; align-items: stretch;">
+        <div style="display: flex; align-items: center; width: 100%;">
+          <div class="card-content" style="margin-right: 8px;">
+            <div class="card-label">Password</div>
+            <input type="password" class="edit-input" id="edit-password" value="${escHtml(item.password || '')}" placeholder="Password">
+          </div>
+          <div class="card-actions" style="margin-top: 14px; display: flex; gap: 4px;">
+            <div class="action-icon" id="btn-toggle-edit-pwd" title="Toggle visibility">
+              <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </div>
+            <div class="action-icon" id="btn-toggle-edit-gen" title="Password generator" style="color: var(--accent);">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM7 7h2v2H7V7zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm10 2h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Password Strength Meter for Edit Mode -->
+        <div class="strength-wrapper" id="edit-strength-box" style="display: ${item.password ? 'flex' : 'none'}; margin-top: 8px;">
+          <div class="strength-bars">
+            <div class="strength-segment" id="edit-str-1"></div>
+            <div class="strength-segment" id="edit-str-2"></div>
+            <div class="strength-segment" id="edit-str-3"></div>
+            <div class="strength-segment" id="edit-str-4"></div>
+          </div>
+          <div class="strength-label" id="edit-str-label">Strength</div>
+        </div>
+
+        <!-- Inline Generator Panel for Edit Mode -->
+        <div class="inline-gen-panel" id="edit-gen-panel" style="display: none; margin-top: 8px;">
+          <div class="gen-row">
+            <span style="font-weight: 500; color: var(--text-main);">Length</span>
+            <div class="gen-slider-container">
+              <input type="range" class="gen-slider" id="edit-gen-length-slider" min="8" max="64" value="20">
+              <span id="edit-gen-length-num" style="font-weight: 600; color: var(--accent); min-width: 20px;">20</span>
+            </div>
+          </div>
+          <div class="gen-options-row">
+            <label class="gen-chip active" id="edit-chip-upper"><input type="checkbox" checked id="edit-chk-upper"> A-Z</label>
+            <label class="gen-chip active" id="edit-chip-lower"><input type="checkbox" checked id="edit-chk-lower"> a-z</label>
+            <label class="gen-chip active" id="edit-chip-digits"><input type="checkbox" checked id="edit-chk-digits"> 0-9</label>
+            <label class="gen-chip active" id="edit-chip-symbols"><input type="checkbox" checked id="edit-chk-symbols"> !@#$%</label>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+            <button class="btn-pill" id="btn-edit-regen-pwd" style="height: 24px; font-size: 11px;">
+              <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              Regenerate
+            </button>
+            <button class="btn-pill" id="btn-edit-apply-pwd" style="height: 24px; font-size: 11px; background: var(--accent); color: #fff;">Use Password</button>
+          </div>
         </div>
       </div>
       <div class="card-row">
@@ -2714,33 +2745,169 @@ function enterEditMode(item: any) {
     updateEditDomainSuggestions(item.title);
   }
 
+  // Password Visibility Toggle
+  document.getElementById('btn-toggle-edit-pwd')?.addEventListener('click', () => {
+    const pwdInput = document.getElementById('edit-password') as HTMLInputElement | null;
+    if (pwdInput) {
+      pwdInput.type = pwdInput.type === 'password' ? 'text' : 'password';
+    }
+  });
+
+  // Generator Helper
+  function generateEditPassword(): string {
+    const slider = document.getElementById('edit-gen-length-slider') as HTMLInputElement | null;
+    const len = slider ? parseInt(slider.value, 10) : 20;
+    const upper = (document.getElementById('edit-chk-upper') as HTMLInputElement | null)?.checked ?? true;
+    const lower = (document.getElementById('edit-chk-lower') as HTMLInputElement | null)?.checked ?? true;
+    const digits = (document.getElementById('edit-chk-digits') as HTMLInputElement | null)?.checked ?? true;
+    const symbols = (document.getElementById('edit-chk-symbols') as HTMLInputElement | null)?.checked ?? true;
+
+    let chars = '';
+    if (lower) chars += 'abcdefghijklmnopqrstuvwxyz';
+    if (upper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    if (digits) chars += '0123456789';
+    if (symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    if (!chars) chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+    const array = new Uint32Array(len);
+    crypto.getRandomValues(array);
+    let result = '';
+    for (let i = 0; i < len; i++) {
+      result += chars.charAt(array[i] % chars.length);
+    }
+    return result;
+  }
+
+  // Password Generator Panel Toggle
+  document.getElementById('btn-toggle-edit-gen')?.addEventListener('click', () => {
+    const panel = document.getElementById('edit-gen-panel');
+    if (panel) {
+      const isOpen = panel.style.display !== 'none';
+      panel.style.display = isOpen ? 'none' : 'flex';
+      if (!isOpen) {
+        const generated = generateEditPassword();
+        const pwdInput = document.getElementById('edit-password') as HTMLInputElement | null;
+        if (pwdInput) {
+          pwdInput.value = generated;
+          pwdInput.type = 'text';
+          const strengthBox = document.getElementById('edit-strength-box');
+          if (strengthBox) strengthBox.style.display = 'flex';
+          updateStrengthMeter(generated, 'edit-str');
+        }
+      }
+    }
+  });
+
+  // Generator Slider & Options
+  const editSlider = document.getElementById('edit-gen-length-slider') as HTMLInputElement | null;
+  const editNumDisplay = document.getElementById('edit-gen-length-num');
+  editSlider?.addEventListener('input', () => {
+    if (editNumDisplay) editNumDisplay.textContent = editSlider.value;
+  });
+
+  ['edit-chk-upper', 'edit-chk-lower', 'edit-chk-digits', 'edit-chk-symbols'].forEach(id => {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    el?.addEventListener('change', () => {
+      el.parentElement?.classList.toggle('active', el.checked);
+    });
+  });
+
+  document.getElementById('btn-edit-regen-pwd')?.addEventListener('click', () => {
+    const generated = generateEditPassword();
+    const pwdInput = document.getElementById('edit-password') as HTMLInputElement | null;
+    if (pwdInput) {
+      pwdInput.value = generated;
+      pwdInput.type = 'text';
+      const strengthBox = document.getElementById('edit-strength-box');
+      if (strengthBox) strengthBox.style.display = 'flex';
+      updateStrengthMeter(generated, 'edit-str');
+    }
+  });
+
+  document.getElementById('btn-edit-apply-pwd')?.addEventListener('click', () => {
+    const panel = document.getElementById('edit-gen-panel');
+    if (panel) panel.style.display = 'none';
+    showToast('✓ Generated password applied');
+  });
+
+  // Password Input Listener for Real-Time Strength Meter
+  const editPwdInput = document.getElementById('edit-password') as HTMLInputElement | null;
+  editPwdInput?.addEventListener('input', () => {
+    const p = editPwdInput.value;
+    const strengthBox = document.getElementById('edit-strength-box');
+    if (!p) {
+      if (strengthBox) strengthBox.style.display = 'none';
+      return;
+    }
+    if (strengthBox) strengthBox.style.display = 'flex';
+    updateStrengthMeter(p, 'edit-str');
+  });
+
+  // Initial Strength Meter Check
+  if (item.password) {
+    updateStrengthMeter(item.password, 'edit-str');
+  }
+
   document.getElementById('btn-cancel-edit')?.addEventListener('click', () => {
     renderDetailPane(item);
   });
 
+  // Save Edit Handler
   document.getElementById('btn-save-edit')?.addEventListener('click', () => {
+    const saveBtn = document.getElementById('btn-save-edit') as HTMLButtonElement | null;
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = '0.7';
+      saveBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; margin-right: 4px; animation: spin 1s linear infinite;"><path fill="currentColor" d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg>
+        Saving...
+      `;
+    }
+
     const editUrlInputs = Array.from(document.querySelectorAll<HTMLInputElement>('.edit-url-input'));
     const urls = editUrlInputs.map(i => i.value.trim()).filter(Boolean);
 
+    const titleVal = (document.getElementById('edit-title') as HTMLInputElement | null)?.value ?? item.title ?? '';
+    const userVal = (document.getElementById('edit-username') as HTMLInputElement | null)?.value ?? item.username ?? '';
+    const pwdVal = (document.getElementById('edit-password') as HTMLInputElement | null)?.value ?? item.password ?? '';
+    const totpVal = (document.getElementById('edit-totp') as HTMLInputElement | null)?.value ?? item.totpSecret ?? '';
+    const notesVal = (document.getElementById('edit-notes') as HTMLTextAreaElement | null)?.value ?? item.notes ?? '';
+
+    // Track password history if password changed
+    const oldPassword = item.password;
+    let passwordHistory = Array.isArray(item.passwordHistory) ? [...item.passwordHistory] : [];
+    if (oldPassword && pwdVal && oldPassword !== pwdVal) {
+      passwordHistory.unshift({
+        password: oldPassword,
+        replacedAt: new Date().toISOString()
+      });
+      if (passwordHistory.length > 10) passwordHistory = passwordHistory.slice(0, 10);
+    }
+
     const updated = {
       ...item,
-      title: (document.getElementById('edit-title') as HTMLInputElement).value,
-      username: (document.getElementById('edit-username') as HTMLInputElement).value,
-      password: (document.getElementById('edit-password') as HTMLInputElement).value,
-      totpSecret: (document.getElementById('edit-totp') as HTMLInputElement).value.trim().replace(/\s+/g, '') || undefined,
-      urls,
-      notes: (document.getElementById('edit-notes') as HTMLTextAreaElement).value,
+      title: titleVal.trim() || item.title || 'Untitled',
+      username: userVal.trim(),
+      password: pwdVal,
+      totpSecret: totpVal.trim().replace(/\s+/g, '') || undefined,
+      urls: urls.length > 0 ? urls : (item.urls || []),
+      notes: notesVal.trim(),
+      passwordHistory,
       updatedAt: new Date().toISOString(),
     };
 
     chrome.runtime.sendMessage({ type: 'UPDATE_ITEM', item: updated }, (res) => {
-      if (res?.success) {
-        const idx = allItems.findIndex(i => i.id === item.id);
-        if (idx !== -1) allItems[idx] = updated;
-        activeItem = updated;
-        renderSidebarList(allItems);
-        renderDetailPane(updated);
+      const savedItem = (res && res.item) ? { ...updated, ...res.item } : updated;
+      const idx = allItems.findIndex(i => i.id === item.id);
+      if (idx !== -1) {
+        allItems[idx] = savedItem;
+      } else {
+        allItems.push(savedItem);
       }
+      activeItem = savedItem;
+      renderSidebarList(allItems);
+      renderDetailPane(savedItem);
+      showToast('✓ Password updated successfully');
     });
   });
 }

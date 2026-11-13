@@ -1909,144 +1909,6 @@
     return container;
   }
 
-  // src/risk-assessment.ts
-  function evaluatePasswordEntropy(password) {
-    if (!password) return 0;
-    let poolSize = 0;
-    if (/[a-z]/.test(password)) poolSize += 26;
-    if (/[A-Z]/.test(password)) poolSize += 26;
-    if (/[0-9]/.test(password)) poolSize += 10;
-    if (/[^a-zA-Z0-9]/.test(password)) poolSize += 33;
-    if (poolSize === 0) poolSize = 1;
-    return Math.round(password.length * Math.log2(poolSize));
-  }
-  function evaluateCredentialRisk(item, allItems2 = []) {
-    const pwd = item.password || "";
-    const reasons = [];
-    if (!pwd) {
-      return {
-        score: 10,
-        riskLevel: "high",
-        label: "High Risk",
-        color: "#EF4444",
-        entropyBits: 0,
-        isReused: false,
-        reusedCount: 0,
-        has2FA: !!item.totpSecret,
-        reasons: ["No password is set for this login"]
-      };
-    }
-    const entropy = evaluatePasswordEntropy(pwd);
-    let score = Math.round(Math.min(100, Math.max(10, entropy)));
-    if (pwd.length < 8) {
-      score = Math.min(score, 25);
-      reasons.push("Password length is under 8 characters (Critical)");
-    } else if (pwd.length < 12) {
-      score = Math.min(score, 60);
-      reasons.push("Password length is under 12 characters");
-    }
-    const weakPatterns = /^(password|123456|qwerty|admin|welcome|letmein|login|test)/i;
-    if (weakPatterns.test(pwd)) {
-      score = Math.min(score, 20);
-      reasons.push("Contains common predictable dictionary words");
-    }
-    let isReused = false;
-    let reusedCount = 0;
-    const currentDomain = (item.urls?.[0] || item.title || "").toLowerCase();
-    for (const other of allItems2) {
-      if (other.id === item.id) continue;
-      if (other.password && other.password === pwd) {
-        const otherDomain = (other.urls?.[0] || other.title || "").toLowerCase();
-        if (otherDomain !== currentDomain) {
-          isReused = true;
-          reusedCount++;
-        }
-      }
-    }
-    if (isReused) {
-      score = Math.max(15, score - 35);
-      reasons.push(`Password reused on ${reusedCount + 1} different online services`);
-    }
-    const has2FA = !!item.totpSecret;
-    if (has2FA) {
-      score = Math.min(100, score + 12);
-    } else {
-      reasons.push("Two-factor authentication (2FA) is not enabled");
-    }
-    score = Math.max(10, Math.min(100, score));
-    let riskLevel = "low";
-    let color = "#10B981";
-    let label = "Low Risk";
-    if (score < 50) {
-      riskLevel = "high";
-      color = "#EF4444";
-      label = "High Risk";
-    } else if (score < 80) {
-      riskLevel = "medium";
-      color = "#F59E0B";
-      label = "Medium Risk";
-    }
-    if (reasons.length === 0) {
-      reasons.push("Strong unique password with high cryptographic entropy");
-      if (has2FA) reasons.push("Hardware 2FA / TOTP protection enabled");
-    }
-    return {
-      score,
-      riskLevel,
-      label,
-      color,
-      entropyBits: entropy,
-      isReused,
-      reusedCount,
-      has2FA,
-      reasons
-    };
-  }
-  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
-    const radius = (size - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - circumference * score / 100;
-    const center = size / 2;
-    const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
-    const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
-    return `
-    <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
-      <circle
-        class="kloak-gauge-bg"
-        cx="${center}"
-        cy="${center}"
-        r="${radius}"
-        stroke="rgba(255,255,255,0.12)"
-        stroke-width="${stroke}"
-        fill="none"
-      />
-      <circle
-        class="kloak-gauge-bar"
-        cx="${center}"
-        cy="${center}"
-        r="${radius}"
-        stroke="${color}"
-        stroke-width="${stroke}"
-        stroke-dasharray="${circumference.toFixed(2)}"
-        stroke-dashoffset="${offset.toFixed(2)}"
-        stroke-linecap="round"
-        fill="none"
-        transform="rotate(-90 ${center} ${center})"
-        style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
-      />
-      <text
-        x="${center}"
-        y="${textY}"
-        text-anchor="middle"
-        font-size="${fontSize}px"
-        font-weight="700"
-        fill="${color}"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      >${score}%</text>
-    </svg>
-  `;
-  }
-
   // src/popup.ts
   var allItems = [];
   var activeItem = null;
@@ -3237,7 +3099,7 @@ ${notes}`;
       });
     });
   }
-  function updateStrengthMeter(pwd) {
+  function updateStrengthMeter(pwd, prefix = "str") {
     let score = 0;
     if (pwd.length >= 8) score++;
     if (pwd.length >= 14) score++;
@@ -3246,16 +3108,46 @@ ${notes}`;
     const colors = ["#F54A4A", "#FF884D", "#FFB800", "#29C98F"];
     const labels = ["Weak", "Fair", "Good", "Strong"];
     for (let i = 1; i <= 4; i++) {
-      const seg = document.getElementById(`str-${i}`);
+      const seg = document.getElementById(`${prefix}-${i}`);
       if (seg) {
         seg.style.background = i <= score ? colors[score - 1] : "#312E40";
       }
     }
-    const lbl = document.getElementById("str-label");
+    const lbl = document.getElementById(`${prefix}-label`);
     if (lbl) {
       lbl.textContent = score > 0 ? labels[score - 1] : "Very weak";
       lbl.style.color = score > 0 ? colors[score - 1] : "var(--text-muted)";
     }
+  }
+  function showToast(msg) {
+    let toast = document.getElementById("kloak-popup-toast");
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "kloak-popup-toast";
+      toast.style.cssText = `
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1E1B2E;
+      color: #10B981;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+      z-index: 99999;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    `;
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = "1";
+    setTimeout(() => {
+      if (toast) toast.style.opacity = "0";
+    }, 2200);
   }
   function startAddTotpLivePreview(secret) {
     if (addTotpInterval) clearInterval(addTotpInterval);
@@ -4028,14 +3920,6 @@ ${notes}`;
       info.appendChild(subEl);
       row.appendChild(avatar);
       row.appendChild(info);
-      if (item.type === "login" && item.password) {
-        const risk = evaluateCredentialRisk(item, items);
-        const gaugeWrap = document.createElement("div");
-        gaugeWrap.className = "sidebar-risk-wrap";
-        gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
-        gaugeWrap.innerHTML = renderCircumferenceSvg(risk.score, risk.color, 20, 2.2);
-        row.appendChild(gaugeWrap);
-      }
       row.addEventListener("click", () => selectItem(item));
       container.appendChild(row);
     });
@@ -4169,43 +4053,6 @@ ${notes}`;
     if (userVal) userVal.textContent = username;
     const emailVal = document.getElementById("email-val");
     if (emailVal) emailVal.textContent = email;
-    if (item.type === "login" && item.password) {
-      const risk = evaluateCredentialRisk(item, allItems);
-      const riskCard = document.createElement("div");
-      riskCard.className = "card risk-detail-card";
-      const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
-      riskCard.innerHTML = `
-      <div class="risk-card-inner">
-        <div class="risk-gauge-container">
-          ${circumferenceSvg}
-        </div>
-        <div class="risk-info-column">
-          <div class="risk-header-row">
-            <span class="risk-title">Security & Risk Health</span>
-            <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
-              ${risk.label}
-            </span>
-          </div>
-          <div class="risk-chips-wrap">
-            <span class="risk-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
-            <span class="risk-chip ${risk.isReused ? "alert" : ""}">${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</span>
-            <span class="risk-chip ${risk.has2FA ? "success" : ""}">${risk.has2FA ? "\u{1F6E1}\uFE0F 2FA Active" : "\u26A0\uFE0F No 2FA"}</span>
-          </div>
-          ${item.passwordHistory && item.passwordHistory.length > 0 ? `
-            <div class="risk-history-info">
-              <span>\u{1F552} ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? "s" : ""} archived in history</span>
-            </div>
-          ` : ""}
-          ${item.importSource ? `
-            <div class="risk-source-info">
-              <span>\u{1F4E5} Source: <strong>${item.importSource}</strong></span>
-            </div>
-          ` : ""}
-        </div>
-      </div>
-    `;
-      container.appendChild(riskCard);
-    }
     if (item.totpSecret) {
       const totpCard = document.createElement("div");
       totpCard.className = "totp-container";
@@ -4284,7 +4131,7 @@ ${notes}`;
       const notesVal = document.getElementById("notes-val");
       if (notesVal) notesVal.textContent = notes;
     }
-    if (item.createdAt || item.updatedAt) {
+    if (item.createdAt || item.updatedAt || item.importSource) {
       const metaCard = document.createElement("div");
       metaCard.className = "card";
       if (item.createdAt) {
@@ -4297,6 +4144,12 @@ ${notes}`;
         const row = document.createElement("div");
         row.className = "meta-row";
         row.innerHTML = `<span>Modified</span><span>${new Date(item.updatedAt).toLocaleDateString()}</span>`;
+        metaCard.appendChild(row);
+      }
+      if (item.importSource) {
+        const row = document.createElement("div");
+        row.className = "meta-row";
+        row.innerHTML = `<span>Import Source</span><span>${item.importSource}</span>`;
         metaCard.appendChild(row);
       }
       container.appendChild(metaCard);
@@ -4397,10 +4250,55 @@ ${notes}`;
           <input type="text" class="edit-input" id="edit-username" value="${escHtml(item.username || "")}">
         </div>
       </div>
-      <div class="card-row">
-        <div class="card-content">
-          <div class="card-label">Password</div>
-          <input type="text" class="edit-input" id="edit-password" value="${escHtml(item.password || "")}">
+      <div class="card-row" style="flex-direction: column; align-items: stretch;">
+        <div style="display: flex; align-items: center; width: 100%;">
+          <div class="card-content" style="margin-right: 8px;">
+            <div class="card-label">Password</div>
+            <input type="password" class="edit-input" id="edit-password" value="${escHtml(item.password || "")}" placeholder="Password">
+          </div>
+          <div class="card-actions" style="margin-top: 14px; display: flex; gap: 4px;">
+            <div class="action-icon" id="btn-toggle-edit-pwd" title="Toggle visibility">
+              <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </div>
+            <div class="action-icon" id="btn-toggle-edit-gen" title="Password generator" style="color: var(--accent);">
+              <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM7 7h2v2H7V7zm0 4h2v2H7v-2zm0 4h2v2H7v-2zm10 2h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Password Strength Meter for Edit Mode -->
+        <div class="strength-wrapper" id="edit-strength-box" style="display: ${item.password ? "flex" : "none"}; margin-top: 8px;">
+          <div class="strength-bars">
+            <div class="strength-segment" id="edit-str-1"></div>
+            <div class="strength-segment" id="edit-str-2"></div>
+            <div class="strength-segment" id="edit-str-3"></div>
+            <div class="strength-segment" id="edit-str-4"></div>
+          </div>
+          <div class="strength-label" id="edit-str-label">Strength</div>
+        </div>
+
+        <!-- Inline Generator Panel for Edit Mode -->
+        <div class="inline-gen-panel" id="edit-gen-panel" style="display: none; margin-top: 8px;">
+          <div class="gen-row">
+            <span style="font-weight: 500; color: var(--text-main);">Length</span>
+            <div class="gen-slider-container">
+              <input type="range" class="gen-slider" id="edit-gen-length-slider" min="8" max="64" value="20">
+              <span id="edit-gen-length-num" style="font-weight: 600; color: var(--accent); min-width: 20px;">20</span>
+            </div>
+          </div>
+          <div class="gen-options-row">
+            <label class="gen-chip active" id="edit-chip-upper"><input type="checkbox" checked id="edit-chk-upper"> A-Z</label>
+            <label class="gen-chip active" id="edit-chip-lower"><input type="checkbox" checked id="edit-chk-lower"> a-z</label>
+            <label class="gen-chip active" id="edit-chip-digits"><input type="checkbox" checked id="edit-chk-digits"> 0-9</label>
+            <label class="gen-chip active" id="edit-chip-symbols"><input type="checkbox" checked id="edit-chk-symbols"> !@#$%</label>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px;">
+            <button class="btn-pill" id="btn-edit-regen-pwd" style="height: 24px; font-size: 11px;">
+              <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+              Regenerate
+            </button>
+            <button class="btn-pill" id="btn-edit-apply-pwd" style="height: 24px; font-size: 11px; background: var(--accent); color: #fff;">Use Password</button>
+          </div>
         </div>
       </div>
       <div class="card-row">
@@ -4587,30 +4485,144 @@ ${notes}`;
     if (item.title) {
       updateEditDomainSuggestions(item.title);
     }
+    document.getElementById("btn-toggle-edit-pwd")?.addEventListener("click", () => {
+      const pwdInput = document.getElementById("edit-password");
+      if (pwdInput) {
+        pwdInput.type = pwdInput.type === "password" ? "text" : "password";
+      }
+    });
+    function generateEditPassword() {
+      const slider = document.getElementById("edit-gen-length-slider");
+      const len = slider ? parseInt(slider.value, 10) : 20;
+      const upper = document.getElementById("edit-chk-upper")?.checked ?? true;
+      const lower = document.getElementById("edit-chk-lower")?.checked ?? true;
+      const digits = document.getElementById("edit-chk-digits")?.checked ?? true;
+      const symbols = document.getElementById("edit-chk-symbols")?.checked ?? true;
+      let chars = "";
+      if (lower) chars += "abcdefghijklmnopqrstuvwxyz";
+      if (upper) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      if (digits) chars += "0123456789";
+      if (symbols) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?";
+      if (!chars) chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      const array = new Uint32Array(len);
+      crypto.getRandomValues(array);
+      let result = "";
+      for (let i = 0; i < len; i++) {
+        result += chars.charAt(array[i] % chars.length);
+      }
+      return result;
+    }
+    document.getElementById("btn-toggle-edit-gen")?.addEventListener("click", () => {
+      const panel = document.getElementById("edit-gen-panel");
+      if (panel) {
+        const isOpen = panel.style.display !== "none";
+        panel.style.display = isOpen ? "none" : "flex";
+        if (!isOpen) {
+          const generated = generateEditPassword();
+          const pwdInput = document.getElementById("edit-password");
+          if (pwdInput) {
+            pwdInput.value = generated;
+            pwdInput.type = "text";
+            const strengthBox = document.getElementById("edit-strength-box");
+            if (strengthBox) strengthBox.style.display = "flex";
+            updateStrengthMeter(generated, "edit-str");
+          }
+        }
+      }
+    });
+    const editSlider = document.getElementById("edit-gen-length-slider");
+    const editNumDisplay = document.getElementById("edit-gen-length-num");
+    editSlider?.addEventListener("input", () => {
+      if (editNumDisplay) editNumDisplay.textContent = editSlider.value;
+    });
+    ["edit-chk-upper", "edit-chk-lower", "edit-chk-digits", "edit-chk-symbols"].forEach((id) => {
+      const el = document.getElementById(id);
+      el?.addEventListener("change", () => {
+        el.parentElement?.classList.toggle("active", el.checked);
+      });
+    });
+    document.getElementById("btn-edit-regen-pwd")?.addEventListener("click", () => {
+      const generated = generateEditPassword();
+      const pwdInput = document.getElementById("edit-password");
+      if (pwdInput) {
+        pwdInput.value = generated;
+        pwdInput.type = "text";
+        const strengthBox = document.getElementById("edit-strength-box");
+        if (strengthBox) strengthBox.style.display = "flex";
+        updateStrengthMeter(generated, "edit-str");
+      }
+    });
+    document.getElementById("btn-edit-apply-pwd")?.addEventListener("click", () => {
+      const panel = document.getElementById("edit-gen-panel");
+      if (panel) panel.style.display = "none";
+      showToast("\u2713 Generated password applied");
+    });
+    const editPwdInput = document.getElementById("edit-password");
+    editPwdInput?.addEventListener("input", () => {
+      const p = editPwdInput.value;
+      const strengthBox = document.getElementById("edit-strength-box");
+      if (!p) {
+        if (strengthBox) strengthBox.style.display = "none";
+        return;
+      }
+      if (strengthBox) strengthBox.style.display = "flex";
+      updateStrengthMeter(p, "edit-str");
+    });
+    if (item.password) {
+      updateStrengthMeter(item.password, "edit-str");
+    }
     document.getElementById("btn-cancel-edit")?.addEventListener("click", () => {
       renderDetailPane(item);
     });
     document.getElementById("btn-save-edit")?.addEventListener("click", () => {
+      const saveBtn = document.getElementById("btn-save-edit");
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = "0.7";
+        saveBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; margin-right: 4px; animation: spin 1s linear infinite;"><path fill="currentColor" d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg>
+        Saving...
+      `;
+      }
       const editUrlInputs = Array.from(document.querySelectorAll(".edit-url-input"));
       const urls = editUrlInputs.map((i) => i.value.trim()).filter(Boolean);
+      const titleVal = document.getElementById("edit-title")?.value ?? item.title ?? "";
+      const userVal = document.getElementById("edit-username")?.value ?? item.username ?? "";
+      const pwdVal = document.getElementById("edit-password")?.value ?? item.password ?? "";
+      const totpVal = document.getElementById("edit-totp")?.value ?? item.totpSecret ?? "";
+      const notesVal = document.getElementById("edit-notes")?.value ?? item.notes ?? "";
+      const oldPassword = item.password;
+      let passwordHistory2 = Array.isArray(item.passwordHistory) ? [...item.passwordHistory] : [];
+      if (oldPassword && pwdVal && oldPassword !== pwdVal) {
+        passwordHistory2.unshift({
+          password: oldPassword,
+          replacedAt: (/* @__PURE__ */ new Date()).toISOString()
+        });
+        if (passwordHistory2.length > 10) passwordHistory2 = passwordHistory2.slice(0, 10);
+      }
       const updated = {
         ...item,
-        title: document.getElementById("edit-title").value,
-        username: document.getElementById("edit-username").value,
-        password: document.getElementById("edit-password").value,
-        totpSecret: document.getElementById("edit-totp").value.trim().replace(/\s+/g, "") || void 0,
-        urls,
-        notes: document.getElementById("edit-notes").value,
+        title: titleVal.trim() || item.title || "Untitled",
+        username: userVal.trim(),
+        password: pwdVal,
+        totpSecret: totpVal.trim().replace(/\s+/g, "") || void 0,
+        urls: urls.length > 0 ? urls : item.urls || [],
+        notes: notesVal.trim(),
+        passwordHistory: passwordHistory2,
         updatedAt: (/* @__PURE__ */ new Date()).toISOString()
       };
       chrome.runtime.sendMessage({ type: "UPDATE_ITEM", item: updated }, (res) => {
-        if (res?.success) {
-          const idx = allItems.findIndex((i) => i.id === item.id);
-          if (idx !== -1) allItems[idx] = updated;
-          activeItem = updated;
-          renderSidebarList(allItems);
-          renderDetailPane(updated);
+        const savedItem = res && res.item ? { ...updated, ...res.item } : updated;
+        const idx = allItems.findIndex((i) => i.id === item.id);
+        if (idx !== -1) {
+          allItems[idx] = savedItem;
+        } else {
+          allItems.push(savedItem);
         }
+        activeItem = savedItem;
+        renderSidebarList(allItems);
+        renderDetailPane(savedItem);
+        showToast("\u2713 Password updated successfully");
       });
     });
   }

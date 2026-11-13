@@ -254,8 +254,14 @@ class IpcSocketServer {
             }
             case 'vault.addItem':
                 return this.vaultManager.addItem(params.item);
-            case 'vault.updateItem':
-                return this.vaultManager.updateItem(params.id, params.updates);
+            case 'vault.updateItem': {
+                const id = params.id || params.item?.id;
+                const updates = params.updates || params.item;
+                if (!id) {
+                    throw new Error('Item ID is required for vault.updateItem');
+                }
+                return this.vaultManager.updateItem(id, updates);
+            }
             case 'vault.deleteItem':
                 this.vaultManager.deleteItem(params.id, Boolean(params.permanent));
                 return { success: true };

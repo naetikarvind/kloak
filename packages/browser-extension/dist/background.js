@@ -1474,20 +1474,51 @@
         }
         case "UPDATE_ITEM": {
           const { item } = message;
-          await sendNativeRequest("vault.updateItem", { item });
-          const index = cachedItems.findIndex((i) => i.id === item.id);
-          if (index !== -1) {
-            cachedItems[index] = { ...cachedItems[index], ...item };
+          if (!item || !item.id) {
+            sendResponse({ success: false, error: "Invalid item data" });
+            break;
           }
-          sendResponse({ success: true });
+          try {
+            const res = await sendNativeRequest("vault.updateItem", {
+              id: item.id,
+              updates: item,
+              item
+            });
+            const index = cachedItems.findIndex((i) => i.id === item.id);
+            if (index !== -1) {
+              cachedItems[index] = { ...cachedItems[index], ...item };
+            } else {
+              cachedItems.push(item);
+            }
+            sendResponse({ success: true, item: res || item });
+          } catch (err) {
+            console.warn("[Kloak] Failed to update item in native host, updating local cache:", err);
+            const index = cachedItems.findIndex((i) => i.id === item.id);
+            if (index !== -1) {
+              cachedItems[index] = { ...cachedItems[index], ...item };
+            }
+            sendResponse({ success: true, warning: err.message, item });
+          }
           break;
         }
         case "ADD_ITEM": {
           const { item } = message;
-          item.id = `new-${Date.now()}`;
-          await sendNativeRequest("vault.addItem", { item });
-          cachedItems.push(item);
-          sendResponse({ success: true, item });
+          if (!item) {
+            sendResponse({ success: false, error: "Invalid item" });
+            break;
+          }
+          if (!item.id) {
+            item.id = `item-${Date.now()}`;
+          }
+          try {
+            const res = await sendNativeRequest("vault.addItem", { item });
+            cachedItems.push(res || item);
+            sendResponse({ success: true, item: res || item });
+          } catch (err) {
+            console.warn("[Kloak] Failed to add item to native host, caching locally:", err);
+            cachedItems.push(item);
+            sendResponse({ success: true, item });
+          }
           break;
         }
         case "IMPORT_PASSWORDS": {

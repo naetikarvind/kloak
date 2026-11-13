@@ -1906,144 +1906,6 @@
     return container;
   }
 
-  // src/risk-assessment.ts
-  function evaluatePasswordEntropy(password) {
-    if (!password) return 0;
-    let poolSize = 0;
-    if (/[a-z]/.test(password)) poolSize += 26;
-    if (/[A-Z]/.test(password)) poolSize += 26;
-    if (/[0-9]/.test(password)) poolSize += 10;
-    if (/[^a-zA-Z0-9]/.test(password)) poolSize += 33;
-    if (poolSize === 0) poolSize = 1;
-    return Math.round(password.length * Math.log2(poolSize));
-  }
-  function evaluateCredentialRisk(item, allItems = []) {
-    const pwd = item.password || "";
-    const reasons = [];
-    if (!pwd) {
-      return {
-        score: 10,
-        riskLevel: "high",
-        label: "High Risk",
-        color: "#EF4444",
-        entropyBits: 0,
-        isReused: false,
-        reusedCount: 0,
-        has2FA: !!item.totpSecret,
-        reasons: ["No password is set for this login"]
-      };
-    }
-    const entropy = evaluatePasswordEntropy(pwd);
-    let score = Math.round(Math.min(100, Math.max(10, entropy)));
-    if (pwd.length < 8) {
-      score = Math.min(score, 25);
-      reasons.push("Password length is under 8 characters (Critical)");
-    } else if (pwd.length < 12) {
-      score = Math.min(score, 60);
-      reasons.push("Password length is under 12 characters");
-    }
-    const weakPatterns = /^(password|123456|qwerty|admin|welcome|letmein|login|test)/i;
-    if (weakPatterns.test(pwd)) {
-      score = Math.min(score, 20);
-      reasons.push("Contains common predictable dictionary words");
-    }
-    let isReused = false;
-    let reusedCount = 0;
-    const currentDomain = (item.urls?.[0] || item.title || "").toLowerCase();
-    for (const other of allItems) {
-      if (other.id === item.id) continue;
-      if (other.password && other.password === pwd) {
-        const otherDomain = (other.urls?.[0] || other.title || "").toLowerCase();
-        if (otherDomain !== currentDomain) {
-          isReused = true;
-          reusedCount++;
-        }
-      }
-    }
-    if (isReused) {
-      score = Math.max(15, score - 35);
-      reasons.push(`Password reused on ${reusedCount + 1} different online services`);
-    }
-    const has2FA = !!item.totpSecret;
-    if (has2FA) {
-      score = Math.min(100, score + 12);
-    } else {
-      reasons.push("Two-factor authentication (2FA) is not enabled");
-    }
-    score = Math.max(10, Math.min(100, score));
-    let riskLevel = "low";
-    let color = "#10B981";
-    let label = "Low Risk";
-    if (score < 50) {
-      riskLevel = "high";
-      color = "#EF4444";
-      label = "High Risk";
-    } else if (score < 80) {
-      riskLevel = "medium";
-      color = "#F59E0B";
-      label = "Medium Risk";
-    }
-    if (reasons.length === 0) {
-      reasons.push("Strong unique password with high cryptographic entropy");
-      if (has2FA) reasons.push("Hardware 2FA / TOTP protection enabled");
-    }
-    return {
-      score,
-      riskLevel,
-      label,
-      color,
-      entropyBits: entropy,
-      isReused,
-      reusedCount,
-      has2FA,
-      reasons
-    };
-  }
-  function renderCircumferenceSvg(score, color, size = 28, stroke = 2.5) {
-    const radius = (size - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - circumference * score / 100;
-    const center = size / 2;
-    const fontSize = size >= 48 ? 13 : size >= 36 ? 10 : 8;
-    const textY = size >= 48 ? center + 4.5 : size >= 36 ? center + 3.5 : center + 3;
-    return `
-    <svg class="kloak-circumference-gauge" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display: block; flex-shrink: 0;">
-      <circle
-        class="kloak-gauge-bg"
-        cx="${center}"
-        cy="${center}"
-        r="${radius}"
-        stroke="rgba(255,255,255,0.12)"
-        stroke-width="${stroke}"
-        fill="none"
-      />
-      <circle
-        class="kloak-gauge-bar"
-        cx="${center}"
-        cy="${center}"
-        r="${radius}"
-        stroke="${color}"
-        stroke-width="${stroke}"
-        stroke-dasharray="${circumference.toFixed(2)}"
-        stroke-dashoffset="${offset.toFixed(2)}"
-        stroke-linecap="round"
-        fill="none"
-        transform="rotate(-90 ${center} ${center})"
-        style="transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1);"
-      />
-      <text
-        x="${center}"
-        y="${textY}"
-        text-anchor="middle"
-        font-size="${fontSize}px"
-        font-weight="700"
-        fill="${color}"
-        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-      >${score}%</text>
-    </svg>
-  `;
-  }
-
   // src/content.ts
   var shadowHost = null;
   var shadowRoot = null;
@@ -2055,7 +1917,6 @@
   var currentGeneratedPassword = "";
   var isRevealingPasswordMap = {};
   var cachedAiEvaluation = null;
-  var isAiDrawerExpanded = false;
   function pushActiveUrl() {
     chrome.runtime.sendMessage({
       type: "PUSH_ACTIVE_URL",
@@ -2358,20 +2219,24 @@
   var POPUP_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   
+  /* \u2500\u2500 Japanese Bento Box Frame \u2500\u2500 */
   .kloak-popup {
     position: fixed;
-    background: #14121F;
-    border: 1px solid rgba(109, 74, 255, 0.45);
+    background: rgba(18, 16, 28, 0.96);
+    border: 1px solid rgba(124, 92, 255, 0.35);
     border-radius: 12px;
-    box-shadow: 0 16px 44px rgba(0,0,0,0.7), 0 0 24px rgba(109, 74, 255, 0.2);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.72), 0 0 20px rgba(109, 74, 255, 0.16), inset 0 1px 0 rgba(255,255,255,0.08);
     color: #FFFFFF;
     z-index: 2147483647;
-    font-size: 12px;
-    backdrop-filter: blur(24px);
+    font-size: 11.5px;
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
     overflow: hidden;
     animation: kloakPop 0.14s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    width: 330px;
+    width: 316px;
     transition: top 0.12s ease, left 0.12s ease;
+    display: flex;
+    flex-direction: column;
   }
 
   @keyframes kloakPop {
@@ -2400,113 +2265,157 @@
     border-color: #6D4AFF;
   }
 
+  /* \u2500\u2500 Bento Header Compartment \u2500\u2500 */
   .kloak-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
-    background: #1C1929;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .kloak-brand {
     display: flex;
     align-items: center;
-    gap: 7px;
-    font-size: 10px;
+    gap: 6px;
+    font-size: 9.5px;
     font-weight: 700;
-    color: #A5A1B2;
+    color: #9D99AA;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.6px;
   }
 
   .kloak-brand-icon {
-    width: 13px;
-    height: 13px;
-    fill: #6D4AFF;
+    width: 12px;
+    height: 12px;
+    fill: #7C5CFF;
   }
 
   .kloak-close-btn {
     background: transparent;
     border: none;
-    color: #9E9AA8;
+    color: #8C8899;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1;
-    padding: 2px 6px;
+    padding: 2px 5px;
     border-radius: 4px;
-    transition: all 0.15s;
+    transition: all 0.14s;
   }
   .kloak-close-btn:hover { color: #FFFFFF; background: rgba(255,255,255,0.12); }
 
+  /* \u2500\u2500 Bento Context Awareness Bar \u2500\u2500 */
+  .kloak-bento-context-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 9px;
+    font-size: 9px;
+    background: rgba(109, 74, 255, 0.07);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #B5A8FF;
+  }
+  .kloak-bento-context-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .kloak-bento-context-tag {
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: rgba(16, 185, 129, 0.18);
+    color: #34D399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    flex-shrink: 0;
+  }
+  .kloak-bento-context-tag.info {
+    background: rgba(109, 74, 255, 0.2);
+    color: #A78BFA;
+    border-color: rgba(109, 74, 255, 0.4);
+  }
+
+  /* \u2500\u2500 Bento Main Body \u2500\u2500 */
   .kloak-body {
     display: flex;
     flex-direction: column;
-    max-height: 420px;
+    padding: 7px;
+    gap: 6px;
+    max-height: 380px;
     overflow-y: auto;
-    padding: 8px;
-    gap: 7px;
   }
 
   .kloak-section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
   }
 
   .kloak-section-title {
-    font-size: 9px;
+    font-size: 8.5px;
     font-weight: 700;
     color: #7A758B;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding: 2px 2px 4px 2px;
+    padding: 1px 2px 2px 2px;
   }
 
   .kloak-notice-badge {
-    padding: 5px 9px;
+    padding: 4px 8px;
     background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.35);
-    border-radius: 6px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: 5px;
     color: #34D399;
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 600;
     display: flex;
     align-items: center;
     gap: 4px;
   }
 
-  /* \u2500\u2500 Modern Credential Tile Design \u2500\u2500 */
-  .kloak-tile {
-    background: #1C1A29;
-    border: 1px solid rgba(109, 74, 255, 0.28);
-    border-radius: 10px;
-    padding: 10px;
+  /* \u2500\u2500 Japanese Bento Credential Tray (Compact Compartment) \u2500\u2500 */
+  .kloak-bento-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 6px 7px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-    cursor: pointer;
-    outline: none;
+    gap: 5px;
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
-  .kloak-tile:hover, .kloak-tile:focus-visible {
-    background: #232034;
-    border-color: #7E5EFF;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.5), 0 0 16px rgba(109, 74, 255, 0.28);
-    transform: translateY(-1px);
+  .kloak-bento-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(109, 74, 255, 0.35);
   }
 
-  /* Tile Top Row: Identity + Fill Action */
-  .kloak-tile-top {
+  /* Bento Top Strip: Identity + Fill All */
+  .kloak-bento-card-top {
     display: flex;
     align-items: center;
-    gap: 9px;
+    justify-content: space-between;
+    gap: 6px;
+    padding-bottom: 2px;
   }
-  .kloak-tile-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 6px;
+  .kloak-bento-id-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+  .kloak-bento-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2514,468 +2423,237 @@
     flex-shrink: 0;
     background: rgba(255,255,255,0.06);
   }
-  .kloak-tile-info {
-    flex: 1;
-    overflow: hidden;
-    min-width: 0;
-  }
-  .kloak-tile-username {
-    font-size: 12px;
+  .kloak-bento-title {
+    font-size: 11px;
     font-weight: 700;
     color: #FFFFFF;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .kloak-tile-meta-row {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 1px;
-  }
-  .kloak-tile-domain {
-    font-size: 9.5px;
-    color: #A5A1B2;
+  .kloak-bento-service-tag {
+    font-size: 8.5px;
+    color: #8C8899;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .kloak-tile-2fa-badge {
-    font-size: 8px;
-    font-weight: 700;
-    color: #10B981;
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.35);
-    padding: 1px 4px;
-    border-radius: 3px;
-    text-transform: uppercase;
   }
 
-  .kloak-tile-fill-btn {
+  .kloak-bento-fill-all-btn {
     background: linear-gradient(135deg, #6D4AFF 0%, #7E5EFF 100%);
     color: #FFFFFF;
     border: none;
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 11px;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 10px;
     font-weight: 700;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     flex-shrink: 0;
-    transition: all 0.16s ease;
-    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.4);
+    transition: all 0.14s ease;
+    box-shadow: 0 1px 6px rgba(109, 74, 255, 0.35);
   }
-  .kloak-tile-fill-btn:hover {
-    background: linear-gradient(135deg, #7C5CFF 0%, #8F72FF 100%);
-    transform: scale(1.03);
-    box-shadow: 0 4px 12px rgba(109, 74, 255, 0.6);
+  .kloak-bento-fill-all-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(109, 74, 255, 0.55);
   }
-  .kloak-tile-fill-btn.filled-success {
+  .kloak-bento-fill-all-btn.filled {
     background: #10B981 !important;
-    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.5) !important;
+    box-shadow: 0 1px 6px rgba(16, 185, 129, 0.5) !important;
   }
 
-  /* \u2500\u2500 Security & Risk Health Sub-Tile (Circumference Ring + Stats) \u2500\u2500 */
-  .kloak-tile-risk-card {
-    background: rgba(0, 0, 0, 0.28);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 7px;
-    padding: 7px 9px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .kloak-tile-gauge-box {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .kloak-tile-risk-body {
-    flex: 1;
+  /* \u2500\u2500 Stacked Horizontal Bento Textboxes \u2500\u2500 */
+  .kloak-bento-inputs {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: 0;
   }
-  .kloak-tile-risk-header {
+
+  .kloak-bento-textbox {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
+    background: rgba(0, 0, 0, 0.32);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 5px;
+    padding: 3px 6px;
+    gap: 5px;
+    transition: all 0.14s ease;
+    cursor: pointer;
   }
-  .kloak-tile-risk-title {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #FFFFFF;
-    letter-spacing: 0.2px;
+  .kloak-bento-textbox:hover {
+    background: rgba(0, 0, 0, 0.42);
+    border-color: rgba(109, 74, 255, 0.3);
   }
-  .kloak-tile-risk-pill {
-    font-size: 8px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
+  .kloak-bento-textbox.highlighted {
+    border-color: #10B981;
+    background: rgba(16, 185, 129, 0.09);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.22);
+  }
+
+  .kloak-bento-label {
+    font-size: 7.5px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
-    letter-spacing: 0.3px;
+    color: #7A758B;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 3px;
+    padding: 1.5px 4px;
+    flex-shrink: 0;
   }
-  .kloak-tile-chips {
+  .kloak-bento-label.totp {
+    color: #34D399;
+    background: rgba(16, 185, 129, 0.18);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+  }
+
+  .kloak-bento-val {
+    flex: 1;
+    font-size: 10px;
+    color: #DCD9E6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  .kloak-bento-val.mono {
+    font-family: 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 9.5px;
+    letter-spacing: 0.5px;
+  }
+  .kloak-bento-val.revealed {
+    color: #00D2B4;
+    letter-spacing: 0;
+  }
+  .kloak-bento-val.totp-code {
+    font-family: 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: #34D399;
+  }
+
+  .kloak-bento-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
   }
-  .kloak-tile-chip {
-    font-size: 9px;
-    padding: 2px 5px;
+
+  .kloak-bento-btn {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 4px;
-    color: #C3C0CD;
+    color: #B2AFC2;
+    cursor: pointer;
+    padding: 1.5px 5px;
+    border-radius: 3px;
+    font-size: 8.5px;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    white-space: nowrap;
+    transition: all 0.12s;
   }
-  .kloak-tile-chip.alert {
-    background: rgba(239, 68, 68, 0.16);
-    border-color: rgba(239, 68, 68, 0.35);
-    color: #FFA5A5;
+  .kloak-bento-btn:hover {
+    color: #FFFFFF;
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.18);
   }
-  .kloak-tile-chip.success {
+  .kloak-bento-btn.fill-btn {
     background: rgba(16, 185, 129, 0.16);
     border-color: rgba(16, 185, 129, 0.35);
     color: #34D399;
   }
-
-  /* \u2500\u2500 Password Bar with Peek & Copy \u2500\u2500 */
-  .kloak-tile-pwd-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(0, 0, 0, 0.22);
-    border-radius: 6px;
-    padding: 4px 8px;
-    gap: 6px;
-  }
-  .kloak-tile-pwd-left {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-width: 0;
-    flex: 1;
-  }
-  .kloak-tile-pwd-label {
-    font-size: 8px;
-    font-weight: 700;
-    color: #7A758B;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .kloak-tile-pwd-val {
-    font-family: 'SF Mono', 'Fira Code', monospace;
-    font-size: 10px;
-    color: #D1CFDA;
-    letter-spacing: 0.5px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 120px;
-  }
-  .kloak-tile-pwd-val.revealed {
-    color: #00D2B4;
-    letter-spacing: 0;
-  }
-  .kloak-tile-pwd-actions {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-  }
-  .kloak-tile-action-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: #D1CFDA;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 9.5px;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    transition: all 0.15s;
-  }
-  .kloak-tile-action-btn:hover {
+  .kloak-bento-btn.fill-btn:hover {
+    background: #10B981;
     color: #FFFFFF;
-    background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.2);
   }
-  .kloak-tile-action-btn.copied {
+  .kloak-bento-btn.copied {
     color: #34D399;
     border-color: #10B981;
-    background: rgba(16, 185, 129, 0.18);
+    background: rgba(16, 185, 129, 0.2);
   }
 
-  /* \u2500\u2500 Action Tiles \u2500\u2500 */
-  .kloak-gen-btn-box {
-    padding: 0;
+  .kloak-bento-timer-badge {
+    font-size: 8px;
+    font-weight: 700;
+    color: #FBBF24;
+    margin-right: 2px;
   }
 
-  .kloak-btn-generator {
-    width: 100%;
+  /* \u2500\u2500 Shrunk Bottom Bento Compartments (Generator & Alias) \u2500\u2500 */
+  .kloak-bento-shelf {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+
+  .kloak-bento-mini-tile {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 5px 7px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #252233;
-    border: 1px solid rgba(109, 74, 255, 0.35);
-    border-radius: 6px;
-    padding: 6px 8px;
-    color: #FFFFFF;
     cursor: pointer;
-    transition: all 0.16s ease;
+    transition: all 0.14s ease;
+    color: #D1CFDA;
+    outline: none;
     font-family: inherit;
     text-align: left;
-    box-sizing: border-box;
   }
-  .kloak-btn-generator:hover {
-    background: #2E2942;
-    border-color: #6D4AFF;
-    box-shadow: 0 2px 8px rgba(109, 74, 255, 0.25);
+  .kloak-bento-mini-tile:hover {
+    background: rgba(109, 74, 255, 0.16);
+    border-color: rgba(109, 74, 255, 0.4);
+    color: #FFFFFF;
     transform: translateY(-1px);
   }
-  .kloak-btn-generator:active {
-    transform: translateY(0);
-  }
-
-  .kloak-gen-btn-left {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-  }
-  .kloak-gen-key-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 5px;
-    background: rgba(109, 74, 255, 0.2);
-    color: #A78BFA;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    flex-shrink: 0;
-  }
-  .kloak-gen-btn-texts {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .kloak-gen-btn-title {
-    font-size: 11px;
-    font-weight: 600;
-    color: #F3F4F6;
-  }
-  .kloak-gen-btn-sub {
-    font-size: 9px;
-    color: #9E9AA8;
-  }
-  .kloak-gen-btn-arrow {
-    font-size: 11px;
-    color: #A78BFA;
-    font-weight: 600;
-    opacity: 0.8;
-  }
-
-  /* \u2500\u2500 Compact AI Certificate & Owner Inspector \u2500\u2500 */
-  .kloak-ai-inspector-section {
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-    background: #181528;
-  }
-
-  .kloak-ai-toggle-btn {
-    width: 100%;
-    background: transparent;
-    border: none;
-    padding: 6px 10px;
-    color: #FFFFFF;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-    font-size: 10px;
-    font-weight: 600;
-    transition: background 0.15s;
-  }
-  .kloak-ai-toggle-btn:hover {
-    background: rgba(109, 74, 255, 0.12);
-  }
-
-  .kloak-ai-toggle-left {
+  .kloak-bento-mini-left {
     display: flex;
     align-items: center;
     gap: 5px;
   }
-
-  .kloak-ai-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #10B981;
-    box-shadow: 0 0 5px #10B981;
+  .kloak-bento-mini-icon {
+    font-size: 10px;
+    line-height: 1;
   }
-  .kloak-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 5px #F59E0B; }
-  .kloak-ai-dot.red { background: #EF4444; box-shadow: 0 0 5px #EF4444; }
-
-  .kloak-ai-status-badge {
+  .kloak-bento-mini-label {
     font-size: 9px;
-    padding: 1px 5px;
-    border-radius: 3px;
     font-weight: 700;
-    background: rgba(16, 185, 129, 0.15);
-    color: #34D399;
-    border: 1px solid rgba(16, 185, 129, 0.3);
-  }
-  .kloak-ai-status-badge.amber {
-    background: rgba(245, 158, 11, 0.15);
-    color: #FBBF24;
-    border-color: rgba(245, 158, 11, 0.3);
-  }
-  .kloak-ai-status-badge.red {
-    background: rgba(239, 68, 68, 0.15);
-    color: #F87171;
-    border-color: rgba(239, 68, 68, 0.3);
-  }
-
-  .kloak-ai-drawer {
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    background: #131120;
-    border-top: 1px solid rgba(255,255,255,0.04);
-    animation: kloakPop 0.14s ease;
-  }
-
-  .kloak-ai-summary-card {
-    background: rgba(109, 74, 255, 0.08);
-    border: 1px solid rgba(109, 74, 255, 0.25);
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 10px;
-    line-height: 1.35;
-    color: #D1CFDA;
-  }
-
-  .kloak-ai-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-  }
-
-  .kloak-ai-metric-card {
-    background: #1C1929;
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 5px;
-    padding: 4px 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .kloak-ai-metric-label {
-    font-size: 8px;
-    font-weight: 700;
-    color: #7A758B;
-    text-transform: uppercase;
-  }
-  .kloak-ai-metric-value {
-    font-size: 10px;
-    font-weight: 600;
-    color: #FFFFFF;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  }
+  .kloak-bento-mini-arrow {
+    font-size: 9px;
+    color: #7A758B;
   }
 
-  .kloak-ai-chips-wrap {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-    margin-top: 1px;
-  }
-
-  .kloak-ai-chip {
-    font-size: 8px;
-    font-weight: 600;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid rgba(16, 185, 129, 0.25);
-    color: #34D399;
-  }
-  .kloak-ai-chip.alert {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.25);
-    color: #F87171;
-  }
-
-  /* \u2500\u2500 Compact Custom Alias Footer (ALWAYS PRESENT) \u2500\u2500 */
-  .kloak-alias-footer {
-    padding: 6px 10px;
-    background: #181624;
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
-
-  .kloak-btn-alias {
-    width: 100%;
-    background: rgba(0, 210, 180, 0.08);
-    border: 1px solid rgba(0, 210, 180, 0.3);
-    border-radius: 6px;
-    padding: 5px 8px;
-    color: #FFFFFF;
-    cursor: pointer;
+  /* \u2500\u2500 Micro AI Status Footer \u2500\u2500 */
+  .kloak-bento-micro-ai {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    transition: all 0.15s ease;
-    text-align: left;
+    padding: 3px 6px;
+    font-size: 8.5px;
+    color: #8C8899;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
   }
-  .kloak-btn-alias:hover {
-    background: rgba(0, 210, 180, 0.16);
-    border-color: #00D2B4;
-  }
-
-  .kloak-alias-btn-left {
-    display: flex;
+  .kloak-bento-ai-pill {
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-  }
-
-  .kloak-alias-icon {
-    font-size: 12px;
-    line-height: 1;
-  }
-
-  .kloak-alias-text-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .kloak-alias-title {
-    font-size: 10px;
+    gap: 4px;
+    color: #34D399;
     font-weight: 600;
-    color: #00D2B4;
   }
-
-  .kloak-alias-sub {
-    font-size: 8px;
-    color: #9E9AA8;
+  .kloak-bento-ai-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 4px #10B981;
   }
-
-  .kloak-alias-arrow {
-    font-size: 11px;
-    font-weight: 700;
-    color: #00D2B4;
-  }
+  .kloak-bento-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 4px #F59E0B; }
+  .kloak-bento-ai-dot.red { background: #EF4444; box-shadow: 0 0 4px #EF4444; }
 
   /* \u2500\u2500 Toast Notification \u2500\u2500 */
   .kloak-toast {
@@ -3019,8 +2697,68 @@
     if (passwordInputs.some((p) => (p.autocomplete || "").toLowerCase() === "new-password" || (p.name || "").toLowerCase().includes("confirm") || (p.id || "").toLowerCase().includes("confirm"))) return true;
     return false;
   }
-  function calculatePopupPosition(rect, estimatedHeight = 280) {
-    const popupWidth = 330;
+  function analyzePageContext(focusedInput) {
+    const allInputs = Array.from(document.querySelectorAll("input")).filter((el) => isVisible(el));
+    const otpInputs = allInputs.filter((input) => {
+      const type = (input.type || "").toLowerCase();
+      if (type === "hidden" || type === "submit" || type === "checkbox") return false;
+      const name = (input.name || "").toLowerCase();
+      const id = (input.id || "").toLowerCase();
+      const placeholder = (input.placeholder || "").toLowerCase();
+      const autocomplete = (input.autocomplete || "").toLowerCase();
+      const aria = (input.getAttribute("aria-label") || "").toLowerCase();
+      if (autocomplete === "one-time-code") return true;
+      if (/(otp|totp|2fa|mfa|verification|security-code|two-step|auth-code)/i.test(`${name} ${id} ${placeholder} ${aria}`)) return true;
+      if (input.maxLength === 6 && (input.inputMode === "numeric" || input.pattern?.includes("[0-9]"))) return true;
+      return false;
+    });
+    const hasOtpField = otpInputs.length > 0;
+    const passwordInputs = allInputs.filter((i) => (i.type || "").toLowerCase() === "password");
+    const usernameInputs = allInputs.filter((i) => {
+      const type = (i.type || "").toLowerCase();
+      return type !== "password" && type !== "hidden" && type !== "submit" && type !== "button" && type !== "checkbox" && !isSearchOrNonCredentialInput(i) && !otpInputs.includes(i);
+    });
+    const hasUsernameField = usernameInputs.length > 0;
+    const usernameInput = usernameInputs[0];
+    const isUsernameFilled = !!(usernameInput && usernameInput.value.trim().length > 0);
+    const usernameValue = usernameInput ? usernameInput.value.trim() : "";
+    const hasPasswordField = passwordInputs.length > 0;
+    const passwordInput = passwordInputs[0];
+    const isPasswordFilled = !!(passwordInput && passwordInput.value.length > 0);
+    const pageText = (document.title + " " + (document.querySelector('h1, h2, h3, h4, form, [role="form"], main')?.textContent || "")).toLowerCase();
+    const isTwoStepPage = hasOtpField || /(two-factor|2-step|two-step|verification code|authenticator|enter the 6-digit|security code)/i.test(pageText);
+    let contextSummary = "Login form ready";
+    let contextTag = "READY";
+    if (hasOtpField || isTwoStepPage && !hasPasswordField) {
+      contextSummary = "2FA verification input detected";
+      contextTag = "2FA ACTIVE";
+    } else if (isUsernameFilled && !isPasswordFilled) {
+      const displayUser = usernameValue.length > 14 ? usernameValue.slice(0, 12) + "\u2026" : usernameValue;
+      contextSummary = `Username detected (${displayUser})`;
+      contextTag = "MATCHED";
+    } else if (isUsernameFilled && isPasswordFilled) {
+      contextSummary = "Credentials entered on page";
+      contextTag = "FILLED";
+    } else if (hasPasswordField) {
+      contextSummary = "Login & Password fields ready";
+      contextTag = "AUTOFILL";
+    }
+    return {
+      hasOtpField,
+      otpInputs,
+      hasUsernameField,
+      isUsernameFilled,
+      usernameValue,
+      hasPasswordField,
+      isPasswordFilled,
+      isTwoStepPage,
+      contextSummary,
+      contextTag
+    };
+  }
+  var activeTotpInterval = null;
+  function calculatePopupPosition(rect, estimatedHeight = 200) {
+    const popupWidth = 316;
     let left = rect.left;
     if (left + popupWidth > window.innerWidth - 10) {
       left = window.innerWidth - popupWidth - 10;
@@ -3035,7 +2773,7 @@
   function updateActivePopupPosition() {
     if (!activePopup || !currentTargetInput) return;
     const rect = currentTargetInput.getBoundingClientRect();
-    const height = activePopup.offsetHeight || 280;
+    const height = activePopup.offsetHeight || 200;
     const { top, left } = calculatePopupPosition(rect, height);
     activePopup.style.top = `${top}px`;
     activePopup.style.left = `${left}px`;
@@ -3044,6 +2782,10 @@
     currentTargetInput = input;
     const root = ensureShadowRoot();
     if (activePopup) {
+      if (activeTotpInterval) {
+        clearInterval(activeTotpInterval);
+        activeTotpInterval = null;
+      }
       activePopup.remove();
       activePopup = null;
     }
@@ -3051,7 +2793,9 @@
     container.className = "kloak-popup";
     const rect = input.getBoundingClientRect();
     const isSignup = isRegistrationOrSignupPage();
-    const { top, left } = calculatePopupPosition(rect, items.length > 0 && !isSignup ? 320 : 180);
+    const pageContext = analyzePageContext(input);
+    const estimatedHeight = items.length > 0 && !isSignup ? items[0]?.totpSecret || pageContext.hasOtpField ? 220 : 185 : 160;
+    const { top, left } = calculatePopupPosition(rect, estimatedHeight);
     container.style.top = `${top}px`;
     container.style.left = `${left}px`;
     if (!root.querySelector("style")) {
@@ -3063,6 +2807,14 @@
     if (!currentGeneratedPassword) {
       currentGeneratedPassword = generateRandomPassword(currentPasswordLength);
     }
+    const cleanDismiss = () => {
+      if (activeTotpInterval) {
+        clearInterval(activeTotpInterval);
+        activeTotpInterval = null;
+      }
+      container.remove();
+      activePopup = null;
+    };
     const header = document.createElement("div");
     header.className = "kloak-header";
     header.innerHTML = `
@@ -3070,120 +2822,162 @@
       <svg class="kloak-brand-icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
       <span>Kloak (${hostname})</span>
     </div>
-    <button class="kloak-close-btn" id="kloak-btn-close" title="Close Popup (Esc)">\u2715</button>
+    <button class="kloak-close-btn" id="kloak-btn-close" title="Close (Esc)">\u2715</button>
   `;
     container.appendChild(header);
     header.querySelector("#kloak-btn-close")?.addEventListener("click", (e) => {
       e.stopPropagation();
-      container.remove();
-      activePopup = null;
+      cleanDismiss();
     });
+    const contextBar = document.createElement("div");
+    contextBar.className = "kloak-bento-context-bar";
+    const tagClass = pageContext.hasOtpField ? "kloak-bento-context-tag" : "kloak-bento-context-tag info";
+    contextBar.innerHTML = `
+    <div class="kloak-bento-context-left">
+      <span>\u{1F3AF}</span>
+      <span>${pageContext.contextSummary}</span>
+    </div>
+    <span class="${tagClass}">${pageContext.contextTag}</span>
+  `;
+    container.appendChild(contextBar);
     const bodyContainer = document.createElement("div");
     bodyContainer.className = "kloak-body";
     if (items.length > 0 && !isSignup) {
       const savedSection = document.createElement("div");
       savedSection.className = "kloak-section";
-      savedSection.innerHTML = `<div class="kloak-section-title">Saved Login${items.length > 1 ? "s" : ""}</div>`;
       items.forEach((item, idx) => {
-        const tile = document.createElement("div");
-        tile.className = "kloak-tile";
-        tile.tabIndex = 0;
+        const card = document.createElement("div");
+        card.className = "kloak-bento-card";
+        card.tabIndex = 0;
         const itemId = item.id || `item-${idx}`;
         const isRevealed = !!isRevealingPasswordMap[itemId];
         const displayPassword = item.password || "";
         const maskedPassword = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022";
-        const risk = evaluateCredentialRisk(item, items);
-        const circumferenceGaugeHtml = renderCircumferenceSvg(risk.score, risk.color, 38, 3.2);
-        const pillLabel = risk.riskLevel === "low" ? "LOW RISK" : risk.riskLevel === "medium" ? "MEDIUM RISK" : "HIGH RISK";
-        const pillBg = risk.riskLevel === "low" ? "rgba(16, 185, 129, 0.16)" : risk.riskLevel === "medium" ? "rgba(245, 158, 11, 0.16)" : "rgba(239, 68, 68, 0.16)";
-        const pillBorder = risk.riskLevel === "low" ? "rgba(16, 185, 129, 0.35)" : risk.riskLevel === "medium" ? "rgba(245, 158, 11, 0.35)" : "rgba(239, 68, 68, 0.35)";
-        const uniqueChipHtml = risk.isReused ? `<span class="kloak-tile-chip alert">\u26A0\uFE0F Reused (${risk.reusedCount + 1} sites)</span>` : `<span class="kloak-tile-chip success">\u2713 Unique password</span>`;
-        const twoFaChipHtml = risk.has2FA ? `<span class="kloak-tile-chip success">\u{1F6E1}\uFE0F 2FA Active</span>` : `<span class="kloak-tile-chip alert">\u26A0\uFE0F No 2FA</span>`;
-        tile.innerHTML = `
-        <div class="kloak-tile-top">
-          <div class="kloak-tile-avatar"></div>
-          <div class="kloak-tile-info">
-            <div class="kloak-tile-username" title="${item.username || "No Username"}">${item.username || "No Username"}</div>
-            <div class="kloak-tile-meta-row">
-              <span class="kloak-tile-domain" title="${item.title || hostname}">${item.title || hostname}</span>
-              ${item.totpSecret ? '<span class="kloak-tile-2fa-badge">2FA</span>' : ""}
-            </div>
+        const hasTotp = !!item.totpSecret;
+        card.innerHTML = `
+        <div class="kloak-bento-card-top">
+          <div class="kloak-bento-id-group">
+            <div class="kloak-bento-avatar"></div>
+            <span class="kloak-bento-title">${item.title || hostname}</span>
+            <span class="kloak-bento-service-tag">\u2022 ${hostname}</span>
           </div>
-          <button class="kloak-tile-fill-btn" id="fill-btn-${itemId}" title="1-Click Fill Credentials">
+          <button class="kloak-bento-fill-all-btn" id="fill-all-btn-${itemId}" title="1-Click Fill All Credentials">
             <span>\u26A1</span>
-            <span class="btn-fill-text">Fill</span>
+            <span class="btn-fill-text">Fill All</span>
           </button>
         </div>
 
-        <div class="kloak-tile-risk-card" title="Security Health: ${risk.score}% (${risk.label})">
-          <div class="kloak-tile-gauge-box">
-            ${circumferenceGaugeHtml}
-          </div>
-          <div class="kloak-tile-risk-body">
-            <div class="kloak-tile-risk-header">
-              <span class="kloak-tile-risk-title">Security & Risk Health</span>
-              <span class="kloak-tile-risk-pill" style="color: ${risk.color}; background: ${pillBg}; border: 1px solid ${pillBorder};">${pillLabel}</span>
-            </div>
-            <div class="kloak-tile-chips">
-              <span class="kloak-tile-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
-              ${uniqueChipHtml}
-              ${twoFaChipHtml}
+        <div class="kloak-bento-inputs">
+          <!-- Horizontal Textbox 1: Username -->
+          <div class="kloak-bento-textbox" id="box-user-${itemId}">
+            <span class="kloak-bento-label">USER</span>
+            <span class="kloak-bento-val" title="${item.username || "No Username"}">${item.username || "No Username"}</span>
+            <div class="kloak-bento-actions">
+              <button class="kloak-bento-btn fill-btn" id="fill-user-btn-${itemId}" title="Fill Username Only">\u26A1 Fill</button>
+              <button class="kloak-bento-btn" id="copy-user-btn-${itemId}" title="Copy Username">\u{1F4CB}</button>
             </div>
           </div>
-        </div>
 
-        <div class="kloak-tile-pwd-bar">
-          <div class="kloak-tile-pwd-left">
-            <span class="kloak-tile-pwd-label">Pass</span>
-            <span class="kloak-tile-pwd-val ${isRevealed ? "revealed" : ""}" id="pwd-val-${itemId}">
+          <!-- Horizontal Textbox 2: Password -->
+          <div class="kloak-bento-textbox" id="box-pwd-${itemId}">
+            <span class="kloak-bento-label">PASS</span>
+            <span class="kloak-bento-val mono ${isRevealed ? "revealed" : ""}" id="pwd-val-${itemId}">
               ${isRevealed ? displayPassword : maskedPassword}
             </span>
+            <div class="kloak-bento-actions">
+              <button class="kloak-bento-btn" id="reveal-btn-${itemId}" title="${isRevealed ? "Hide Password" : "Show Password"}">
+                ${isRevealed ? "\u{1F648}" : "\u{1F441}\uFE0F"}
+              </button>
+              <button class="kloak-bento-btn fill-btn" id="fill-pwd-btn-${itemId}" title="Fill Password Only">\u26A1 Fill</button>
+              <button class="kloak-bento-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">\u{1F4CB}</button>
+            </div>
           </div>
-          <div class="kloak-tile-pwd-actions">
-            <button class="kloak-tile-action-btn" id="reveal-btn-${itemId}" title="${isRevealed ? "Hide Password" : "Show Password"}">
-              ${isRevealed ? "\u{1F648}" : "\u{1F441}\uFE0F"}
-            </button>
-            <button class="kloak-tile-action-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">
-              <span>\u{1F4CB}</span>
-              <span class="copy-text">Pass</span>
-            </button>
-            <button class="kloak-tile-action-btn" id="copy-user-btn-${itemId}" title="Copy Username">
-              <span>\u{1F464}</span>
-              <span class="copy-text">User</span>
-            </button>
-          </div>
+
+          <!-- Horizontal Textbox 3: TOTP Code Filler (Context Aware) -->
+          ${hasTotp ? `
+            <div class="kloak-bento-textbox ${pageContext.hasOtpField ? "highlighted" : ""}" id="box-totp-${itemId}">
+              <span class="kloak-bento-label totp">2FA OTP</span>
+              <span class="kloak-bento-val totp-code" id="totp-val-${itemId}">------</span>
+              <span class="kloak-bento-timer-badge" id="totp-timer-${itemId}">\u23F3 30s</span>
+              <div class="kloak-bento-actions">
+                <button class="kloak-bento-btn fill-btn" id="fill-totp-btn-${itemId}" title="Fill 2FA Code">\u26A1 Fill Code</button>
+                <button class="kloak-bento-btn" id="copy-totp-btn-${itemId}" title="Copy 2FA Code">\u{1F4CB}</button>
+              </div>
+            </div>
+          ` : pageContext.hasOtpField ? `
+            <div class="kloak-bento-textbox" id="box-totp-${itemId}">
+              <span class="kloak-bento-label totp">2FA OTP</span>
+              <span class="kloak-bento-val" style="color: #8C8899; font-size: 9px;">No 2FA secret saved in vault</span>
+              <div class="kloak-bento-actions">
+                <button class="kloak-bento-btn" id="copy-user-btn-fallback-${itemId}" title="Fill Username">\u{1F464} User</button>
+              </div>
+            </div>
+          ` : ""}
         </div>
       `;
-        const avatarBox = tile.querySelector(".kloak-tile-avatar");
+        const avatarBox = card.querySelector(".kloak-bento-avatar");
         if (avatarBox) {
-          renderFavicon(avatarBox, { item, size: 28 });
+          renderFavicon(avatarBox, { item, size: 20 });
         }
-        const triggerFill = (e) => {
+        const triggerMasterFill = (e) => {
           e.stopPropagation();
-          const fillBtn = tile.querySelector(`#fill-btn-${itemId}`);
+          const fillBtn = card.querySelector(`#fill-all-btn-${itemId}`);
           const fillText = fillBtn?.querySelector(".btn-fill-text");
           if (fillBtn) {
-            fillBtn.classList.add("filled-success");
+            fillBtn.classList.add("filled");
             if (fillText) fillText.textContent = "Filled!";
           }
           injectCredentials(item.username, item.password, input, item.totpSecret);
           setTimeout(() => {
-            container.remove();
-            activePopup = null;
+            cleanDismiss();
           }, 220);
         };
-        tile.querySelector(`#fill-btn-${itemId}`)?.addEventListener("click", triggerFill);
-        tile.querySelector(".kloak-tile-info")?.addEventListener("click", triggerFill);
-        tile.addEventListener("keydown", (e) => {
+        card.querySelector(`#fill-all-btn-${itemId}`)?.addEventListener("click", triggerMasterFill);
+        card.addEventListener("keydown", (e) => {
           if (e.key === "Enter") {
-            triggerFill(e);
+            triggerMasterFill(e);
           }
         });
-        tile.querySelector(`#reveal-btn-${itemId}`)?.addEventListener("click", (e) => {
+        card.querySelector(`#fill-user-btn-${itemId}`)?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (item.username) {
+            const userField = pageContext.hasUsernameField ? pageContext.usernameValue ? input : input : input;
+            setInputValue(userField, item.username);
+            showToastNotification(`\u{1F464} Filled username (${item.username})`);
+            setTimeout(() => cleanDismiss(), 180);
+          }
+        });
+        card.querySelector(`#copy-user-btn-${itemId}`)?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (item.username) {
+            navigator.clipboard.writeText(item.username);
+            const btn = card.querySelector(`#copy-user-btn-${itemId}`);
+            if (btn) {
+              btn.classList.add("copied");
+              btn.textContent = "\u2713";
+              setTimeout(() => {
+                btn.classList.remove("copied");
+                btn.textContent = "\u{1F4CB}";
+              }, 1500);
+            }
+            showToastNotification("\u{1F464} Username copied!");
+          }
+        });
+        card.querySelector(`#fill-pwd-btn-${itemId}`)?.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (displayPassword) {
+            const allInputs = Array.from(document.querySelectorAll("input")).filter((el) => isVisible(el));
+            const pwdField = allInputs.find((i) => (i.type || "").toLowerCase() === "password") || input;
+            setInputValue(pwdField, displayPassword);
+            showToastNotification("\u{1F511} Filled password");
+            setTimeout(() => cleanDismiss(), 180);
+          }
+        });
+        card.querySelector(`#reveal-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();
           isRevealingPasswordMap[itemId] = !isRevealingPasswordMap[itemId];
-          const valEl = tile.querySelector(`#pwd-val-${itemId}`);
-          const btnEl = tile.querySelector(`#reveal-btn-${itemId}`);
+          const valEl = card.querySelector(`#pwd-val-${itemId}`);
+          const btnEl = card.querySelector(`#reveal-btn-${itemId}`);
           if (isRevealingPasswordMap[itemId]) {
             valEl.textContent = displayPassword;
             valEl.classList.add("revealed");
@@ -3196,67 +2990,121 @@
             btnEl.title = "Show Password";
           }
         });
-        tile.querySelector(`#copy-pwd-btn-${itemId}`)?.addEventListener("click", (e) => {
+        card.querySelector(`#copy-pwd-btn-${itemId}`)?.addEventListener("click", (e) => {
           e.stopPropagation();
           if (displayPassword) {
             navigator.clipboard.writeText(displayPassword);
-            const btn = tile.querySelector(`#copy-pwd-btn-${itemId}`);
+            const btn = card.querySelector(`#copy-pwd-btn-${itemId}`);
             if (btn) {
               btn.classList.add("copied");
-              const txt = btn.querySelector(".copy-text");
-              if (txt) txt.textContent = "Copied!";
+              btn.textContent = "\u2713";
               setTimeout(() => {
                 btn.classList.remove("copied");
-                if (txt) txt.textContent = "Pass";
-              }, 1800);
+                btn.textContent = "\u{1F4CB}";
+              }, 1500);
             }
-            showToastNotification("\u{1F4CB} Password copied to clipboard!");
+            showToastNotification("\u{1F4CB} Password copied!");
           }
         });
-        tile.querySelector(`#copy-user-btn-${itemId}`)?.addEventListener("click", (e) => {
-          e.stopPropagation();
-          if (item.username) {
-            navigator.clipboard.writeText(item.username);
-            const btn = tile.querySelector(`#copy-user-btn-${itemId}`);
-            if (btn) {
-              btn.classList.add("copied");
-              const txt = btn.querySelector(".copy-text");
-              if (txt) txt.textContent = "Copied!";
-              setTimeout(() => {
-                btn.classList.remove("copied");
-                if (txt) txt.textContent = "User";
-              }, 1800);
+        if (hasTotp) {
+          let currentTotpToken = "";
+          const updateTotpDisplay = (token, secRemaining) => {
+            currentTotpToken = token;
+            const valEl = card.querySelector(`#totp-val-${itemId}`);
+            const timerEl = card.querySelector(`#totp-timer-${itemId}`);
+            if (valEl) {
+              valEl.textContent = token.length === 6 ? `${token.slice(0, 3)} ${token.slice(3)}` : token;
             }
-            showToastNotification("\u{1F464} Username copied to clipboard!");
-          }
-        });
-        savedSection.appendChild(tile);
+            if (timerEl) {
+              timerEl.textContent = `\u23F3 ${secRemaining}s`;
+            }
+          };
+          const fetchTotp = () => {
+            chrome.runtime.sendMessage({ type: "GET_TOTP", secret: item.totpSecret }, (res) => {
+              if (res && res.success && res.token) {
+                const sec = res.secondsRemaining ?? 30 - Math.floor(Date.now() / 1e3 % 30);
+                updateTotpDisplay(res.token, sec);
+              }
+            });
+          };
+          fetchTotp();
+          activeTotpInterval = setInterval(() => {
+            const sec = 30 - Math.floor(Date.now() / 1e3 % 30);
+            if (sec === 30 || !currentTotpToken) {
+              fetchTotp();
+            } else {
+              const timerEl = card.querySelector(`#totp-timer-${itemId}`);
+              if (timerEl) timerEl.textContent = `\u23F3 ${sec}s`;
+            }
+          }, 1e3);
+          const handleTotpFillAction = (e) => {
+            e.stopPropagation();
+            const cleanToken = currentTotpToken.replace(/\s+/g, "");
+            if (!cleanToken) return;
+            if (pageContext.hasOtpField && pageContext.otpInputs.length > 0) {
+              if (pageContext.otpInputs.length === 1) {
+                setInputValue(pageContext.otpInputs[0], cleanToken);
+              } else {
+                pageContext.otpInputs.forEach((inp, idx2) => {
+                  if (cleanToken[idx2]) setInputValue(inp, cleanToken[idx2]);
+                });
+              }
+              showToastNotification(`\u2728 Filled 2FA code (${cleanToken}) into page!`);
+              setTimeout(() => cleanDismiss(), 200);
+            } else {
+              navigator.clipboard.writeText(cleanToken);
+              showToastNotification(`\u{1F4CB} 2FA code (${cleanToken}) copied to clipboard!`);
+            }
+          };
+          card.querySelector(`#fill-totp-btn-${itemId}`)?.addEventListener("click", handleTotpFillAction);
+          card.querySelector(`#copy-totp-btn-${itemId}`)?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const cleanToken = currentTotpToken.replace(/\s+/g, "");
+            if (cleanToken) {
+              navigator.clipboard.writeText(cleanToken);
+              const btn = card.querySelector(`#copy-totp-btn-${itemId}`);
+              if (btn) {
+                btn.classList.add("copied");
+                btn.textContent = "\u2713";
+                setTimeout(() => {
+                  btn.classList.remove("copied");
+                  btn.textContent = "\u{1F4CB}";
+                }, 1500);
+              }
+              showToastNotification(`\u{1F4CB} 2FA code (${cleanToken}) copied!`);
+            }
+          });
+        }
+        savedSection.appendChild(card);
       });
       bodyContainer.appendChild(savedSection);
     }
     if (isSignup) {
       const banner = document.createElement("div");
       banner.className = "kloak-notice-badge";
-      banner.innerHTML = `<span>\u2728 Create Account Detected</span> \u2022 Fill password`;
+      banner.innerHTML = `<span>\u2728 Registration Form</span> \u2022 Auto-generate strong password`;
       bodyContainer.appendChild(banner);
     }
-    const genSection = document.createElement("div");
-    genSection.className = "kloak-gen-btn-box";
-    const genTitle = items.length === 0 ? "Generate Strong Password" : isSignup ? "New Account Password" : "Password Generator";
-    genSection.innerHTML = `
-    <button class="kloak-btn-generator" id="kloak-btn-open-gen" title="Open Password Generator tab in Kloak Extension">
-      <div class="kloak-gen-btn-left">
-        <span class="kloak-gen-key-icon">\u26A1</span>
-        <div class="kloak-gen-btn-texts">
-          <div class="kloak-gen-btn-title">${genTitle}</div>
-          <div class="kloak-gen-btn-sub">Open Generator in Kloak App</div>
-        </div>
+    const shelfSection = document.createElement("div");
+    shelfSection.className = "kloak-bento-shelf";
+    shelfSection.innerHTML = `
+    <button class="kloak-bento-mini-tile" id="kloak-btn-open-gen" title="Generate Strong Password">
+      <div class="kloak-bento-mini-left">
+        <span class="kloak-bento-mini-icon">\u26A1</span>
+        <span class="kloak-bento-mini-label">${items.length === 0 ? "Gen Pass" : "New Pass"}</span>
       </div>
-      <span class="kloak-gen-btn-arrow">\u2197</span>
+      <span class="kloak-bento-mini-arrow">\u2197</span>
+    </button>
+    <button class="kloak-bento-mini-tile" id="kloak-btn-custom-alias" title="Create Protected Email Alias">
+      <div class="kloak-bento-mini-left">
+        <span class="kloak-bento-mini-icon">\u{1F977}</span>
+        <span class="kloak-bento-mini-label">Mask Alias</span>
+      </div>
+      <span class="kloak-bento-mini-arrow">\u2192</span>
     </button>
   `;
-    bodyContainer.appendChild(genSection);
-    genSection.querySelector("#kloak-btn-open-gen")?.addEventListener("click", (e) => {
+    bodyContainer.appendChild(shelfSection);
+    shelfSection.querySelector("#kloak-btn-open-gen")?.addEventListener("click", (e) => {
       e.stopPropagation();
       try {
         chrome.runtime.sendMessage({
@@ -3265,123 +3113,9 @@
         });
       } catch {
       }
-      container.remove();
-      activePopup = null;
+      cleanDismiss();
     });
-    const aiSection = document.createElement("div");
-    aiSection.className = "kloak-ai-inspector-section";
-    aiSection.innerHTML = `
-    <button class="kloak-ai-toggle-btn" id="kloak-ai-toggle-btn">
-      <div class="kloak-ai-toggle-left">
-        <span class="kloak-ai-dot" id="kloak-ai-dot"></span>
-        <span>\u{1F9E0} AI Security Inspector</span>
-      </div>
-      <span class="kloak-ai-status-badge" id="kloak-ai-badge">Analyzing...</span>
-    </button>
-    <div class="kloak-ai-drawer" id="kloak-ai-drawer" style="display: ${isAiDrawerExpanded ? "flex" : "none"};">
-      <div class="kloak-ai-summary-card" id="kloak-ai-summary">
-        Fetching TLS certificate and domain owner records...
-      </div>
-      <div class="kloak-ai-grid" id="kloak-ai-grid" style="display: none;">
-        <div class="kloak-ai-metric-card">
-          <span class="kloak-ai-metric-label">\u{1F512} Certificate</span>
-          <span class="kloak-ai-metric-value" id="kloak-ai-cert-val">-</span>
-        </div>
-        <div class="kloak-ai-metric-card">
-          <span class="kloak-ai-metric-label">\u{1F3E2} Domain</span>
-          <span class="kloak-ai-metric-value" id="kloak-ai-owner-val">-</span>
-        </div>
-      </div>
-      <div class="kloak-ai-chips-wrap" id="kloak-ai-chips"></div>
-    </div>
-  `;
-    bodyContainer.appendChild(aiSection);
-    const toggleBtn = aiSection.querySelector("#kloak-ai-toggle-btn");
-    const drawerEl = aiSection.querySelector("#kloak-ai-drawer");
-    const dotEl = aiSection.querySelector("#kloak-ai-dot");
-    const badgeEl = aiSection.querySelector("#kloak-ai-badge");
-    const summaryEl = aiSection.querySelector("#kloak-ai-summary");
-    const gridEl = aiSection.querySelector("#kloak-ai-grid");
-    const certValEl = aiSection.querySelector("#kloak-ai-cert-val");
-    const ownerValEl = aiSection.querySelector("#kloak-ai-owner-val");
-    const chipsEl = aiSection.querySelector("#kloak-ai-chips");
-    toggleBtn?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      isAiDrawerExpanded = !isAiDrawerExpanded;
-      if (drawerEl) {
-        drawerEl.style.display = isAiDrawerExpanded ? "flex" : "none";
-      }
-    });
-    const renderAiEvaluation = (evalData) => {
-      if (!evalData) return;
-      const isSafe = evalData.threatLevel === "VERIFIED_SAFE" || evalData.riskScore < 30;
-      const isCaution = evalData.threatLevel === "CAUTION_SUSPICIOUS" || evalData.riskScore >= 30 && evalData.riskScore < 60;
-      if (dotEl && badgeEl) {
-        if (isSafe) {
-          dotEl.className = "kloak-ai-dot";
-          badgeEl.className = "kloak-ai-status-badge";
-          badgeEl.textContent = "\u{1F7E2} 0% Risk \u2022 Safe";
-        } else if (isCaution) {
-          dotEl.className = "kloak-ai-dot amber";
-          badgeEl.className = "kloak-ai-status-badge amber";
-          badgeEl.textContent = `\u{1F7E1} ${evalData.riskScore}% Risk \u2022 Caution`;
-        } else {
-          dotEl.className = "kloak-ai-dot red";
-          badgeEl.className = "kloak-ai-status-badge red";
-          badgeEl.textContent = `\u{1F6A8} ${evalData.riskScore}% Risk \u2022 Threat`;
-        }
-      }
-      if (summaryEl) {
-        summaryEl.textContent = evalData.aiSummary || "Security evaluation complete.";
-      }
-      if (gridEl) gridEl.style.display = "grid";
-      if (certValEl && evalData.certificate) {
-        const certTier = evalData.certificate.validationLevel ? `(${evalData.certificate.validationLevel})` : "";
-        certValEl.textContent = `${evalData.certificate.issuerOrg || evalData.certificate.issuerName || "Verified CA"} ${certTier}`;
-        certValEl.title = evalData.certificateVerdict || "";
-      }
-      if (ownerValEl && evalData.domainIntel) {
-        const ageStr = evalData.domainIntel.domainAgeYears ? `${evalData.domainIntel.domainAgeYears} yrs` : `${evalData.domainIntel.domainAgeDays}d`;
-        ownerValEl.textContent = `${evalData.domainIntel.registrantOrg || evalData.domainIntel.registrarName} \u2022 ${ageStr}`;
-        ownerValEl.title = evalData.ownerVerdict || "";
-      }
-      if (chipsEl) {
-        chipsEl.innerHTML = "";
-        const allChips = [...evalData.trustBadges || [], ...evalData.redFlags || []];
-        allChips.forEach((chipText) => {
-          const chip = document.createElement("span");
-          const isRed = chipText.includes("\u{1F6A8}") || chipText.includes("\u26A0\uFE0F") || chipText.includes("discrepancy");
-          chip.className = `kloak-ai-chip ${isRed ? "alert" : ""}`;
-          chip.textContent = chipText;
-          chipsEl.appendChild(chip);
-        });
-      }
-    };
-    if (cachedAiEvaluation) {
-      renderAiEvaluation(cachedAiEvaluation);
-    } else {
-      chrome.runtime.sendMessage({ type: "AI_INSPECT_WEBSITE", url: window.location.href }, (res) => {
-        if (res && res.evaluation) {
-          cachedAiEvaluation = res.evaluation;
-          renderAiEvaluation(res.evaluation);
-        }
-      });
-    }
-    const aliasSection = document.createElement("div");
-    aliasSection.className = "kloak-alias-footer";
-    aliasSection.innerHTML = `
-    <button class="kloak-btn-alias" id="kloak-btn-custom-alias">
-      <div class="kloak-alias-btn-left">
-        <span class="kloak-alias-icon">\u{1F6E1}\uFE0F</span>
-        <div class="kloak-alias-text-wrap">
-          <div class="kloak-alias-title">Generate Custom Alias for ${hostname}</div>
-          <div class="kloak-alias-sub">Masks real email \u2022 Auto-forwards to inbox</div>
-        </div>
-      </div>
-      <span class="kloak-alias-arrow">\u2192</span>
-    </button>
-  `;
-    aliasSection.querySelector("#kloak-btn-custom-alias")?.addEventListener("click", (e) => {
+    shelfSection.querySelector("#kloak-btn-custom-alias")?.addEventListener("click", (e) => {
       e.stopPropagation();
       chrome.runtime.sendMessage({
         type: "GENERATE_PROTECTED_ALIAS",
@@ -3404,13 +3138,51 @@
             navigator.clipboard.writeText(res.aliasEmail);
           } catch {
           }
-          showToastNotification(`\u{1F6E1}\uFE0F Created alias (${res.aliasEmail}) forwarding to ${res.forwardTo}!`);
-          container.remove();
-          activePopup = null;
+          showToastNotification(`\u{1F6E1}\uFE0F Alias (${res.aliasEmail}) autofilled & copied!`);
+          cleanDismiss();
         }
       });
     });
-    bodyContainer.appendChild(aliasSection);
+    const microAi = document.createElement("div");
+    microAi.className = "kloak-bento-micro-ai";
+    microAi.innerHTML = `
+    <span>Kloak Security</span>
+    <div class="kloak-bento-ai-pill">
+      <span class="kloak-bento-ai-dot" id="kloak-bento-ai-dot"></span>
+      <span id="kloak-bento-ai-text">0% Risk \u2022 Safe</span>
+    </div>
+  `;
+    bodyContainer.appendChild(microAi);
+    const dotEl = microAi.querySelector("#kloak-bento-ai-dot");
+    const textEl = microAi.querySelector("#kloak-bento-ai-text");
+    if (cachedAiEvaluation) {
+      if (dotEl && textEl) {
+        const isSafe = cachedAiEvaluation.threatLevel === "VERIFIED_SAFE" || cachedAiEvaluation.riskScore < 30;
+        if (isSafe) {
+          dotEl.className = "kloak-bento-ai-dot";
+          textEl.textContent = "0% Risk \u2022 Verified";
+        } else {
+          dotEl.className = "kloak-bento-ai-dot amber";
+          textEl.textContent = `${cachedAiEvaluation.riskScore}% Risk \u2022 Caution`;
+        }
+      }
+    } else {
+      chrome.runtime.sendMessage({ type: "AI_INSPECT_WEBSITE", url: window.location.href }, (res) => {
+        if (res && res.evaluation) {
+          cachedAiEvaluation = res.evaluation;
+          if (dotEl && textEl) {
+            const isSafe = res.evaluation.threatLevel === "VERIFIED_SAFE" || res.evaluation.riskScore < 30;
+            if (isSafe) {
+              dotEl.className = "kloak-bento-ai-dot";
+              textEl.textContent = "0% Risk \u2022 Verified";
+            } else {
+              dotEl.className = "kloak-bento-ai-dot amber";
+              textEl.textContent = `${res.evaluation.riskScore}% Risk \u2022 Caution`;
+            }
+          }
+        }
+      });
+    }
     container.appendChild(bodyContainer);
     root.appendChild(container);
     activePopup = container;
@@ -3420,8 +3192,7 @@
         return;
       }
       if (e.key === "Escape") {
-        activePopup.remove();
-        activePopup = null;
+        cleanDismiss();
         document.removeEventListener("keydown", handleKeyDown);
       }
     };
@@ -3429,10 +3200,7 @@
     const handleOutsideClick = (e) => {
       const target = e.target;
       if (target !== input && !shadowHost?.contains(target)) {
-        if (activePopup) {
-          activePopup.remove();
-          activePopup = null;
-        }
+        cleanDismiss();
         document.removeEventListener("mousedown", handleOutsideClick);
       }
     };
