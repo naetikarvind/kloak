@@ -42,7 +42,7 @@ public struct UnlockView: View {
                     .foregroundColor(.primary)
 
                 // Password Entry Glass Panel
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     HStack(spacing: 8) {
                         if showPassword {
                             TextField("Master Password", text: $password)
@@ -64,7 +64,7 @@ public struct UnlockView: View {
                         .buttonStyle(.plain)
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 11)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
                             .fill(Color.black.opacity(0.35))
@@ -79,46 +79,72 @@ public struct UnlockView: View {
                         if errorMessage != nil { errorMessage = nil }
                     }
 
-                    ZStack {
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(LiquidGlassTheme.roseAccent)
-                                .multilineTextAlignment(.center)
-                                .transition(.opacity)
-                        }
-                    }
-                    .frame(height: 18)
-
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Button(action: attemptUnlock) {
-                            if isProcessing {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                Label("Unlock", systemImage: "lock.open.fill")
-                                    .frame(maxWidth: .infinity)
+                            HStack(spacing: 6) {
+                                if isProcessing {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Image(systemName: "lock.open.fill")
+                                    Text("Unlock")
+                                }
                             }
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [LiquidGlassTheme.primaryAccent, Color.blue],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 0.75)
+                                    )
+                            )
                         }
-                        .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                        .buttonStyle(.plain)
                         .disabled(password.isEmpty || isProcessing)
+                        .opacity(password.isEmpty || isProcessing ? 0.6 : 1.0)
 
                         if BiometricAuth.shared.canAuthenticateWithBiometrics() {
                             Button(action: attemptBiometricUnlock) {
                                 Image(systemName: "touchid")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundColor(LiquidGlassTheme.primaryAccent)
-                                    .frame(width: 40, height: 36)
+                                    .frame(width: 44, height: 38)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(Color.white.opacity(0.08))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .stroke(Color.white.opacity(0.15), lineWidth: 0.75)
+                                            )
+                                    )
                             }
-                            .buttonStyle(GlassCapsuleButton(isPrimary: false))
+                            .buttonStyle(.plain)
                             .disabled(isProcessing)
                             .help("Unlock with Touch ID")
                         }
                     }
                     .frame(width: 280)
+
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(LiquidGlassTheme.roseAccent)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 2)
+                            .transition(.opacity)
+                    }
                 }
-                .padding(24)
+                .padding(20)
                 .glassEffect(cornerRadius: 20)
 
                 Button(action: { DevModeManager.shared.showSheet = true }) {
