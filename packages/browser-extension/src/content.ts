@@ -28,6 +28,7 @@ let currentGeneratedPassword = '';
 let isRevealingPasswordMap: { [key: string]: boolean } = {};
 let cachedAiEvaluation: any = null;
 let isAiDrawerExpanded = false;
+let activeLockedPollTimer: any = null;
 
 // ── Active URL Sync ──
 function pushActiveUrl() {
@@ -814,6 +815,25 @@ const POPUP_STYLES = `
   .kloak-bento-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 4px #F59E0B; }
   .kloak-bento-ai-dot.red { background: #EF4444; box-shadow: 0 0 4px #EF4444; }
 
+  /* ── Smart Unlock & Reveal Animations ── */
+  @keyframes bentoRevealIn {
+    0% { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(3px); }
+    60% { opacity: 1; transform: translateY(-2px) scale(1.01); filter: blur(0px); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+  }
+  @keyframes bentoUnlockPulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); border-color: #10B981; }
+    50% { box-shadow: 0 0 18px 4px rgba(16, 185, 129, 0.4); border-color: #10B981; }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); border-color: rgba(109, 74, 255, 0.35); }
+  }
+  @keyframes bentoBadgeFlip {
+    0% { transform: rotateX(90deg); opacity: 0; }
+    100% { transform: rotateX(0deg); opacity: 1; }
+  }
+  .kloak-bento-reveal { animation: bentoRevealIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .kloak-bento-unlock-success { animation: bentoUnlockPulse 0.4s ease-out forwards; }
+  .kloak-bento-badge-flip { animation: bentoBadgeFlip 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
   /* ── Toast Notification ── */
   .kloak-toast {
     position: fixed;
@@ -846,6 +866,28 @@ function showToastNotification(text: string) {
   setTimeout(() => {
     toast.remove();
   }, 3500);
+}
+
+function refreshBentoPopupWithAnimation(input: HTMLInputElement) {
+  if (!activePopup) return;
+
+  const lockedCard = activePopup.querySelector('.kloak-bento-card') as HTMLElement | null;
+  const touchText = activePopup.querySelector('#bento-touch-text');
+  if (lockedCard) {
+    lockedCard.classList.add('kloak-bento-unlock-success');
+    if (touchText) touchText.textContent = '✓ Unlocked!';
+    lockedCard.style.borderColor = '#10B981';
+    lockedCard.style.background = 'rgba(16, 185, 129, 0.12)';
+  }
+
+  chrome.runtime.sendMessage({ type: 'GET_CREDENTIALS', url: window.location.href }, (credRes) => {
+    const newItems = (credRes && Array.isArray(credRes.items)) ? credRes.items : [];
+    cachedCredentialsForSite = newItems;
+    setTimeout(() => {
+      buildPopupUI(newItems, input, true, true);
+      showToastNotification(`✓ Vault unlocked • ${newItems.length} password${newItems.length === 1 ? '' : 's'} available`);
+    }, 180);
+  });
 }
 
 // ── Signup / Registration Page Detector ──
@@ -980,13 +1022,17 @@ function updateActivePopupPosition() {
 }
 
 // ── Japanese Bento Box Popup Builder ──
-function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean = true) {
+function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean = true, animateReveal: boolean = false) {
   currentTargetInput = input;
   const root = ensureShadowRoot();
   if (activePopup) {
     if (activeTotpInterval) {
       clearInterval(activeTotpInterval);
       activeTotpInterval = null;
+    }
+    if (activeLockedPollTimer) {
+      clearInterval(activeLockedPollTimer);
+      activeLockedPollTimer = null;
     }
     activePopup.remove();
     activePopup = null;
@@ -1027,6 +1073,10 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
       clearInterval(activeTotpInterval);
       activeTotpInterval = null;
     }
+    if (activeLockedPollTimer) {
+      clearInterval(activeLockedPollTimer);
+      activeLockedPollTimer = null;
+    }
     container.remove();
     activePopup = null;
   };
@@ -1059,12 +1109,12 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
       <span>${!isUnlocked ? '🔒' : '🎯'}</span>
       <span>${!isUnlocked ? 'Kloak Vault is Locked' : pageContext.contextSummary}</span>
     </div>
-    <span class="${tagClass}">${!isUnlocked ? 'Locked' : pageContext.contextTag}</span>
+    <span class="${tagClass} ${animateReveal ? 'kloak-bento-badge-flip' : ''}">${!isUnlocked ? 'Locked' : pageContext.contextTag}</span>
   `;
   container.appendChild(contextBar);
 
   const bodyContainer = document.createElement('div');
-  bodyContainer.className = 'kloak-body';
+  bodyContainer.className = `kloak-body ${animateReveal ? 'kloak-bento-reveal' : ''}`;
 
   // 3. Saved Login(s) Bento Tray with Stacked Horizontal Containers
   if (isUnlocked && items.length > 0 && !isSignup) {
@@ -1345,6 +1395,19 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
   }
 
   if (!isUnlocked) {
+    if (activeLockedPollTimer) clearInterval(activeLockedPollTimer);
+    activeLockedPollTimer = setInterval(() => {
+      chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (statusRes) => {
+        if (statusRes && statusRes.isUnlocked && activePopup && currentTargetInput) {
+          if (activeLockedPollTimer) {
+            clearInterval(activeLockedPollTimer);
+            activeLockedPollTimer = null;
+          }
+          refreshBentoPopupWithAnimation(currentTargetInput);
+        }
+      });
+    }, 1200);
+
     const lockedCard = document.createElement('div');
     lockedCard.className = 'kloak-bento-card';
     lockedCard.style.padding = '12px 14px';
@@ -1405,12 +1468,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
         if (touchText) touchText.textContent = 'Unlock with Touch ID';
 
         if (res && res.success) {
-          showToastNotification('✓ Vault unlocked with Touch ID');
-          chrome.runtime.sendMessage({ type: 'GET_CREDENTIALS', url: window.location.href }, (credRes) => {
-            const newItems = (credRes && Array.isArray(credRes.items)) ? credRes.items : (res.items || []);
-            cachedCredentialsForSite = newItems;
-            buildPopupUI(newItems, input, true);
-          });
+          refreshBentoPopupWithAnimation(input);
         } else {
           if (errEl) {
             errEl.textContent = res?.error || 'Touch ID failed or was cancelled.';
@@ -1429,12 +1487,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
 
       chrome.runtime.sendMessage({ type: 'UNLOCK_VAULT', password: pwd }, (res) => {
         if (res && res.success) {
-          showToastNotification('✓ Vault unlocked');
-          chrome.runtime.sendMessage({ type: 'GET_CREDENTIALS', url: window.location.href }, (credRes) => {
-            const newItems = (credRes && Array.isArray(credRes.items)) ? credRes.items : (res.items || []);
-            cachedCredentialsForSite = newItems;
-            buildPopupUI(newItems, input, true);
-          });
+          refreshBentoPopupWithAnimation(input);
         } else {
           if (errEl) {
             errEl.textContent = res?.error || 'Incorrect master password.';
@@ -1443,6 +1496,11 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
         }
       });
     });
+  } else {
+    if (activeLockedPollTimer) {
+      clearInterval(activeLockedPollTimer);
+      activeLockedPollTimer = null;
+    }
   }
 
   if (isSignup) {
@@ -2162,6 +2220,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   } else if (message.type === 'THREAT_DETECTED') {
     showThreatBanner(message.analysis, message.aiEvaluation, message.connectedAccount);
+    sendResponse({ success: true });
+  } else if (message.type === 'VAULT_STATE_CHANGED') {
+    if (message.isUnlocked && activePopup && currentTargetInput) {
+      refreshBentoPopupWithAnimation(currentTargetInput);
+    }
     sendResponse({ success: true });
   }
 });

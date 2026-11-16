@@ -15,7 +15,7 @@ public struct SetupView: View {
     @State private var showConfirmPassword: Bool = false
     @State private var enableBiometrics: Bool = true
     @State private var enableHardwareKey: Bool = false
-    @State private var hardwareKeyName: String = "YubiKey 5C NFC"
+    @State private var hardwareKeyName: String = ""
     @State private var hardwareKeyUnlockMode: String = "hardware_only"
     @State private var isEnrollingHwKey: Bool = false
     @State private var hwKeyEnrolledDate: String? = nil
@@ -1514,8 +1514,8 @@ public struct SetupView: View {
                     connectedAccounts: activeConnections,
                     keychainSyncEnabled: enableKeychainSync,
                     accessibilityAutofillEnabled: enableAccessibilityAutofill,
-                    hardwareKeyEnabled: enableHardwareKey,
-                    hardwareKeyName: enableHardwareKey ? hardwareKeyName : nil,
+                    hardwareKeyEnabled: enableHardwareKey && hwKeyEnrolledDate != nil,
+                    hardwareKeyName: (enableHardwareKey && hwKeyEnrolledDate != nil) ? hardwareKeyName : nil,
                     hardwareKeyUnlockMode: hardwareKeyUnlockMode,
                     hardwareKeyEnrolledDate: hwKeyEnrolledDate
                 )

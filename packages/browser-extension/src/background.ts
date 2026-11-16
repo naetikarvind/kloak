@@ -165,10 +165,26 @@ async function sendNativeRequest(method: string, params: any = {}): Promise<any>
   return null;
 }
 
+async function broadcastVaultState(isUnlocked: boolean) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (tab.id) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: 'VAULT_STATE_CHANGED',
+          isUnlocked,
+          itemCount: cachedItems.length
+        }).catch(() => {});
+      }
+    }
+  } catch {}
+}
+
 /**
  * Refreshes vault status and items from the native host.
  */
 async function refreshVaultState(): Promise<void> {
+  const previousState = isVaultUnlocked;
   const status = await sendNativeRequest('vault.status');
   if (status && typeof status.isUnlocked === 'boolean') {
     isVaultUnlocked = status.isUnlocked;
@@ -179,6 +195,10 @@ async function refreshVaultState(): Promise<void> {
     if (Array.isArray(itemsRes)) {
       cachedItems = itemsRes;
     }
+  }
+
+  if (previousState !== isVaultUnlocked) {
+    broadcastVaultState(isVaultUnlocked);
   }
 }
 
@@ -502,6 +522,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (lastActiveTabId && lastActiveUrl) {
               updateBadgeForTab(lastActiveTabId, lastActiveUrl);
             }
+            broadcastVaultState(true);
             sendResponse({ success: true, isUnlocked: true, items: cachedItems });
           } else {
             const errorMsg = res?.error || res?.__error || 'Touch ID authentication failed or was cancelled.';
@@ -530,6 +551,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (lastActiveTabId && lastActiveUrl) {
               updateBadgeForTab(lastActiveTabId, lastActiveUrl);
             }
+            broadcastVaultState(true);
             sendResponse({ success: true, isUnlocked: true, items: cachedItems });
           } else {
             sendResponse({ success: false, error: 'Incorrect master password. Please try again.' });
@@ -557,6 +579,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             if (lastActiveTabId && lastActiveUrl) {
               updateBadgeForTab(lastActiveTabId, lastActiveUrl);
             }
+            broadcastVaultState(true);
             sendResponse({ success: true, isUnlocked: true, items: cachedItems });
           } else {
             sendResponse({ success: false, error: 'Hardware key verification failed. Please try again.' });
@@ -636,6 +659,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           if (lastActiveTabId) {
             await chrome.action.setBadgeText({ tabId: lastActiveTabId, text: '' });
           }
+          broadcastVaultState(false);
           sendResponse({ success: true, isUnlocked: false });
         } catch (err: any) {
           sendResponse({ success: false, error: err.message || 'Lock failed' });

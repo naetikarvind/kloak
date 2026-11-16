@@ -2044,6 +2044,7 @@
   var currentGeneratedPassword = "";
   var isRevealingPasswordMap = {};
   var cachedAiEvaluation = null;
+  var activeLockedPollTimer = null;
   function pushActiveUrl() {
     chrome.runtime.sendMessage({
       type: "PUSH_ACTIVE_URL",
@@ -2782,6 +2783,25 @@
   .kloak-bento-ai-dot.amber { background: #F59E0B; box-shadow: 0 0 4px #F59E0B; }
   .kloak-bento-ai-dot.red { background: #EF4444; box-shadow: 0 0 4px #EF4444; }
 
+  /* \u2500\u2500 Smart Unlock & Reveal Animations \u2500\u2500 */
+  @keyframes bentoRevealIn {
+    0% { opacity: 0; transform: translateY(12px) scale(0.97); filter: blur(3px); }
+    60% { opacity: 1; transform: translateY(-2px) scale(1.01); filter: blur(0px); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+  }
+  @keyframes bentoUnlockPulse {
+    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); border-color: #10B981; }
+    50% { box-shadow: 0 0 18px 4px rgba(16, 185, 129, 0.4); border-color: #10B981; }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); border-color: rgba(109, 74, 255, 0.35); }
+  }
+  @keyframes bentoBadgeFlip {
+    0% { transform: rotateX(90deg); opacity: 0; }
+    100% { transform: rotateX(0deg); opacity: 1; }
+  }
+  .kloak-bento-reveal { animation: bentoRevealIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .kloak-bento-unlock-success { animation: bentoUnlockPulse 0.4s ease-out forwards; }
+  .kloak-bento-badge-flip { animation: bentoBadgeFlip 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
   /* \u2500\u2500 Toast Notification \u2500\u2500 */
   .kloak-toast {
     position: fixed;
@@ -2811,6 +2831,25 @@
     setTimeout(() => {
       toast.remove();
     }, 3500);
+  }
+  function refreshBentoPopupWithAnimation(input) {
+    if (!activePopup) return;
+    const lockedCard = activePopup.querySelector(".kloak-bento-card");
+    const touchText = activePopup.querySelector("#bento-touch-text");
+    if (lockedCard) {
+      lockedCard.classList.add("kloak-bento-unlock-success");
+      if (touchText) touchText.textContent = "\u2713 Unlocked!";
+      lockedCard.style.borderColor = "#10B981";
+      lockedCard.style.background = "rgba(16, 185, 129, 0.12)";
+    }
+    chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
+      const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : [];
+      cachedCredentialsForSite = newItems;
+      setTimeout(() => {
+        buildPopupUI(newItems, input, true, true);
+        showToastNotification(`\u2713 Vault unlocked \u2022 ${newItems.length} password${newItems.length === 1 ? "" : "s"} available`);
+      }, 180);
+    });
   }
   function isRegistrationOrSignupPage() {
     const url = window.location.href.toLowerCase();
@@ -2905,13 +2944,17 @@
     activePopup.style.top = `${top}px`;
     activePopup.style.left = `${left}px`;
   }
-  function buildPopupUI(items, input, isUnlocked = true) {
+  function buildPopupUI(items, input, isUnlocked = true, animateReveal = false) {
     currentTargetInput = input;
     const root = ensureShadowRoot();
     if (activePopup) {
       if (activeTotpInterval) {
         clearInterval(activeTotpInterval);
         activeTotpInterval = null;
+      }
+      if (activeLockedPollTimer) {
+        clearInterval(activeLockedPollTimer);
+        activeLockedPollTimer = null;
       }
       activePopup.remove();
       activePopup = null;
@@ -2939,6 +2982,10 @@
         clearInterval(activeTotpInterval);
         activeTotpInterval = null;
       }
+      if (activeLockedPollTimer) {
+        clearInterval(activeLockedPollTimer);
+        activeLockedPollTimer = null;
+      }
       container.remove();
       activePopup = null;
     };
@@ -2964,11 +3011,11 @@
       <span>${!isUnlocked ? "\u{1F512}" : "\u{1F3AF}"}</span>
       <span>${!isUnlocked ? "Kloak Vault is Locked" : pageContext.contextSummary}</span>
     </div>
-    <span class="${tagClass}">${!isUnlocked ? "Locked" : pageContext.contextTag}</span>
+    <span class="${tagClass} ${animateReveal ? "kloak-bento-badge-flip" : ""}">${!isUnlocked ? "Locked" : pageContext.contextTag}</span>
   `;
     container.appendChild(contextBar);
     const bodyContainer = document.createElement("div");
-    bodyContainer.className = "kloak-body";
+    bodyContainer.className = `kloak-body ${animateReveal ? "kloak-bento-reveal" : ""}`;
     if (isUnlocked && items.length > 0 && !isSignup) {
       const savedSection = document.createElement("div");
       savedSection.className = "kloak-section";
@@ -3219,6 +3266,18 @@
       bodyContainer.appendChild(savedSection);
     }
     if (!isUnlocked) {
+      if (activeLockedPollTimer) clearInterval(activeLockedPollTimer);
+      activeLockedPollTimer = setInterval(() => {
+        chrome.runtime.sendMessage({ type: "GET_STATUS" }, (statusRes) => {
+          if (statusRes && statusRes.isUnlocked && activePopup && currentTargetInput) {
+            if (activeLockedPollTimer) {
+              clearInterval(activeLockedPollTimer);
+              activeLockedPollTimer = null;
+            }
+            refreshBentoPopupWithAnimation(currentTargetInput);
+          }
+        });
+      }, 1200);
       const lockedCard = document.createElement("div");
       lockedCard.className = "kloak-bento-card";
       lockedCard.style.padding = "12px 14px";
@@ -3273,12 +3332,7 @@
           touchBtn.disabled = false;
           if (touchText) touchText.textContent = "Unlock with Touch ID";
           if (res && res.success) {
-            showToastNotification("\u2713 Vault unlocked with Touch ID");
-            chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
-              const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : res.items || [];
-              cachedCredentialsForSite = newItems;
-              buildPopupUI(newItems, input, true);
-            });
+            refreshBentoPopupWithAnimation(input);
           } else {
             if (errEl) {
               errEl.textContent = res?.error || "Touch ID failed or was cancelled.";
@@ -3295,12 +3349,7 @@
         if (errEl) errEl.style.display = "none";
         chrome.runtime.sendMessage({ type: "UNLOCK_VAULT", password: pwd }, (res) => {
           if (res && res.success) {
-            showToastNotification("\u2713 Vault unlocked");
-            chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
-              const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : res.items || [];
-              cachedCredentialsForSite = newItems;
-              buildPopupUI(newItems, input, true);
-            });
+            refreshBentoPopupWithAnimation(input);
           } else {
             if (errEl) {
               errEl.textContent = res?.error || "Incorrect master password.";
@@ -3309,6 +3358,11 @@
           }
         });
       });
+    } else {
+      if (activeLockedPollTimer) {
+        clearInterval(activeLockedPollTimer);
+        activeLockedPollTimer = null;
+      }
     }
     if (isSignup) {
       const banner = document.createElement("div");
@@ -3924,6 +3978,11 @@
       sendResponse({ success: true });
     } else if (message.type === "THREAT_DETECTED") {
       showThreatBanner(message.analysis, message.aiEvaluation, message.connectedAccount);
+      sendResponse({ success: true });
+    } else if (message.type === "VAULT_STATE_CHANGED") {
+      if (message.isUnlocked && activePopup && currentTargetInput) {
+        refreshBentoPopupWithAnimation(currentTargetInput);
+      }
       sendResponse({ success: true });
     }
   });

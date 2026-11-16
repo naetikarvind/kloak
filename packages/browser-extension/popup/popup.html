@@ -1411,22 +1411,22 @@
     .unlock-view {
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at 50% 30%, rgba(109, 74, 255, 0.18) 0%, #16151D 70%);
+      background: radial-gradient(circle at 50% 25%, rgba(109, 74, 255, 0.16) 0%, #16151D 70%);
       z-index: 500;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 10px 14px;
       animation: paneSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .unlock-card {
       width: 100%;
-      max-width: 360px;
-      background: rgba(33, 31, 45, 0.95);
+      max-width: 350px;
+      background: rgba(33, 31, 45, 0.96);
       border: 1px solid rgba(109, 74, 255, 0.28);
-      border-radius: 16px;
+      border-radius: 14px;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
-      padding: 26px 24px 20px 24px;
+      padding: 16px 20px 12px 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -1434,42 +1434,42 @@
       backdrop-filter: blur(16px);
     }
     .unlock-shield-icon {
-      width: 50px;
-      height: 50px;
-      border-radius: 14px;
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
       background: linear-gradient(135deg, rgba(109, 74, 255, 0.3) 0%, rgba(109, 74, 255, 0.08) 100%);
       border: 1px solid rgba(109, 74, 255, 0.4);
       color: #6D4AFF;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 12px;
-      box-shadow: 0 0 20px rgba(109, 74, 255, 0.35);
+      margin-bottom: 6px;
+      box-shadow: 0 0 14px rgba(109, 74, 255, 0.35);
       animation: pulseRing 3.5s infinite ease-in-out;
     }
     .unlock-shield-icon svg {
-      width: 26px;
-      height: 26px;
+      width: 18px;
+      height: 18px;
       fill: currentColor;
     }
     .unlock-title {
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 700;
       color: #FFFFFF;
-      margin-bottom: 4px;
+      margin-bottom: 2px;
       letter-spacing: -0.2px;
     }
     .unlock-subtitle {
-      font-size: 11.5px;
+      font-size: 11px;
       color: var(--text-muted);
-      margin-bottom: 18px;
-      line-height: 1.45;
+      margin-bottom: 12px;
+      line-height: 1.35;
     }
     .unlock-form {
       width: 100%;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
     }
     .unlock-input-wrapper {
       position: relative;
@@ -1494,19 +1494,19 @@
       pointer-events: none;
     }
     .unlock-input-icon svg {
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       fill: currentColor;
     }
     .unlock-input {
       width: 100%;
-      height: 38px;
+      height: 35px;
       background: transparent;
       border: none;
       outline: none;
-      padding: 0 38px 0 34px;
+      padding: 0 36px 0 32px;
       color: #FFFFFF;
-      font-size: 13px;
+      font-size: 12.5px;
       font-family: inherit;
     }
     .unlock-input::placeholder {
@@ -1529,15 +1529,15 @@
       color: #FFFFFF;
     }
     .btn-unlock-eye svg {
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       fill: currentColor;
     }
     .unlock-error {
       background: rgba(245, 74, 74, 0.14);
       border: 1px solid rgba(245, 74, 74, 0.35);
       border-radius: 7px;
-      padding: 7px 10px;
+      padding: 6px 10px;
       color: #ff9191;
       font-size: 11px;
       line-height: 1.35;
@@ -1546,12 +1546,12 @@
     }
     .btn-unlock-submit {
       width: 100%;
-      height: 38px;
+      height: 35px;
       background: var(--accent);
       color: #FFFFFF;
       border: none;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
@@ -1581,10 +1581,10 @@
     .unlock-footer {
       display: flex;
       flex-direction: column;
-      gap: 5px;
+      gap: 3px;
       align-items: center;
-      margin-top: 14px;
-      font-size: 10.5px;
+      margin-top: 10px;
+      font-size: 10px;
       color: var(--text-subtle);
     }
     .unlock-badge {
@@ -1592,13 +1592,14 @@
       align-items: center;
       gap: 4px;
       background: rgba(255, 255, 255, 0.04);
-      padding: 3px 8px;
-      border-radius: 6px;
+      padding: 2px 7px;
+      border-radius: 5px;
       border: 1px solid rgba(255, 255, 255, 0.06);
       color: #9E9AA8;
+      font-size: 10px;
     }
     .unlock-daemon-status {
-      font-size: 10px;
+      font-size: 9.5px;
       color: var(--text-subtle);
     }
 
@@ -1956,22 +1957,41 @@
       padding: 0 10px;
       letter-spacing: 1px;
     }
+    .unlock-divider {
+      display: flex;
+      align-items: center;
+      margin: 6px 0;
+      color: var(--text-subtle);
+      font-size: 10px;
+      font-weight: 600;
+    }
+    .unlock-divider::before,
+    .unlock-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .unlock-divider span {
+      padding: 0 10px;
+      letter-spacing: 1px;
+    }
     .btn-unlock-hw-key {
       width: 100%;
-      height: 40px;
+      height: 34px;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text-main);
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
       cursor: pointer;
       transition: all 0.2s ease;
-      margin-top: 2px;
+      margin-top: 0;
     }
     .btn-unlock-hw-key:hover {
       background: rgba(109, 74, 255, 0.15);
@@ -1986,20 +2006,20 @@
     }
     .btn-unlock-touch-id {
       width: 100%;
-      height: 40px;
+      height: 35px;
       background: linear-gradient(135deg, rgba(109, 74, 255, 0.18) 0%, rgba(147, 51, 234, 0.18) 100%);
       border: 1px solid rgba(109, 74, 255, 0.45);
       border-radius: 8px;
       color: #FFFFFF;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
       cursor: pointer;
       transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-      margin-top: 10px;
+      margin-top: 0;
     }
     .btn-unlock-touch-id:hover {
       background: linear-gradient(135deg, rgba(109, 74, 255, 0.32) 0%, rgba(147, 51, 234, 0.32) 100%);
@@ -2085,11 +2105,11 @@
           <span id="touch-id-btn-text">Unlock with Touch ID</span>
         </button>
 
-        <div class="unlock-divider">
+        <div class="unlock-divider" id="unlock-hw-divider" style="display: none;">
           <span>OR</span>
         </div>
 
-        <button type="button" id="btn-unlock-hardware-key" class="btn-unlock-hw-key" title="Touch your YubiKey or FIDO2 Security Key to unlock">
+        <button type="button" id="btn-unlock-hardware-key" class="btn-unlock-hw-key" title="Touch your YubiKey or FIDO2 Security Key to unlock" style="display: none;">
           <svg class="hw-key-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M16 2H8C6.9 2 6 2.9 6 4v16c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-4 17c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-9H9V5h6v5zm-4-3h-1v2h1V7zm3 0h-1v2h1V7z"/></svg>
           <span id="hw-key-btn-text">Unlock with Hardware Key</span>
         </button>

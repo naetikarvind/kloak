@@ -4096,6 +4096,16 @@ ${notes}`;
     }
     return false;
   }
+  function updateHardwareKeyVisibility() {
+    const hwDivider = document.getElementById("unlock-hw-divider");
+    const hwBtn = document.getElementById("btn-unlock-hardware-key");
+    if (!hwDivider || !hwBtn) return;
+    chrome.runtime.sendMessage({ type: "GET_HARDWARE_KEY_CONFIG" }, (res) => {
+      const isConfigured = !!(res && res.hardwareKey && res.hardwareKey.enabled);
+      hwDivider.style.display = isConfigured ? "flex" : "none";
+      hwBtn.style.display = isConfigured ? "flex" : "none";
+    });
+  }
   function showUnlockView(statusMessage) {
     const unlockView = document.getElementById("unlock-view");
     if (unlockView) {
@@ -4112,6 +4122,7 @@ ${notes}`;
     if (statusEl) {
       statusEl.textContent = statusMessage || "Connected to local Kloak daemon";
     }
+    updateHardwareKeyVisibility();
   }
   function hideUnlockView() {
     const unlockView = document.getElementById("unlock-view");

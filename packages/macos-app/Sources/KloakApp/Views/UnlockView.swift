@@ -25,9 +25,9 @@ public struct UnlockView: View {
 
     public var body: some View {
         GlassEffectContainer {
-            VStack(spacing: 28) {
+            VStack(spacing: 20) {
                 // Official Kloak App Icon with Liquid Halo
-                KloakLogoView(size: 88, glow: pulseGlow)
+                KloakLogoView(size: 76, glow: pulseGlow)
                     .scaleEffect(pulseGlow ? 1.05 : 0.98)
                     .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: pulseGlow)
                     .onAppear {
@@ -38,11 +38,11 @@ public struct UnlockView: View {
                     }
 
                 Text("Kloak")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundColor(.primary)
 
                 // Password Entry Glass Panel
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         if showPassword {
                             TextField("Master Password", text: $password)
@@ -79,7 +79,7 @@ public struct UnlockView: View {
                         if errorMessage != nil { errorMessage = nil }
                     }
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: 8) {
                         Button(action: attemptUnlock) {
                             HStack(spacing: 6) {
                                 if isProcessing {
@@ -132,6 +132,26 @@ public struct UnlockView: View {
                             .disabled(isProcessing)
                             .help("Unlock with Touch ID")
                         }
+
+                        if VaultStore.shared.settings.hardwareKeyEnabled {
+                            Button(action: attemptHardwareKeyUnlock) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                    .frame(width: 44, height: 38)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .fill(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                    .stroke(LiquidGlassTheme.emeraldAccent.opacity(0.3), lineWidth: 0.75)
+                                            )
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(isProcessing)
+                            .help("Unlock with Hardware Security Key")
+                        }
                     }
                     .frame(width: 280)
 
@@ -144,7 +164,7 @@ public struct UnlockView: View {
                             .transition(.opacity)
                     }
                 }
-                .padding(20)
+                .padding(18)
                 .glassEffect(cornerRadius: 20)
 
                 Button(action: { DevModeManager.shared.showSheet = true }) {
@@ -160,9 +180,9 @@ public struct UnlockView: View {
                 .padding(.top, 4)
                 .help("Developer Mode (Immutable Password Required)")
             }
-            .padding(40)
+            .padding(32)
         }
-        .frame(minWidth: 460, minHeight: 480)
+        .frame(minWidth: 440, minHeight: 450)
     }
 
     private func attemptUnlock() {
@@ -197,6 +217,28 @@ public struct UnlockView: View {
                 } else {
                     errorMessage = "Touch ID authentication failed."
                 }
+            }
+        }
+    }
+
+    private func attemptHardwareKeyUnlock() {
+        guard !isProcessing else { return }
+        isProcessing = true
+        errorMessage = nil
+
+        Task {
+            let connected = HardwareSecurityKeyService.shared.getConnectedKeys()
+            if connected.isEmpty {
+                isProcessing = false
+                errorMessage = "No hardware security key detected on USB or NFC."
+                return
+            }
+            let success = await onBiometricUnlock() || VaultStore.shared.isUnlocked
+            isProcessing = false
+            if success || VaultStore.shared.isUnlocked {
+                isUnlocked = true
+            } else {
+                errorMessage = "Hardware security key verification failed."
             }
         }
     }

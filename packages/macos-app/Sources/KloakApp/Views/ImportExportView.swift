@@ -155,7 +155,7 @@ public struct ImportExportView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        .frame(minHeight: 52)
+                        .frame(height: 52)
                         .animation(.easeInOut(duration: 0.2), value: exportFormat)
 
                         Button(action: runExport) {

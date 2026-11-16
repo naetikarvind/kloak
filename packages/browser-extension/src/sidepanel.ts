@@ -107,6 +107,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  const updateSideHwVisibility = () => {
+    const sideHwDivider = document.getElementById('side-unlock-hw-divider');
+    const sideHwBtn = document.getElementById('btn-side-unlock-hw');
+    if (!sideHwDivider || !sideHwBtn) return;
+    chrome.runtime.sendMessage({ type: 'GET_HARDWARE_KEY_CONFIG' }, (res) => {
+      const isConfigured = !!(res && res.hardwareKey && res.hardwareKey.enabled);
+      sideHwDivider.style.display = isConfigured ? 'flex' : 'none';
+      sideHwBtn.style.display = isConfigured ? 'flex' : 'none';
+    });
+  };
+
   const showLocked = () => {
     if (unlockView) unlockView.style.display = 'flex';
     if (unlockedView) unlockedView.style.display = 'none';
@@ -116,6 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
       pwdInput.value = '';
       setTimeout(() => pwdInput.focus(), 60);
     }
+    updateSideHwVisibility();
   };
 
   const showUnlocked = (items: any[]) => {
