@@ -135,10 +135,28 @@ public struct ImportExportView: View {
                         }
                         .pickerStyle(.radioGroup)
 
-                        if exportFormat == "kloak-encrypted" {
-                            SecureField("Backup Password", text: $exportPassword)
-                                .textFieldStyle(.roundedBorder)
+                        VStack(alignment: .leading, spacing: 6) {
+                            if exportFormat == "kloak-encrypted" {
+                                SecureField("Backup Password (AES-256-GCM)", text: $exportPassword)
+                                    .textFieldStyle(.roundedBorder)
+                                Text("Your backup is protected with zero-knowledge AES-256-GCM encryption.")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "info.circle")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                    Text("Unencrypted export. No backup password required. Store safely.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
+                        .frame(minHeight: 52)
+                        .animation(.easeInOut(duration: 0.2), value: exportFormat)
 
                         Button(action: runExport) {
                             Label("Export", systemImage: "square.and.arrow.up")

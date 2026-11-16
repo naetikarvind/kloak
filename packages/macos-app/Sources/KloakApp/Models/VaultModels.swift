@@ -409,6 +409,12 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var autofillHotkeyModifiers: UInt
     public var autofillHotkeyDisplay: String
 
+    // Hardware Security Key (FIDO2 / YubiKey)
+    public var hardwareKeyEnabled: Bool
+    public var hardwareKeyName: String?
+    public var hardwareKeyEnrolledDate: String?
+    public var hardwareKeyUnlockMode: String // "hardware_only", "password_plus_hardware"
+
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
         clearClipboardSeconds: 30,
@@ -427,7 +433,11 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         accessibilityAutofillEnabled: true,
         autofillHotkeyKeyCode: 42,
         autofillHotkeyModifiers: 1048576,
-        autofillHotkeyDisplay: "⌘\\"
+        autofillHotkeyDisplay: "⌘\\",
+        hardwareKeyEnabled: false,
+        hardwareKeyName: nil,
+        hardwareKeyEnrolledDate: nil,
+        hardwareKeyUnlockMode: "hardware_only"
     )
 
     public init(
@@ -448,7 +458,11 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         accessibilityAutofillEnabled: Bool = true,
         autofillHotkeyKeyCode: Int = 42,
         autofillHotkeyModifiers: UInt = 1048576,
-        autofillHotkeyDisplay: String = "⌘\\"
+        autofillHotkeyDisplay: String = "⌘\\",
+        hardwareKeyEnabled: Bool = false,
+        hardwareKeyName: String? = nil,
+        hardwareKeyEnrolledDate: String? = nil,
+        hardwareKeyUnlockMode: String = "hardware_only"
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -468,6 +482,10 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.autofillHotkeyKeyCode = autofillHotkeyKeyCode
         self.autofillHotkeyModifiers = autofillHotkeyModifiers
         self.autofillHotkeyDisplay = autofillHotkeyDisplay
+        self.hardwareKeyEnabled = hardwareKeyEnabled
+        self.hardwareKeyName = hardwareKeyName
+        self.hardwareKeyEnrolledDate = hardwareKeyEnrolledDate
+        self.hardwareKeyUnlockMode = hardwareKeyUnlockMode
     }
 
     public init(from decoder: Decoder) throws {
@@ -490,6 +508,10 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.autofillHotkeyKeyCode = try container.decodeIfPresent(Int.self, forKey: .autofillHotkeyKeyCode) ?? 42
         self.autofillHotkeyModifiers = try container.decodeIfPresent(UInt.self, forKey: .autofillHotkeyModifiers) ?? 1048576
         self.autofillHotkeyDisplay = try container.decodeIfPresent(String.self, forKey: .autofillHotkeyDisplay) ?? "⌘\\"
+        self.hardwareKeyEnabled = try container.decodeIfPresent(Bool.self, forKey: .hardwareKeyEnabled) ?? false
+        self.hardwareKeyName = try container.decodeIfPresent(String.self, forKey: .hardwareKeyName)
+        self.hardwareKeyEnrolledDate = try container.decodeIfPresent(String.self, forKey: .hardwareKeyEnrolledDate)
+        self.hardwareKeyUnlockMode = try container.decodeIfPresent(String.self, forKey: .hardwareKeyUnlockMode) ?? "hardware_only"
     }
 }
 

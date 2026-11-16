@@ -79,12 +79,16 @@ public struct UnlockView: View {
                         if errorMessage != nil { errorMessage = nil }
                     }
 
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(LiquidGlassTheme.roseAccent)
-                            .transition(.opacity)
+                    ZStack {
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(LiquidGlassTheme.roseAccent)
+                                .multilineTextAlignment(.center)
+                                .transition(.opacity)
+                        }
                     }
+                    .frame(height: 18)
 
                     HStack(spacing: 12) {
                         Button(action: attemptUnlock) {
@@ -98,7 +102,6 @@ public struct UnlockView: View {
                             }
                         }
                         .buttonStyle(GlassCapsuleButton(isPrimary: true))
-                        .frame(width: 180)
                         .disabled(password.isEmpty || isProcessing)
 
                         if BiometricAuth.shared.canAuthenticateWithBiometrics() {
@@ -113,6 +116,7 @@ public struct UnlockView: View {
                             .help("Unlock with Touch ID")
                         }
                     }
+                    .frame(width: 280)
                 }
                 .padding(24)
                 .glassEffect(cornerRadius: 20)

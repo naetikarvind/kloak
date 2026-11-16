@@ -186,6 +186,8 @@ const OptionsApp: React.FC = () => {
   const [bentoAutofill, setBentoAutofill] = useState<boolean>(true);
   const [totpAutofill, setTotpAutofill] = useState<boolean>(true);
   const [hardwareKeyRegistered, setHardwareKeyRegistered] = useState<boolean>(false);
+  const [hwKeyFeedback, setHwKeyFeedback] = useState<string>('');
+  const [isRegisteringKey, setIsRegisteringKey] = useState<boolean>(false);
 
   // Generator state
   const [pwLength, setPwLength] = useState<number>(20);
@@ -274,6 +276,62 @@ const OptionsApp: React.FC = () => {
   const handleAutoLockChange = (mins: number) => {
     setAutoLockMinutes(mins);
     chrome.storage?.local?.set({ kloak_autolock: mins });
+  };
+
+  const handleRegisterHardwareKey = async () => {
+    setIsRegisteringKey(true);
+    setHwKeyFeedback('');
+    try {
+      if (typeof window !== 'undefined' && window.PublicKeyCredential) {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const userId = crypto.getRandomValues(new Uint8Array(16));
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: 'Kloak Password Vault' },
+            user: {
+              id: userId,
+              name: 'kloak-vault-owner',
+              displayName: 'Kloak Hardware Key'
+            },
+            pubKeyCredParams: [
+              { alg: -7, type: 'public-key' },
+              { alg: -257, type: 'public-key' }
+            ],
+            authenticatorSelection: {
+              authenticatorAttachment: 'cross-platform',
+              userVerification: 'preferred'
+            },
+            timeout: 60000
+          }
+        });
+
+        if (credential) {
+          const hwData = {
+            id: (credential as any).id,
+            name: 'YubiKey / FIDO2 Key',
+            registeredAt: new Date().toLocaleDateString()
+          };
+          chrome.storage.local.set({ kloak_hardware_key: hwData }, () => {
+            setHardwareKeyRegistered(true);
+            setHwKeyFeedback('Hardware security key enrolled successfully!');
+          });
+        }
+      } else {
+        setHwKeyFeedback('WebAuthn is not supported in this browser window.');
+      }
+    } catch (err: any) {
+      setHwKeyFeedback(err.message || 'Key registration cancelled or failed.');
+    } finally {
+      setIsRegisteringKey(false);
+    }
+  };
+
+  const handleRemoveHardwareKey = () => {
+    chrome.storage.local.remove('kloak_hardware_key', () => {
+      setHardwareKeyRegistered(false);
+      setHwKeyFeedback('Hardware key removed.');
+    });
   };
 
   const handleCopy = () => {
@@ -571,9 +629,70 @@ const OptionsApp: React.FC = () => {
             <p style={{ color: '#9E9AA8', fontSize: '13px', lineHeight: 1.5, marginBottom: '14px' }}>
               Unlock your vault with a single physical touch on your YubiKey or FIDO2 hardware security key. Fast, hardware-backed, and phishing-proof.
             </p>
-            <div style={{ fontSize: '12.5px', color: '#cbd5e1', background: 'rgba(0,0,0,0.25)', padding: '10px 14px', borderRadius: '8px' }}>
-              💡 To register or change your hardware key, click the <strong>Key icon</strong> in the extension popup header.
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginTop: '12px', flexWrap: 'wrap' }}>
+              {!hardwareKeyRegistered ? (
+                <button
+                  onClick={handleRegisterHardwareKey}
+                  disabled={isRegisteringKey}
+                  style={{
+                    background: '#6D4AFF',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '12.5px',
+                    cursor: isRegisteringKey ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'background 0.2s',
+                  }}
+                >
+                  <span>🔑</span>
+                  <span>{isRegisteringKey ? 'Touch your security key...' : 'Register Hardware Key'}</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={handleRegisterHardwareKey}
+                    disabled={isRegisteringKey}
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#ffffff',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Re-enroll Key
+                  </button>
+                  <button
+                    onClick={handleRemoveHardwareKey}
+                    style={{
+                      background: 'rgba(239,68,68,0.15)',
+                      color: '#f87171',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Remove Key
+                  </button>
+                </>
+              )}
             </div>
+            {hwKeyFeedback && (
+              <div style={{ fontSize: '12px', color: hwKeyFeedback.includes('success') ? '#34d399' : '#f87171', marginTop: '8px' }}>
+                {hwKeyFeedback}
+              </div>
+            )}
           </SpotlightCard>
 
           <SpotlightCard spotlightColor="rgba(56, 189, 248, 0.2)">

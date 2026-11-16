@@ -696,8 +696,10 @@ public final class IPCServer: ObservableObject {
         case "vault.getHardwareKeyConfig":
             reply(.dictionary([
                 "hardwareKey": .dictionary([
-                    "enabled": .bool(store.settings.biometricsEnabled),
-                    "mode": .string("hardware_only")
+                    "enabled": .bool(store.settings.hardwareKeyEnabled),
+                    "mode": .string(store.settings.hardwareKeyUnlockMode),
+                    "name": .string(store.settings.hardwareKeyName ?? "YubiKey 5C NFC"),
+                    "registeredDate": .string(store.settings.hardwareKeyEnrolledDate ?? "")
                 ])
             ]))
 
@@ -706,14 +708,39 @@ public final class IPCServer: ObservableObject {
                 replyError(-32001, "Vault is locked")
                 return
             }
-            reply(.dictionary(["success": .bool(true)]))
+            let keyName = params?["keyName"]?.stringValue ?? "YubiKey 5C NFC"
+            let mode = params?["mode"]?.stringValue ?? "hardware_only"
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d, yyyy"
+            let dateStr = formatter.string(from: Date())
+            Task { @MainActor in
+                var updated = store.settings
+                updated.hardwareKeyEnabled = true
+                updated.hardwareKeyName = keyName
+                updated.hardwareKeyUnlockMode = mode
+                updated.hardwareKeyEnrolledDate = dateStr
+                store.updateSettings(updated)
+                reply(.dictionary([
+                    "success": .bool(true),
+                    "keyName": .string(keyName),
+                    "mode": .string(mode),
+                    "enrolledDate": .string(dateStr)
+                ]))
+            }
 
         case "vault.removeHardwareKey":
             guard store.isUnlocked else {
                 replyError(-32001, "Vault is locked")
                 return
             }
-            reply(.dictionary(["success": .bool(true)]))
+            Task { @MainActor in
+                var updated = store.settings
+                updated.hardwareKeyEnabled = false
+                updated.hardwareKeyName = nil
+                updated.hardwareKeyEnrolledDate = nil
+                store.updateSettings(updated)
+                reply(.dictionary(["success": .bool(true)]))
+            }
 
         case "vault.lock":
             store.lock()

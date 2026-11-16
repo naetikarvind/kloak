@@ -82,7 +82,11 @@ public final class VaultStore: ObservableObject {
         importedItems: [VaultItem] = [],
         connectedAccounts: [OnboardingAccountConnection] = [],
         keychainSyncEnabled: Bool = false,
-        accessibilityAutofillEnabled: Bool = true
+        accessibilityAutofillEnabled: Bool = true,
+        hardwareKeyEnabled: Bool = false,
+        hardwareKeyName: String? = nil,
+        hardwareKeyUnlockMode: String = "hardware_only",
+        hardwareKeyEnrolledDate: String? = nil
     ) async throws {
         guard !masterPassword.isEmpty else {
             throw NSError(domain: "KloakVault", code: 1, userInfo: [NSLocalizedDescriptionKey: "Master password cannot be empty."])
@@ -118,6 +122,10 @@ public final class VaultStore: ObservableObject {
         initialSettings.biometricsEnabled = enableBiometrics
         initialSettings.keychainSyncEnabled = keychainSyncEnabled
         initialSettings.accessibilityAutofillEnabled = accessibilityAutofillEnabled
+        initialSettings.hardwareKeyEnabled = hardwareKeyEnabled
+        initialSettings.hardwareKeyName = hardwareKeyName
+        initialSettings.hardwareKeyUnlockMode = hardwareKeyUnlockMode
+        initialSettings.hardwareKeyEnrolledDate = hardwareKeyEnrolledDate
         AccessibilityAutofillService.shared.updateHotkeyConfig(
             keyCode: initialSettings.autofillHotkeyKeyCode,
             modifiers: initialSettings.autofillHotkeyModifiers,

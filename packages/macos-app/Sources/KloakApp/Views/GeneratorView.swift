@@ -4,6 +4,9 @@ public struct GeneratorView: View {
     @State private var mode: Int = 0 // 0: Password, 1: Passphrase
     @State private var length: Double = 20
     @State private var wordsCount: Double = 4
+    @State private var passphraseSeparator: String = "-"
+    @State private var capitalizeWords: Bool = true
+    @State private var includeNumberInPassphrase: Bool = true
     @State private var useUpper: Bool = true
     @State private var useLower: Bool = true
     @State private var useNumbers: Bool = true
@@ -110,8 +113,31 @@ public struct GeneratorView: View {
                             Slider(value: $wordsCount, in: 3...10, step: 1)
                                 .onChange(of: wordsCount) { _, _ in generate() }
                         }
+
+                        Divider().opacity(0.15)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Word Separator")
+                                .font(.system(size: 12, weight: .medium))
+                            Picker("", selection: $passphraseSeparator) {
+                                Text("Hyphen (-)").tag("-")
+                                Text("Period (.)").tag(".")
+                                Text("Underscore (_)").tag("_")
+                                Text("Space ( )").tag(" ")
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: passphraseSeparator) { _, _ in generate() }
+                        }
+
+                        Toggle("Capitalize Words", isOn: $capitalizeWords)
+                            .onChange(of: capitalizeWords) { _, _ in generate() }
+
+                        Toggle("Append 2-Digit Number", isOn: $includeNumberInPassphrase)
+                            .onChange(of: includeNumberInPassphrase) { _, _ in generate() }
                     }
                 }
+                .frame(minHeight: 280, alignment: .top)
+                .animation(.easeInOut(duration: 0.25), value: mode)
                 .padding(20)
                 .glassEffect(cornerRadius: 20)
             }
@@ -151,13 +177,19 @@ public struct GeneratorView: View {
             }
             generatedString = res
         } else {
-            let sampleWords = ["Quantum", "Obsidian", "Cascade", "Cipher", "Aurora", "Beacon", "Vortex", "Horizon", "Nebula", "Sentinel", "Apex", "Echo"]
+            let sampleWords = ["Quantum", "Obsidian", "Cascade", "Cipher", "Aurora", "Beacon", "Vortex", "Horizon", "Nebula", "Sentinel", "Apex", "Echo", "Falcon", "Mirage", "Prism", "Zenith", "Solar", "Orbit"]
             var words: [String] = []
             for _ in 0..<Int(wordsCount) {
-                words.append(sampleWords.randomElement() ?? "Key")
+                var w = sampleWords.randomElement() ?? "Key"
+                if !capitalizeWords {
+                    w = w.lowercased()
+                }
+                words.append(w)
             }
-            words.append("\(Int.random(in: 10...99))")
-            generatedString = words.joined(separator: "-")
+            if includeNumberInPassphrase {
+                words.append("\(Int.random(in: 10...99))")
+            }
+            generatedString = words.joined(separator: passphraseSeparator)
         }
     }
 

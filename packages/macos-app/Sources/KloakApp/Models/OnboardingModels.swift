@@ -25,9 +25,9 @@ public enum OnboardingStep: Int, CaseIterable, Identifiable, Sendable {
     public var subtitle: String {
         switch self {
         case .cloudAccounts: return "Connect Google, Proton, or Microsoft"
-        case .appleKeychain: return "Import from any password manager or Apple Keychain"
-        case .vaultPassword: return "Initialize local vault encryption"
-        case .ecosystem: return "Accessibility Autofill, Browser & Raycast"
+        case .appleKeychain: return "Multi-source import (Google, Apple, Bitwarden, Opera) & Auto-Merge"
+        case .vaultPassword: return "Argon2id encryption, Touch ID & Hardware Security Key"
+        case .ecosystem: return "Browser Extension, Desktop Autofill (⌘\\) & iCloud Sync"
         case .complete: return "Your vault is ready"
         }
     }
