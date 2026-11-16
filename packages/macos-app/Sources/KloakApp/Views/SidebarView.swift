@@ -86,7 +86,7 @@ public struct SidebarView: View {
                     ForEach(ItemType.allCases) { type in
                         NavigationLink(value: NavigationSection.category(type)) {
                             Label {
-                                Text(type.displayName)
+                                Text(type == .login ? "Logins" : type.displayName)
                             } icon: {
                                 Image(systemName: type.iconName).foregroundColor(.secondary)
                             }

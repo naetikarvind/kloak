@@ -2119,6 +2119,11 @@
     };
     const renderItems = (items) => {
       if (!container) return;
+      const firstPositions = /* @__PURE__ */ new Map();
+      container.querySelectorAll(".item-card[data-id]").forEach((c) => {
+        const id = c.dataset.id;
+        if (id) firstPositions.set(id, c.getBoundingClientRect());
+      });
       container.innerHTML = "";
       if (items.length === 0) {
         container.innerHTML = `
@@ -2129,9 +2134,11 @@
       `;
         return;
       }
+      const newCards = [];
       items.forEach((item) => {
         const card = document.createElement("div");
         card.className = "item-card";
+        card.dataset.id = item.id;
         card.innerHTML = `
         <div class="item-top">
           <div class="item-title-group">
@@ -2209,7 +2216,35 @@
           }
         });
         container.appendChild(card);
+        newCards.push(card);
       });
+      if (firstPositions.size > 0) {
+        newCards.forEach((c) => {
+          const id = c.dataset.id;
+          if (!id) return;
+          const first = firstPositions.get(id);
+          if (first) {
+            const last = c.getBoundingClientRect();
+            const dy = first.top - last.top;
+            if (dy !== 0) {
+              c.style.transform = `translateY(${dy}px)`;
+              c.style.transition = "none";
+            }
+          } else {
+            c.style.opacity = "0";
+            c.style.transform = "translateY(10px) scale(0.97)";
+            c.style.transition = "none";
+          }
+        });
+        void container.offsetHeight;
+        requestAnimationFrame(() => {
+          newCards.forEach((c) => {
+            c.style.transition = "transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, background 0.15s, border-color 0.15s";
+            c.style.transform = "";
+            c.style.opacity = "";
+          });
+        });
+      }
     };
     const loadVault = async () => {
       const direct = await checkDirectStatus();

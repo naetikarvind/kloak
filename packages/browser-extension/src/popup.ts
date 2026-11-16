@@ -165,6 +165,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 let currentSortMode: 'recent' | 'alpha' | 'newest' | 'oldest' = 'recent';
+let currentFilterMode: 'all' | 'logins' | 'favorites' = 'all';
 
 // ── Search & Filter ──
 function setupSearch() {
@@ -172,38 +173,66 @@ function setupSearch() {
   searchInput?.addEventListener('input', () => {
     if (isGeneratorOpen) {
       isGeneratorOpen = false;
-      document.getElementById('filter-generator')?.classList.remove('active');
-      document.getElementById('filter-all')?.classList.add('active');
+      updateActiveFilterTab(document.getElementById('filter-all'));
     }
-    applyFilterAndSort();
+    applyFilterAndSort(true);
   });
+}
+
+function updateActiveFilterTab(activeBtn: HTMLElement | null) {
+  document.getElementById('filter-all')?.classList.remove('active');
+  document.getElementById('filter-logins')?.classList.remove('active');
+  document.getElementById('filter-favorites')?.classList.remove('active');
+  document.getElementById('filter-generator')?.classList.remove('active');
+  activeBtn?.classList.add('active');
 }
 
 function setupFilters() {
   const filterAllBtn = document.getElementById('filter-all');
+  const filterLoginsBtn = document.getElementById('filter-logins');
+  const filterFavsBtn = document.getElementById('filter-favorites');
   const filterGenBtn = document.getElementById('filter-generator');
   const headerGenBtn = document.getElementById('btn-header-gen');
 
   filterAllBtn?.addEventListener('click', () => {
     isGeneratorOpen = false;
-    const searchInput = document.getElementById('search-input') as HTMLInputElement;
-    if (searchInput) searchInput.value = '';
-    filterAllBtn.classList.add('active');
-    filterGenBtn?.classList.remove('active');
-    applyFilterAndSort();
-    if (allItems.length > 0) {
+    currentFilterMode = 'all';
+    updateActiveFilterTab(filterAllBtn);
+    applyFilterAndSort(true);
+    if (allItems.length > 0 && (!activeItem || !allItems.some(i => i.id === activeItem.id))) {
       selectItem(allItems[0]);
-    } else {
-      const container = document.getElementById('detail-pane');
-      if (container) container.innerHTML = '<div class="detail-empty">Select an item to view details</div>';
+    }
+  });
+
+  filterLoginsBtn?.addEventListener('click', () => {
+    isGeneratorOpen = false;
+    currentFilterMode = 'logins';
+    updateActiveFilterTab(filterLoginsBtn);
+    applyFilterAndSort(true);
+    const loginItems = allItems.filter(i => i.type === 'login' || !i.type);
+    if (loginItems.length > 0 && (!activeItem || !loginItems.some(i => i.id === activeItem.id))) {
+      selectItem(loginItems[0]);
+    }
+  });
+
+  filterFavsBtn?.addEventListener('click', () => {
+    isGeneratorOpen = false;
+    currentFilterMode = 'favorites';
+    updateActiveFilterTab(filterFavsBtn);
+    applyFilterAndSort(true);
+    const favItems = allItems.filter(i => Boolean(i.favorite));
+    if (favItems.length > 0 && (!activeItem || !favItems.some(i => i.id === activeItem.id))) {
+      selectItem(favItems[0]);
     }
   });
 
   filterGenBtn?.addEventListener('click', () => {
+    updateActiveFilterTab(filterGenBtn);
     showGeneratorView();
   });
 
   headerGenBtn?.addEventListener('click', () => {
+    updateActiveFilterTab(filterGenBtn);
     showGeneratorView();
   });
 }
@@ -256,7 +285,7 @@ function setupSortDropdown() {
 
         sortDropdown.classList.remove('open');
         sortWrapper?.classList.remove('open');
-        applyFilterAndSort();
+        applyFilterAndSort(true);
       }
     });
   });
@@ -281,19 +310,26 @@ function sortItems(items: any[]): any[] {
   }
 }
 
-function applyFilterAndSort() {
+function applyFilterAndSort(animate: boolean = true) {
   const searchInput = document.getElementById('search-input') as HTMLInputElement;
   const query = (searchInput?.value || '').toLowerCase();
   let filtered = allItems;
+
+  if (currentFilterMode === 'favorites') {
+    filtered = filtered.filter(item => Boolean(item.favorite));
+  } else if (currentFilterMode === 'logins') {
+    filtered = filtered.filter(item => item.type === 'login' || !item.type);
+  }
+
   if (query) {
-    filtered = allItems.filter(item =>
+    filtered = filtered.filter(item =>
       (item.title || '').toLowerCase().includes(query) ||
       (item.username || '').toLowerCase().includes(query) ||
       (item.urls || []).some((u: string) => u.toLowerCase().includes(query))
     );
   }
   const sorted = sortItems(filtered);
-  renderSidebarList(sorted);
+  renderSidebarList(sorted, animate);
 }
 
 // ── Add Dropdown ──
@@ -2302,7 +2338,7 @@ function renderItemAvatar(avatarEl: HTMLElement, item: any, size: number = 32) {
 }
 
 // ── Sidebar List ──
-function renderSidebarList(items: any[]) {
+function renderSidebarList(items: any[], animate: boolean = true) {
   const container = document.getElementById('sidebar-list');
   if (!container) return;
 
@@ -2311,16 +2347,31 @@ function renderSidebarList(items: any[]) {
     return;
   }
 
+  // 1. FLIP: Record first positions before clearing
+  const firstPositions = new Map<string, DOMRect>();
+  if (animate) {
+    const existingRows = container.querySelectorAll<HTMLElement>('.list-item[data-item-id]');
+    existingRows.forEach(row => {
+      const id = row.dataset.itemId;
+      if (id) {
+        firstPositions.set(id, row.getBoundingClientRect());
+      }
+    });
+  }
+
   container.innerHTML = '';
 
   const groupHeader = document.createElement('div');
   groupHeader.className = 'list-group-header';
-  groupHeader.textContent = 'All items';
+  groupHeader.textContent = currentFilterMode === 'favorites' ? 'Favorites' : (currentFilterMode === 'logins' ? 'Logins' : 'All items');
   container.appendChild(groupHeader);
+
+  const newRows: HTMLElement[] = [];
 
   items.forEach(item => {
     const row = document.createElement('div');
     row.className = `list-item ${activeItem?.id === item.id ? 'active' : ''}`;
+    row.dataset.itemId = item.id;
 
     const avatar = document.createElement('div');
     avatar.className = 'item-avatar';
@@ -2355,17 +2406,57 @@ function renderSidebarList(items: any[]) {
 
     row.addEventListener('click', () => selectItem(item));
     container.appendChild(row);
+    newRows.push(row);
   });
+
+  // 2. FLIP: Invert & Play
+  if (animate && firstPositions.size > 0) {
+    newRows.forEach(row => {
+      const id = row.dataset.itemId;
+      if (!id) return;
+      const firstRect = firstPositions.get(id);
+      if (firstRect) {
+        const lastRect = row.getBoundingClientRect();
+        const deltaY = firstRect.top - lastRect.top;
+        if (deltaY !== 0) {
+          row.style.transform = `translateY(${deltaY}px)`;
+          row.style.transition = 'none';
+        }
+      } else {
+        row.style.opacity = '0';
+        row.style.transform = 'translateY(10px) scale(0.96)';
+        row.style.transition = 'none';
+      }
+    });
+
+    // Force layout reflow
+    void container.offsetHeight;
+
+    requestAnimationFrame(() => {
+      newRows.forEach(row => {
+        row.style.transition = 'transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, background 0.18s ease';
+        row.style.transform = '';
+        row.style.opacity = '';
+      });
+    });
+  }
 }
 
 function selectItem(item: any) {
   isGeneratorOpen = false;
   activeItem = item;
-  document.getElementById('filter-generator')?.classList.remove('active');
-  document.getElementById('filter-all')?.classList.add('active');
   if (totpInterval) { clearInterval(totpInterval); totpInterval = null; }
   if (addTotpInterval) { clearInterval(addTotpInterval); addTotpInterval = null; }
-  renderSidebarList(allItems);
+
+  const rows = document.querySelectorAll<HTMLElement>('.list-item[data-item-id]');
+  rows.forEach(r => {
+    if (r.dataset.itemId === item.id) {
+      r.classList.add('active');
+    } else {
+      r.classList.remove('active');
+    }
+  });
+
   renderDetailPane(item);
 }
 
@@ -2418,6 +2509,10 @@ function renderDetailPane(item: any) {
   actionsDiv.className = 'detail-actions';
 
   actionsDiv.innerHTML = `
+    <button class="btn-pill ${item.favorite ? 'active-fav' : ''}" id="btn-toggle-favorite" title="${item.favorite ? 'Remove from Favorites' : 'Add to Favorites'}">
+      <svg viewBox="0 0 24 24" style="fill: ${item.favorite ? '#F59E0B' : 'currentColor'}"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+      <span>${item.favorite ? 'Favorited' : 'Favorite'}</span>
+    </button>
     <button class="btn-pill" id="btn-autofill">
       <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 9h-2V7h-2v5H6v2h2v5h2v-5h2v-2z"/></svg>
       Fill
@@ -2702,6 +2797,19 @@ function renderDetailPane(item: any) {
   document.getElementById('copy-totp')?.addEventListener('click', (e) => {
     const code = document.getElementById('totp-code')?.textContent || '';
     copyToClipboard(code, e.currentTarget as HTMLElement);
+  });
+
+  document.getElementById('btn-toggle-favorite')?.addEventListener('click', async () => {
+    item.favorite = !item.favorite;
+    await saveVaultItemDirect(item);
+    chrome.runtime.sendMessage({ type: 'UPDATE_ITEM', item }, () => {});
+    const idx = allItems.findIndex(i => i.id === item.id);
+    if (idx !== -1) {
+      allItems[idx].favorite = item.favorite;
+    }
+    renderDetailPane(item);
+    applyFilterAndSort(true);
+    showToast(item.favorite ? '★ Added to Favorites' : '☆ Removed from Favorites');
   });
 
   document.getElementById('btn-autofill')?.addEventListener('click', async () => {

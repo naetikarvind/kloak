@@ -131,7 +131,7 @@ public struct ItemListView: View {
                             folders: folders,
                             currentSection: currentSection,
                             onToggleFavorite: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
                                     onToggleFavorite(item.id)
                                 }
                             },
@@ -141,14 +141,21 @@ public struct ItemListView: View {
                             onDeletePermanently: onDeletePermanently
                         )
                         .tag(item.id)
+                        .transition(
+                            .asymmetric(
+                                insertion: .opacity.combined(with: .offset(y: 8)),
+                                removal: .opacity.combined(with: .offset(y: -8))
+                            )
+                        )
                     }
                 }
                 .listStyle(.inset)
                 .tint(LiquidGlassTheme.primaryAccent)
                 .accentColor(LiquidGlassTheme.primaryAccent)
-                .animation(.spring(response: 0.35, dampingFraction: 0.75), value: items)
+                .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items)
             }
         }
+        .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items.isEmpty)
     }
 }
 

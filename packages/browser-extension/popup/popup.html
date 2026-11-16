@@ -639,17 +639,22 @@
 
     .sidebar-filters {
       display: flex;
-      padding: 8px 10px;
-      gap: 5px;
+      padding: 6px 8px;
+      gap: 3px;
       align-items: center;
       flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .sidebar-filters::-webkit-scrollbar {
+      display: none;
     }
 
     .filter-btn {
-      display: flex; align-items: center; gap: 5px;
-      height: 28px; padding: 0 8px; border-radius: 6px;
+      display: flex; align-items: center; gap: 4px;
+      height: 26px; padding: 0 6px; border-radius: 6px;
       background: transparent; border: 1px solid transparent;
-      color: var(--text-muted); font-size: 11px; font-weight: 500; cursor: pointer;
+      color: var(--text-muted); font-size: 10.5px; font-weight: 500; cursor: pointer;
       transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
       white-space: nowrap;
       user-select: none;
@@ -659,11 +664,11 @@
       background: rgba(109,74,255,0.16); color: var(--text-main);
       border-color: rgba(109,74,255,0.35);
     }
-    .filter-btn svg { width: 13px; height: 13px; fill: currentColor; flex-shrink: 0; }
+    .filter-btn svg { width: 12px; height: 12px; fill: currentColor; flex-shrink: 0; }
 
     .filter-btn.icon-only-btn {
       padding: 0 5px;
-      height: 28px;
+      height: 26px;
       gap: 2px;
       justify-content: center;
     }
@@ -783,9 +788,10 @@
       display: flex; align-items: center;
       padding: 8px 12px; cursor: pointer;
       border-left: 2px solid transparent;
-      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.26s ease, background 0.18s ease, padding 0.18s ease;
       box-sizing: border-box;
       width: 100%;
+      will-change: transform, opacity;
     }
     .list-item:hover {
       background: var(--bg-card-hover);
@@ -871,6 +877,14 @@
     }
     .btn-pill:active { transform: translateY(0) scale(0.98); }
     .btn-pill svg { width: 13px; height: 13px; fill: currentColor; }
+    .btn-pill.active-fav {
+      background: rgba(245, 158, 11, 0.18);
+      color: #F59E0B;
+      border-color: rgba(245, 158, 11, 0.35);
+    }
+    .btn-pill.active-fav svg {
+      fill: #F59E0B;
+    }
 
     /* ── CARDS ── */
     .card {
@@ -2232,13 +2246,21 @@
       </div>
 
       <div class="sidebar-filters">
-        <button class="filter-btn active" id="filter-all">
+        <button class="filter-btn active" id="filter-all" title="All Items">
           <svg viewBox="0 0 24 24"><path d="M4 4h6v6H4V4zm10 0h6v6h-6V4zM4 14h6v6H4v-6zm10 0h6v6h-6v-6z"/></svg>
           All
         </button>
-        <button class="filter-btn" id="filter-generator" title="Password Generator">
+        <button class="filter-btn" id="filter-logins" title="Logins Only">
           <svg viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-          Generator
+          Logins
+        </button>
+        <button class="filter-btn" id="filter-favorites" title="Favorites">
+          <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+          Favorites
+        </button>
+        <button class="filter-btn" id="filter-generator" title="Password Generator">
+          <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.9 17.58 11 21 11 21z"/></svg>
+          Gen
         </button>
         <div class="sort-wrapper" id="sort-wrapper">
           <button class="filter-btn icon-only-btn" id="btn-sort" title="Sort: Recently used">

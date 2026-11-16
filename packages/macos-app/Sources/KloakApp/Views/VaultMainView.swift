@@ -205,45 +205,53 @@ public struct VaultMainView: View {
     }
 
     private func handleMoveToTrash(_ id: String) {
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            items[idx].trashed = true
-            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-            VaultStore.shared.moveToTrash(id: id)
-            if selectedItemId == id {
-                selectedItemId = nil
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.75)) {
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].trashed = true
+                items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                VaultStore.shared.moveToTrash(id: id)
+                if selectedItemId == id {
+                    selectedItemId = nil
+                }
             }
         }
     }
 
     private func handleRestoreItem(_ id: String) {
-        if let idx = items.firstIndex(where: { $0.id == id }) {
-            items[idx].trashed = false
-            items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-            VaultStore.shared.restoreItem(id: id)
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.75)) {
+            if let idx = items.firstIndex(where: { $0.id == id }) {
+                items[idx].trashed = false
+                items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                VaultStore.shared.restoreItem(id: id)
+                if selectedItemId == id {
+                    selectedItemId = nil
+                }
+            }
+        }
+    }
+
+    private func handleDeletePermanently(_ id: String) {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.75)) {
+            items.removeAll { $0.id == id }
+            VaultStore.shared.deletePermanently(id: id)
             if selectedItemId == id {
                 selectedItemId = nil
             }
         }
     }
 
-    private func handleDeletePermanently(_ id: String) {
-        items.removeAll { $0.id == id }
-        VaultStore.shared.deletePermanently(id: id)
-        if selectedItemId == id {
+    private func handleEmptyTrash() {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.75)) {
+            items.removeAll { $0.trashed }
+            VaultStore.shared.emptyTrash()
             selectedItemId = nil
         }
-    }
-
-    private func handleEmptyTrash() {
-        items.removeAll { $0.trashed }
-        VaultStore.shared.emptyTrash()
-        selectedItemId = nil
     }
 
     public var body: some View {
         NavigationSplitView {
             SidebarView(
-                selection: $selection,
+                selection: $selection.animation(.spring(response: 0.36, dampingFraction: 0.76)),
                 items: items,
                 folders: $folders,
                 onLock: onLock,
@@ -285,10 +293,12 @@ public struct VaultMainView: View {
                             selectedItemId: $selectedItemId,
                             searchText: $searchText,
                             onToggleFavorite: { id in
-                                if let idx = items.firstIndex(where: { $0.id == id }) {
-                                    items[idx].favorite.toggle()
-                                    items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
-                                    onSaveItem(items[idx])
+                                withAnimation(.spring(response: 0.36, dampingFraction: 0.72)) {
+                                    if let idx = items.firstIndex(where: { $0.id == id }) {
+                                        items[idx].favorite.toggle()
+                                        items[idx].updatedAt = ISO8601DateFormatter().string(from: Date())
+                                        onSaveItem(items[idx])
+                                    }
                                 }
                             },
                             onAddItem: { isShowingNewItemSheet = true },
@@ -313,6 +323,8 @@ public struct VaultMainView: View {
                         )
                         .frame(minWidth: 260, idealWidth: 280, maxWidth: 320)
                         .background(Color.black.opacity(0.12))
+                        .animation(.spring(response: 0.36, dampingFraction: 0.76), value: selection)
+                        .animation(.spring(response: 0.36, dampingFraction: 0.76), value: filteredItems)
 
                         Divider()
                             .opacity(0.18)
