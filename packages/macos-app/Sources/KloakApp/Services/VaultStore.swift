@@ -323,8 +323,8 @@ public final class VaultStore: ObservableObject {
                 self.saveVault()
             }
 
-            // Store in Keychain for biometric unlock across sessions only if keychain sync is enabled
-            if self.settings.keychainSyncEnabled {
+            // Store in Keychain for biometric unlock across sessions if biometrics or keychain sync enabled
+            if self.settings.keychainSyncEnabled || self.settings.biometricsEnabled {
                 let keyData = CryptoEngine.shared.keyToData(unwrappedVaultKey)
                 _ = KeychainManager.shared.storeKey(keyData: keyData)
             } else {
@@ -345,7 +345,7 @@ public final class VaultStore: ObservableObject {
         if sessionVaultKey != nil {
             return true
         }
-        if settings.keychainSyncEnabled {
+        if settings.keychainSyncEnabled || settings.biometricsEnabled {
             return KeychainManager.shared.retrieveKey() != nil
         }
         return false
@@ -354,7 +354,7 @@ public final class VaultStore: ObservableObject {
     public func unlockWithBiometrics() async -> Bool {
         let candidateKey: SymmetricKey? = {
             if let key = sessionVaultKey { return key }
-            if settings.keychainSyncEnabled, let data = KeychainManager.shared.retrieveKey() {
+            if (settings.keychainSyncEnabled || settings.biometricsEnabled), let data = KeychainManager.shared.retrieveKey() {
                 return CryptoEngine.shared.keyFromData(data)
             }
             return nil
@@ -610,7 +610,7 @@ public final class VaultStore: ObservableObject {
             modifiers: newSettings.autofillHotkeyModifiers,
             enabled: newSettings.accessibilityAutofillEnabled
         )
-        if newSettings.biometricsEnabled && newSettings.keychainSyncEnabled {
+        if (newSettings.biometricsEnabled || newSettings.keychainSyncEnabled) {
             if let key = vaultKey {
                 _ = KeychainManager.shared.storeKey(keyData: CryptoEngine.shared.keyToData(key))
             }

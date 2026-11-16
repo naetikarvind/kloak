@@ -314,6 +314,37 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Touch ID Unlock
+  const sideTouchIdBtn = document.getElementById('btn-side-unlock-touch-id');
+  const sideTouchIdText = document.getElementById('side-touch-id-text');
+  sideTouchIdBtn?.addEventListener('click', async () => {
+    if (unlockError) unlockError.style.display = 'none';
+    if (sideTouchIdText) sideTouchIdText.textContent = 'Touch ID Sensor...';
+
+    try {
+      const unlockRes: any = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'UNLOCK_WITH_TOUCH_ID' }, resolve);
+      });
+
+      if (unlockRes && unlockRes.success) {
+        if (pwdInput) pwdInput.value = '';
+        await loadVault();
+      } else {
+        if (unlockError) {
+          unlockError.textContent = unlockRes?.error || 'Touch ID verification failed or was cancelled.';
+          unlockError.style.display = 'block';
+        }
+      }
+    } catch (err: any) {
+      if (unlockError) {
+        unlockError.textContent = err.message || 'Touch ID authentication cancelled.';
+        unlockError.style.display = 'block';
+      }
+    } finally {
+      if (sideTouchIdText) sideTouchIdText.textContent = 'Unlock with Touch ID';
+    }
+  });
+
   // Hardware Key Unlock
   const sideHwBtn = document.getElementById('btn-side-unlock-hw');
   const sideHwText = document.getElementById('side-hw-text');

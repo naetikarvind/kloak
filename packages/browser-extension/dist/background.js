@@ -1417,11 +1417,41 @@
         }
         case "GET_STATUS": {
           await refreshVaultState();
+          let biometricsAvailable = false;
+          try {
+            const pingRes = await sendNativeRequest("daemon.ping");
+            biometricsAvailable = !!pingRes?.biometricsAvailable;
+          } catch {
+          }
           sendResponse({
             success: true,
             isUnlocked: isVaultUnlocked,
-            itemCount: cachedItems.length
+            itemCount: cachedItems.length,
+            biometricsAvailable
           });
+          break;
+        }
+        case "UNLOCK_WITH_TOUCH_ID":
+        case "UNLOCK_VAULT_WITH_TOUCH_ID": {
+          try {
+            const res = await sendNativeRequest("vault.unlockWithBiometrics");
+            if (res && (res.success || res.isUnlocked || res.status?.isUnlocked)) {
+              isVaultUnlocked = true;
+              const itemsRes = await sendNativeRequest("vault.getItems");
+              if (Array.isArray(itemsRes)) {
+                cachedItems = itemsRes;
+              }
+              if (lastActiveTabId && lastActiveUrl) {
+                updateBadgeForTab(lastActiveTabId, lastActiveUrl);
+              }
+              sendResponse({ success: true, isUnlocked: true, items: cachedItems });
+            } else {
+              const errorMsg = res?.error || res?.__error || "Touch ID authentication failed or was cancelled.";
+              sendResponse({ success: false, error: errorMsg });
+            }
+          } catch (err) {
+            sendResponse({ success: false, error: err.message || "Touch ID authentication failed" });
+          }
           break;
         }
         case "UNLOCK_VAULT": {

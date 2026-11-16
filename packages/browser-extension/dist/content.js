@@ -2905,7 +2905,7 @@
     activePopup.style.top = `${top}px`;
     activePopup.style.left = `${left}px`;
   }
-  function buildPopupUI(items, input) {
+  function buildPopupUI(items, input, isUnlocked = true) {
     currentTargetInput = input;
     const root = ensureShadowRoot();
     if (activePopup) {
@@ -2921,7 +2921,7 @@
     const rect = input.getBoundingClientRect();
     const isSignup = isRegistrationOrSignupPage();
     const pageContext = analyzePageContext(input);
-    const estimatedHeight = items.length > 0 && !isSignup ? items[0]?.totpSecret || pageContext.hasOtpField ? 220 : 185 : 160;
+    const estimatedHeight = !isUnlocked ? 210 : items.length > 0 && !isSignup ? items[0]?.totpSecret || pageContext.hasOtpField ? 220 : 185 : 160;
     const { top, left } = calculatePopupPosition(rect, estimatedHeight);
     container.style.top = `${top}px`;
     container.style.left = `${left}px`;
@@ -2958,18 +2958,18 @@
     });
     const contextBar = document.createElement("div");
     contextBar.className = "kloak-bento-context-bar";
-    const tagClass = pageContext.hasOtpField ? "kloak-bento-context-tag" : "kloak-bento-context-tag info";
+    const tagClass = !isUnlocked ? "kloak-bento-context-tag" : pageContext.hasOtpField ? "kloak-bento-context-tag" : "kloak-bento-context-tag info";
     contextBar.innerHTML = `
     <div class="kloak-bento-context-left">
-      <span>\u{1F3AF}</span>
-      <span>${pageContext.contextSummary}</span>
+      <span>${!isUnlocked ? "\u{1F512}" : "\u{1F3AF}"}</span>
+      <span>${!isUnlocked ? "Kloak Vault is Locked" : pageContext.contextSummary}</span>
     </div>
-    <span class="${tagClass}">${pageContext.contextTag}</span>
+    <span class="${tagClass}">${!isUnlocked ? "Locked" : pageContext.contextTag}</span>
   `;
     container.appendChild(contextBar);
     const bodyContainer = document.createElement("div");
     bodyContainer.className = "kloak-body";
-    if (items.length > 0 && !isSignup) {
+    if (isUnlocked && items.length > 0 && !isSignup) {
       const savedSection = document.createElement("div");
       savedSection.className = "kloak-section";
       items.forEach((item, idx) => {
@@ -3218,6 +3218,98 @@
       });
       bodyContainer.appendChild(savedSection);
     }
+    if (!isUnlocked) {
+      const lockedCard = document.createElement("div");
+      lockedCard.className = "kloak-bento-card";
+      lockedCard.style.padding = "12px 14px";
+      lockedCard.style.background = "rgba(24, 24, 34, 0.92)";
+      lockedCard.style.border = "1px solid rgba(109, 74, 255, 0.35)";
+      lockedCard.style.borderRadius = "10px";
+      lockedCard.style.display = "flex";
+      lockedCard.style.flexDirection = "column";
+      lockedCard.style.gap = "10px";
+      lockedCard.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 14px;">\u{1F512}</span>
+          <span style="font-size: 12px; font-weight: 600; color: #FFFFFF;">Unlock to Autofill</span>
+        </div>
+        <span style="font-size: 9.5px; color: #A1A1AA; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 4px;">Touch ID Ready</span>
+      </div>
+
+      <button type="button" class="kloak-bento-touch-btn" id="bento-btn-touch-id" title="Touch your Mac's Touch ID sensor to unlock" style="width: 100%; height: 36px; background: linear-gradient(135deg, #6D4AFF 0%, #9333EA 100%); border: none; border-radius: 6px; color: #FFFFFF; font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 10px rgba(109, 74, 255, 0.4);">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/>
+          <path d="M14 13.12c0 2.38 0 6.38-1 8.88"/>
+          <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/>
+          <path d="M2 12a10 10 0 0 1 18-6"/>
+          <path d="M2 16h.01"/>
+          <path d="M21.8 16c.2-2 .131-5.354 0-6"/>
+          <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/>
+          <path d="M8.65 22c.21-.66.45-1.32.57-2"/>
+          <path d="M9 6.8a6 6 0 0 1 9 5.2v2"/>
+        </svg>
+        <span id="bento-touch-text">Unlock with Touch ID</span>
+      </button>
+
+      <form id="bento-unlock-form" style="display: flex; gap: 6px; margin: 0; align-items: center;">
+        <input type="password" id="bento-pwd-input" placeholder="Or Master Password" style="flex: 1; height: 28px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #FFFFFF; font-size: 11px; padding: 0 8px; outline: none;">
+        <button type="submit" id="bento-pwd-btn" style="height: 28px; padding: 0 10px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: #FFFFFF; font-size: 11px; font-weight: 500; cursor: pointer;">Unlock</button>
+      </form>
+      <div id="bento-unlock-err" style="display: none; color: #F87171; font-size: 10px; line-height: 1.2;"></div>
+    `;
+      bodyContainer.appendChild(lockedCard);
+      const touchBtn = lockedCard.querySelector("#bento-btn-touch-id");
+      const touchText = lockedCard.querySelector("#bento-touch-text");
+      const errEl = lockedCard.querySelector("#bento-unlock-err");
+      const unlockForm = lockedCard.querySelector("#bento-unlock-form");
+      const pwdInput = lockedCard.querySelector("#bento-pwd-input");
+      touchBtn?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (errEl) errEl.style.display = "none";
+        if (touchText) touchText.textContent = "Touch Sensor...";
+        touchBtn.disabled = true;
+        chrome.runtime.sendMessage({ type: "UNLOCK_WITH_TOUCH_ID" }, (res) => {
+          touchBtn.disabled = false;
+          if (touchText) touchText.textContent = "Unlock with Touch ID";
+          if (res && res.success) {
+            showToastNotification("\u2713 Vault unlocked with Touch ID");
+            chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
+              const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : res.items || [];
+              cachedCredentialsForSite = newItems;
+              buildPopupUI(newItems, input, true);
+            });
+          } else {
+            if (errEl) {
+              errEl.textContent = res?.error || "Touch ID failed or was cancelled.";
+              errEl.style.display = "block";
+            }
+          }
+        });
+      });
+      unlockForm?.addEventListener("submit", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const pwd = pwdInput?.value || "";
+        if (!pwd) return;
+        if (errEl) errEl.style.display = "none";
+        chrome.runtime.sendMessage({ type: "UNLOCK_VAULT", password: pwd }, (res) => {
+          if (res && res.success) {
+            showToastNotification("\u2713 Vault unlocked");
+            chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
+              const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : res.items || [];
+              cachedCredentialsForSite = newItems;
+              buildPopupUI(newItems, input, true);
+            });
+          } else {
+            if (errEl) {
+              errEl.textContent = res?.error || "Incorrect master password.";
+              errEl.style.display = "block";
+            }
+          }
+        });
+      });
+    }
     if (isSignup) {
       const banner = document.createElement("div");
       banner.className = "kloak-notice-badge";
@@ -3356,8 +3448,9 @@
       } else {
         cachedCredentialsForSite = [];
       }
+      const isUnlocked = response ? response.isUnlocked !== false : true;
       hasFetchedCredentials = true;
-      buildPopupUI(cachedCredentialsForSite, input);
+      buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
     });
   }
   document.addEventListener("focusin", (e) => {

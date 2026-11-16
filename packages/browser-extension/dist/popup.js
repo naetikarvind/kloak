@@ -3989,6 +3989,27 @@ ${notes}`;
       return { success: false, error: e.message || "Connection failed" };
     }
   }
+  async function unlockVaultWithBiometricsDirect() {
+    try {
+      const res = await fetch("http://127.0.0.1:53152/rpc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "vault.unlockWithBiometrics"
+        })
+      });
+      if (!res.ok) return { success: false, error: "HTTP error " + res.status };
+      const data = await res.json();
+      if (data.error) {
+        return { success: false, error: data.error.message || "Touch ID verification failed" };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message || "Connection failed" };
+    }
+  }
   async function lockVaultDirect() {
     try {
       const res = await fetch("http://127.0.0.1:53152/rpc", {
@@ -4173,6 +4194,51 @@ ${notes}`;
           if (submitBtn) submitBtn.disabled = false;
           if (btnText) btnText.textContent = "Unlock Vault";
           if (spinner) spinner.style.display = "none";
+        }
+      });
+    }
+    const touchIdBtn = document.getElementById("btn-unlock-touch-id");
+    const touchIdText = document.getElementById("touch-id-btn-text");
+    if (touchIdBtn) {
+      touchIdBtn.addEventListener("click", async () => {
+        if (errorEl) errorEl.style.display = "none";
+        touchIdBtn.classList.add("active");
+        if (touchIdText) touchIdText.textContent = "Touch ID Sensor...";
+        try {
+          let unlockSuccess = false;
+          let errorMessage = "";
+          const directRes = await unlockVaultWithBiometricsDirect();
+          if (directRes.success) {
+            unlockSuccess = true;
+          } else {
+            errorMessage = directRes.error || "";
+            const bgRes = await new Promise((resolve) => {
+              chrome.runtime.sendMessage({ type: "UNLOCK_WITH_TOUCH_ID" }, resolve);
+            });
+            if (bgRes && bgRes.success) {
+              unlockSuccess = true;
+            } else if (bgRes && bgRes.error) {
+              errorMessage = bgRes.error;
+            }
+          }
+          if (unlockSuccess) {
+            hideUnlockView();
+            await loadLogins();
+            showToast("\u2713 Vault unlocked with Touch ID");
+          } else {
+            if (errorEl) {
+              errorEl.textContent = errorMessage || "Touch ID authentication failed or was cancelled.";
+              errorEl.style.display = "block";
+            }
+          }
+        } catch (err) {
+          if (errorEl) {
+            errorEl.textContent = err.message || "Touch ID authentication cancelled.";
+            errorEl.style.display = "block";
+          }
+        } finally {
+          touchIdBtn.classList.remove("active");
+          if (touchIdText) touchIdText.textContent = "Unlock with Touch ID";
         }
       });
     }
@@ -4473,13 +4539,9 @@ ${notes}`;
       const risk = evaluateCredentialRisk(item, allItems);
       const riskCard = document.createElement("div");
       riskCard.className = "card risk-detail-card";
-      const circumferenceSvg = renderCircumferenceSvg(risk.score, risk.color, 52, 4.5);
       riskCard.innerHTML = `
       <div class="risk-card-inner">
-        <div class="risk-gauge-container">
-          ${circumferenceSvg}
-        </div>
-        <div class="risk-info-column">
+        <div class="risk-info-column" style="width: 100%;">
           <div class="risk-header-row">
             <span class="risk-title">Security & Risk Health</span>
             <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">

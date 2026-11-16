@@ -276,7 +276,8 @@ public final class IPCServer: ObservableObject {
                 "pong": .bool(true),
                 "version": .string("1.0.0"),
                 "app": .string("Kloak macOS App"),
-                "isUnlocked": .bool(store.isUnlocked)
+                "isUnlocked": .bool(store.isUnlocked),
+                "biometricsAvailable": .bool(BiometricAuth.shared.canAuthenticateWithBiometrics())
             ]))
 
         case "vault.status":
@@ -284,7 +285,8 @@ public final class IPCServer: ObservableObject {
                 "isInitialized": .bool(store.hasVault),
                 "isUnlocked": .bool(store.isUnlocked),
                 "itemCount": .int(store.items.filter { !$0.trashed }.count),
-                "autoLockMinutes": .int(store.settings.autoLockMinutes)
+                "autoLockMinutes": .int(store.settings.autoLockMinutes),
+                "biometricsAvailable": .bool(BiometricAuth.shared.canAuthenticateWithBiometrics())
             ]))
 
         case "vault.getItems":
@@ -667,6 +669,23 @@ public final class IPCServer: ObservableObject {
                     ]))
                 } else {
                     replyError(-32002, store.lastError ?? "Incorrect master password")
+                }
+            }
+
+        case "vault.unlockWithBiometrics":
+            Task { @MainActor in
+                let success = await store.unlockWithBiometrics()
+                if success {
+                    reply(.dictionary([
+                        "success": .bool(true),
+                        "status": .dictionary([
+                            "isInitialized": .bool(store.hasVault),
+                            "isUnlocked": .bool(store.isUnlocked),
+                            "itemCount": .int(store.items.filter { !$0.trashed }.count)
+                        ])
+                    ]))
+                } else {
+                    replyError(-32002, store.lastError ?? "Touch ID authentication failed or cancelled")
                 }
             }
 
