@@ -20,7 +20,7 @@ public struct PasswordHealthView: View {
 
     private var reusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
-            .filter { !vaultStore.ignoredReusedGroupIds.contains($0.id) }
+            .filter { !vaultStore.ignoredHealthIssueIds.contains($0.id) }
         if searchText.isEmpty { return all }
         let q = searchText.lowercased()
         return all.filter { group in
@@ -34,7 +34,7 @@ public struct PasswordHealthView: View {
 
     private var ignoredReusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
-            .filter { vaultStore.ignoredReusedGroupIds.contains($0.id) }
+            .filter { vaultStore.ignoredHealthIssueIds.contains($0.id) }
         if searchText.isEmpty { return all }
         let q = searchText.lowercased()
         return all.filter { group in
@@ -48,6 +48,19 @@ public struct PasswordHealthView: View {
 
     private var weakPasswords: [WeakPasswordItem] {
         let all = DuplicateDetectorService.shared.findWeakPasswords(in: items)
+            .filter { !vaultStore.ignoredHealthIssueIds.contains($0.id) && !vaultStore.ignoredHealthIssueIds.contains($0.item.id) }
+        if searchText.isEmpty { return all }
+        let q = searchText.lowercased()
+        return all.filter {
+            $0.item.title.lowercased().contains(q) ||
+            ($0.item.username?.lowercased().contains(q) ?? false) ||
+            $0.item.urls.contains { $0.lowercased().contains(q) }
+        }
+    }
+
+    private var ignoredWeakPasswords: [WeakPasswordItem] {
+        let all = DuplicateDetectorService.shared.findWeakPasswords(in: items)
+            .filter { vaultStore.ignoredHealthIssueIds.contains($0.id) || vaultStore.ignoredHealthIssueIds.contains($0.item.id) }
         if searchText.isEmpty { return all }
         let q = searchText.lowercased()
         return all.filter {
@@ -119,7 +132,8 @@ public struct PasswordHealthView: View {
                 }
 
                 // Main Content
-                let isListEmpty = (selectedFilter == 4) ? ignoredReusedGroups.isEmpty : (reusedGroups.isEmpty && weakPasswords.isEmpty && (selectedFilter == 3 ? missing2FA.isEmpty : true))
+                let totalIgnoredCount = ignoredReusedGroups.count + ignoredWeakPasswords.count
+                let isListEmpty = (selectedFilter == 4) ? totalIgnoredCount == 0 : (reusedGroups.isEmpty && weakPasswords.isEmpty && (selectedFilter == 3 ? missing2FA.isEmpty : true))
                 if isListEmpty {
                     emptyHealthStateView
                 } else {
@@ -230,13 +244,14 @@ public struct PasswordHealthView: View {
     private var controlsBar: some View {
         VStack(spacing: 10) {
             // Row 1: Filter tabs — full width so labels never truncate
+            let totalIgnored = ignoredReusedGroups.count + ignoredWeakPasswords.count
             Picker("", selection: $selectedFilter) {
                 Text("All Issues").tag(0)
                 Text("Reused (\(reusedGroups.count))").tag(1)
                 Text("Weak (\(weakPasswords.count))").tag(2)
                 Text("No 2FA (\(missing2FA.count))").tag(3)
-                if !vaultStore.ignoredReusedGroupIds.isEmpty {
-                    Text("Ignored (\(ignoredReusedGroups.count))").tag(4)
+                if totalIgnored > 0 {
+                    Text("Ignored (\(totalIgnored))").tag(4)
                 }
             }
             .pickerStyle(.segmented)
@@ -289,7 +304,7 @@ public struct PasswordHealthView: View {
             }
 
             // Ignored Passwords
-            if (selectedFilter == 4) && !ignoredReusedGroups.isEmpty {
+            if (selectedFilter == 4) && (!ignoredReusedGroups.isEmpty || !ignoredWeakPasswords.isEmpty) {
                 ignoredPasswordsSection
             }
         }
@@ -501,22 +516,35 @@ public struct PasswordHealthView: View {
 
                         Spacer()
 
-                        if updatedItemId == weakItem.id {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Strengthened!")
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                        } else {
+                        HStack(spacing: 8) {
                             Button(action: {
-                                handleGenerateNewPassword(for: weakItem.item)
+                                lastIgnoredGroupId = weakItem.id
+                                _ = withAnimation(.easeOut(duration: 0.2)) {
+                                    vaultStore.ignoreHealthIssue(id: weakItem.id)
+                                }
+                                statusMessage = "Weak password issue ignored. Moved to Ignored tab."
                             }) {
-                                Label("Strengthen Password", systemImage: "bolt.shield.fill")
+                                Label("Ignore", systemImage: "eye.slash")
                             }
-                            .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                            .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                            if updatedItemId == weakItem.id {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Strengthened!")
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                            } else {
+                                Button(action: {
+                                    handleGenerateNewPassword(for: weakItem.item)
+                                }) {
+                                    Label("Strengthen Password", systemImage: "bolt.shield.fill")
+                                }
+                                .buttonStyle(GlassCapsuleButton(isPrimary: true))
+                            }
                         }
                     }
                     .padding(10)
@@ -651,20 +679,85 @@ public struct PasswordHealthView: View {
     // MARK: - Ignored Passwords Section
 
     private var ignoredPasswordsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "eye.slash.fill")
-                    .foregroundColor(.secondary)
-                    .font(.system(size: 13))
-                Text("IGNORED REUSED PASSWORD GROUPS")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 18) {
+            if !ignoredReusedGroups.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "eye.slash.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 13))
+                        Text("IGNORED REUSED PASSWORD GROUPS")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.secondary)
+                    }
+
+                    ForEach(ignoredReusedGroups) { group in
+                        ignoredGroupCard(group)
+                    }
+                }
             }
 
-            ForEach(ignoredReusedGroups) { group in
-                ignoredGroupCard(group)
+            if !ignoredWeakPasswords.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "shield.slash.fill")
+                            .foregroundColor(.secondary)
+                            .font(.system(size: 13))
+                        Text("IGNORED WEAK PASSWORDS")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.secondary)
+                    }
+
+                    VStack(spacing: 8) {
+                        ForEach(ignoredWeakPasswords) { weakItem in
+                            ignoredWeakPasswordCard(weakItem)
+                        }
+                    }
+                }
             }
         }
+    }
+
+    private func ignoredWeakPasswordCard(_ weakItem: WeakPasswordItem) -> some View {
+        HStack(spacing: 12) {
+            FaviconView(
+                urls: weakItem.item.urls,
+                title: weakItem.item.title,
+                itemType: weakItem.item.type,
+                size: 28
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(weakItem.item.title)
+                    .font(.system(size: 12, weight: .semibold))
+
+                HStack(spacing: 6) {
+                    if let user = weakItem.item.username, !user.isEmpty {
+                        Text(user)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    Text("• \(weakItem.reason) (Ignored)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            Spacer()
+
+            Button(action: {
+                _ = withAnimation(.easeOut(duration: 0.2)) {
+                    vaultStore.unignoreHealthIssue(id: weakItem.id)
+                }
+                statusMessage = "Restored password to active audit list."
+            }) {
+                Label("Unignore", systemImage: "eye")
+            }
+            .buttonStyle(GlassCapsuleButton(isPrimary: true))
+        }
+        .padding(12)
+        .background(Color.black.opacity(0.2))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     private func ignoredGroupCard(_ group: ReusedPasswordGroup) -> some View {
@@ -838,10 +931,10 @@ public struct PasswordHealthView: View {
                     .font(.system(size: 42))
                     .foregroundColor(.secondary)
 
-                Text("No Ignored Groups")
+                Text("No Ignored Issues")
                     .font(.system(size: 16, weight: .bold))
 
-                Text("You haven't ignored any reused password groups.")
+                Text("You haven't ignored any reused or weak password issues.")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             } else {

@@ -396,10 +396,17 @@ public struct VaultMainView: View {
             updater.checkForUpdates(userInitiated: false)
         }
         .onChange(of: selection) { _, newSel in
+            VaultStore.shared.recordUserActivity()
             selectedItemId = nil
             focus2FAOnItemId = nil
             searchText = ""
             triggerWindowResize(for: newSel, animated: true)
+        }
+        .onChange(of: selectedItemId) { _, _ in
+            VaultStore.shared.recordUserActivity()
+        }
+        .onChange(of: searchText) { _, _ in
+            VaultStore.shared.recordUserActivity()
         }
         .sheet(isPresented: $isShowingNewItemSheet) {
             NewItemSheet(

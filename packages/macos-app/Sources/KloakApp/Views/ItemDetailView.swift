@@ -1783,6 +1783,7 @@ public struct ItemDetailView: View {
     }
 
     private func copyToClipboard(_ text: String, _ field: String) {
+        VaultStore.shared.recordUserActivity()
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {

@@ -415,6 +415,9 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     public var hardwareKeyEnrolledDate: String?
     public var hardwareKeyUnlockMode: String // "hardware_only", "password_plus_hardware"
 
+    // Password Health Ignored Issues
+    public var ignoredHealthIssueIds: [String]
+
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
         clearClipboardSeconds: 30,
@@ -437,7 +440,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         hardwareKeyEnabled: false,
         hardwareKeyName: nil,
         hardwareKeyEnrolledDate: nil,
-        hardwareKeyUnlockMode: "hardware_only"
+        hardwareKeyUnlockMode: "hardware_only",
+        ignoredHealthIssueIds: []
     )
 
     public init(
@@ -462,7 +466,8 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         hardwareKeyEnabled: Bool = false,
         hardwareKeyName: String? = nil,
         hardwareKeyEnrolledDate: String? = nil,
-        hardwareKeyUnlockMode: String = "hardware_only"
+        hardwareKeyUnlockMode: String = "hardware_only",
+        ignoredHealthIssueIds: [String] = []
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -486,6 +491,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.hardwareKeyName = hardwareKeyName
         self.hardwareKeyEnrolledDate = hardwareKeyEnrolledDate
         self.hardwareKeyUnlockMode = hardwareKeyUnlockMode
+        self.ignoredHealthIssueIds = ignoredHealthIssueIds
     }
 
     public init(from decoder: Decoder) throws {
@@ -512,6 +518,7 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.hardwareKeyName = try container.decodeIfPresent(String.self, forKey: .hardwareKeyName)
         self.hardwareKeyEnrolledDate = try container.decodeIfPresent(String.self, forKey: .hardwareKeyEnrolledDate)
         self.hardwareKeyUnlockMode = try container.decodeIfPresent(String.self, forKey: .hardwareKeyUnlockMode) ?? "hardware_only"
+        self.ignoredHealthIssueIds = try container.decodeIfPresent([String].self, forKey: .ignoredHealthIssueIds) ?? []
     }
 }
 

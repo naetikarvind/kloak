@@ -106,7 +106,7 @@ export declare class VaultManager {
     private save;
     private loadVaultFileFromDisk;
     private writeVaultFileToDisk;
-    private touchActivity;
+    touchActivity(): void;
     private resetAutoLockTimer;
 }
 //# sourceMappingURL=vault-manager.d.ts.map

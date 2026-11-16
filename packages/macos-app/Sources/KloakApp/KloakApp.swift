@@ -2,6 +2,8 @@ import SwiftUI
 import AppKit
 
 public final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var userActivityEventMonitor: Any? = nil
+
     public func applicationDidFinishLaunching(_ notification: Notification) {
         NSWindow.allowsAutomaticWindowTabbing = false
         NSApp.setActivationPolicy(.regular)
@@ -15,6 +17,37 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Start system-wide accessibility autofill service & hotkey monitor
         AccessibilityAutofillService.shared.start()
+
+        // Monitor user activity across mouse clicks, keyboard presses, and scrolling to ensure
+        // auto-lock only activates after true inactivity, never while using the app
+        userActivityEventMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown, .scrollWheel]
+        ) { event in
+            Task { @MainActor in
+                VaultStore.shared.recordUserActivity()
+            }
+            return event
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                VaultStore.shared.recordUserActivity()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                VaultStore.shared.recordUserActivity()
+            }
+        }
 
         sanitizeTabOverview()
 

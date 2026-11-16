@@ -228,6 +228,12 @@ class IpcSocketServer {
                 return { pong: true, timestamp: Date.now(), version: '1.0.0' };
             case 'vault.status':
                 return this.vaultManager.getStatus();
+            case 'vault.touch':
+            case 'vault.touchActivity':
+                if (this.vaultManager.isUnlocked()) {
+                    this.vaultManager.touchActivity();
+                }
+                return { success: true };
             case 'vault.create':
                 this.vaultManager.createVault(params.masterPassword);
                 return { success: true, status: this.vaultManager.getStatus() };

@@ -289,6 +289,10 @@ public final class IPCServer: ObservableObject {
                 "biometricsAvailable": .bool(BiometricAuth.shared.canAuthenticateWithBiometrics())
             ]))
 
+        case "vault.touch", "vault.touchActivity":
+            store.recordUserActivity()
+            reply(.dictionary(["success": .bool(true)]))
+
         case "vault.getItems":
             guard store.isUnlocked else {
                 replyError(-32001, "Vault is locked")

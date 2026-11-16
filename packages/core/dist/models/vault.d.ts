@@ -92,6 +92,7 @@ export interface VaultSettings {
         symbols: boolean;
         avoidAmbiguous: boolean;
     };
+    ignoredHealthIssueIds?: string[];
 }
 export interface VaultPayload {
     version: number;

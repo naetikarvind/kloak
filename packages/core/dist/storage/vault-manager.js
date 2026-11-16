@@ -68,7 +68,8 @@ exports.DEFAULT_SETTINGS = {
         numbers: true,
         symbols: true,
         avoidAmbiguous: false
-    }
+    },
+    ignoredHealthIssueIds: []
 };
 class VaultManager {
     vaultPath;

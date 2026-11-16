@@ -14,14 +14,39 @@ public final class VaultStore: ObservableObject {
     @Published public var folders: [VaultFolder] = []
     @Published public var settings: VaultSettings = .default
     @Published public var lastError: String? = nil
-    @Published public var ignoredReusedGroupIds: Set<String> = []
+    @Published public var ignoredHealthIssueIds: Set<String> = []
+
+    public var ignoredReusedGroupIds: Set<String> {
+        get { ignoredHealthIssueIds }
+        set { ignoredHealthIssueIds = newValue }
+    }
+
+    public func ignoreHealthIssue(id: String) {
+        ignoredHealthIssueIds.insert(id)
+        settings.ignoredHealthIssueIds = Array(ignoredHealthIssueIds)
+        UserDefaults.standard.set(Array(ignoredHealthIssueIds), forKey: "kloak.ignoredHealthIssueIds")
+        if isUnlocked {
+            saveVault()
+        }
+        recordUserActivity()
+    }
+
+    public func unignoreHealthIssue(id: String) {
+        ignoredHealthIssueIds.remove(id)
+        settings.ignoredHealthIssueIds = Array(ignoredHealthIssueIds)
+        UserDefaults.standard.set(Array(ignoredHealthIssueIds), forKey: "kloak.ignoredHealthIssueIds")
+        if isUnlocked {
+            saveVault()
+        }
+        recordUserActivity()
+    }
 
     public func ignoreReusedGroup(id: String) {
-        ignoredReusedGroupIds.insert(id)
+        ignoreHealthIssue(id: id)
     }
 
     public func unignoreReusedGroup(id: String) {
-        ignoredReusedGroupIds.remove(id)
+        unignoreHealthIssue(id: id)
     }
 
     // MARK: - Private State
@@ -41,6 +66,9 @@ public final class VaultStore: ObservableObject {
     }()
 
     public init() {
+        if let cached = UserDefaults.standard.stringArray(forKey: "kloak.ignoredHealthIssueIds") {
+            self.ignoredHealthIssueIds = Set(cached)
+        }
         checkVaultExistence()
         NotificationCenter.default.addObserver(
             forName: NSNotification.Name("KloakVaultRemoteChangeNotification"),
@@ -51,6 +79,16 @@ public final class VaultStore: ObservableObject {
                 _ = await self?.reloadFromDiskIfUnlocked()
             }
         }
+    }
+
+    private func syncIgnoredIssuesFromLoadedSettings() {
+        var allIgnored = Set(self.settings.ignoredHealthIssueIds)
+        if let cached = UserDefaults.standard.stringArray(forKey: "kloak.ignoredHealthIssueIds") {
+            allIgnored.formUnion(cached)
+        }
+        self.ignoredHealthIssueIds = allIgnored
+        self.settings.ignoredHealthIssueIds = Array(allIgnored)
+        UserDefaults.standard.set(Array(allIgnored), forKey: "kloak.ignoredHealthIssueIds")
     }
 
     // MARK: - Vault Existence Check
@@ -310,6 +348,7 @@ public final class VaultStore: ObservableObject {
             self.items = sanitizedItems
             self.folders = payload.folders
             self.settings = payload.settings
+            self.syncIgnoredIssuesFromLoadedSettings()
             LogoService.shared.prefetchLogos(for: sanitizedItems)
             AccessibilityAutofillService.shared.updateHotkeyConfig(
                 keyCode: payload.settings.autofillHotkeyKeyCode,
@@ -428,6 +467,7 @@ public final class VaultStore: ObservableObject {
                         self.items = sanitizedItems
                         self.folders = payload.folders
                         self.settings = payload.settings
+            self.syncIgnoredIssuesFromLoadedSettings()
                         LogoService.shared.prefetchLogos(for: sanitizedItems)
                         AccessibilityAutofillService.shared.updateHotkeyConfig(
                             keyCode: payload.settings.autofillHotkeyKeyCode,
@@ -521,6 +561,7 @@ public final class VaultStore: ObservableObject {
             self.items = payload.items
             self.folders = payload.folders
             self.settings = payload.settings
+            self.syncIgnoredIssuesFromLoadedSettings()
             LogoService.shared.prefetchLogos(for: payload.items)
             return true
         } catch {
@@ -817,6 +858,7 @@ public final class VaultStore: ObservableObject {
     // MARK: - Auto-Lock Timer
 
     public func recordUserActivity() {
+        guard isUnlocked else { return }
         self.lastActivityTime = Date()
     }
 

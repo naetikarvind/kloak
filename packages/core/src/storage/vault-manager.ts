@@ -64,7 +64,8 @@ export const DEFAULT_SETTINGS: VaultSettings = {
     numbers: true,
     symbols: true,
     avoidAmbiguous: false
-  }
+  },
+  ignoredHealthIssueIds: []
 };
 
 export class VaultManager {
@@ -547,7 +548,7 @@ export class VaultManager {
     });
   }
 
-  private touchActivity(): void {
+  public touchActivity(): void {
     this.lastActivityTime = Date.now();
     this.resetAutoLockTimer();
   }
