@@ -422,18 +422,28 @@ public struct SetupView: View {
 
                                 Button(action: {
                                     isEnrollingHwKey = true
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                                        let formatter = DateFormatter()
-                                        formatter.dateFormat = "MMM d, yyyy"
-                                        hwKeyEnrolledDate = formatter.string(from: Date())
-                                        isEnrollingHwKey = false
-                                        hwKeyFeedback = "YubiKey 5C NFC enrolled successfully!"
+                                    hwKeyFeedback = nil
+                                    Task {
+                                        do {
+                                            let (keyName, dateStr) = try await HardwareSecurityKeyService.shared.enrollConnectedKey()
+                                            await MainActor.run {
+                                                hardwareKeyName = keyName
+                                                hwKeyEnrolledDate = dateStr
+                                                isEnrollingHwKey = false
+                                                hwKeyFeedback = "Enrolled '\(keyName)' successfully!"
+                                            }
+                                        } catch {
+                                            await MainActor.run {
+                                                isEnrollingHwKey = false
+                                                hwKeyFeedback = error.localizedDescription
+                                            }
+                                        }
                                     }
                                 }) {
                                     if isEnrollingHwKey {
                                         ProgressView().controlSize(.small)
                                     } else {
-                                        Text(hwKeyEnrolledDate != nil ? "Re-tap Key" : "Tap Key to Enroll")
+                                        Text(hwKeyEnrolledDate != nil ? "Re-scan Key" : "Tap Key to Enroll")
                                             .font(.system(size: 11, weight: .semibold))
                                     }
                                 }

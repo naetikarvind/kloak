@@ -708,21 +708,30 @@ public final class IPCServer: ObservableObject {
                 replyError(-32001, "Vault is locked")
                 return
             }
-            let keyName = params?["keyName"]?.stringValue ?? "YubiKey 5C NFC"
-            let mode = params?["mode"]?.stringValue ?? "hardware_only"
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d, yyyy"
-            let dateStr = formatter.string(from: Date())
             Task { @MainActor in
+                let connectedKeys = HardwareSecurityKeyService.shared.getConnectedKeys()
+                let paramKeyName = params?["keyName"]?.stringValue
+                let detectedName = connectedKeys.first?.name ?? paramKeyName
+
+                guard let finalKeyName = detectedName, (!connectedKeys.isEmpty || paramKeyName != nil) else {
+                    replyError(-32002, "No physical FIDO2 / YubiKey hardware security key detected on USB or NFC.")
+                    return
+                }
+
+                let mode = params?["mode"]?.stringValue ?? "hardware_only"
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MMM d, yyyy"
+                let dateStr = formatter.string(from: Date())
+
                 var updated = store.settings
                 updated.hardwareKeyEnabled = true
-                updated.hardwareKeyName = keyName
+                updated.hardwareKeyName = finalKeyName
                 updated.hardwareKeyUnlockMode = mode
                 updated.hardwareKeyEnrolledDate = dateStr
                 store.updateSettings(updated)
                 reply(.dictionary([
                     "success": .bool(true),
-                    "keyName": .string(keyName),
+                    "keyName": .string(finalKeyName),
                     "mode": .string(mode),
                     "enrolledDate": .string(dateStr)
                 ]))

@@ -24,6 +24,7 @@ public struct SettingsView: View {
     @State private var testPingFeedback: String? = nil
     @State private var copiedForwardingEmail: Bool = false
     @State private var hwKeyFeedback: String? = nil
+    @State private var hwKeyFeedbackIsError: Bool = false
     @State private var isRegisteringHwKey: Bool = false
     @ObservedObject private var devManager = DevModeManager.shared
 
@@ -308,7 +309,20 @@ public struct SettingsView: View {
 
                     HStack(spacing: 12) {
                         Button(action: {
-                            hwKeyFeedback = "Key verified! Hardware key signature validated."
+                            Task {
+                                do {
+                                    let msg = try await HardwareSecurityKeyService.shared.testConnection(expectedKeyName: settings.hardwareKeyName)
+                                    await MainActor.run {
+                                        hwKeyFeedback = msg
+                                        hwKeyFeedbackIsError = false
+                                    }
+                                } catch {
+                                    await MainActor.run {
+                                        hwKeyFeedback = error.localizedDescription
+                                        hwKeyFeedbackIsError = true
+                                    }
+                                }
+                            }
                         }) {
                             Label("Test Key", systemImage: "sparkles")
                         }
@@ -322,6 +336,7 @@ public struct SettingsView: View {
                             settings = updated
                             onSaveSettings(settings)
                             hwKeyFeedback = "Hardware key removed."
+                            hwKeyFeedbackIsError = false
                         }) {
                             Label("Remove Key", systemImage: "trash")
                         }
@@ -334,23 +349,34 @@ public struct SettingsView: View {
 
                     Button(action: {
                         isRegisteringHwKey = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            let formatter = DateFormatter()
-                            formatter.dateFormat = "MMM d, yyyy"
-                            var updated = settings
-                            updated.hardwareKeyEnabled = true
-                            updated.hardwareKeyName = "YubiKey 5C NFC"
-                            updated.hardwareKeyEnrolledDate = formatter.string(from: Date())
-                            settings = updated
-                            onSaveSettings(settings)
-                            isRegisteringHwKey = false
-                            hwKeyFeedback = "Successfully enrolled YubiKey 5C NFC!"
+                        hwKeyFeedback = nil
+                        Task {
+                            do {
+                                let (keyName, dateStr) = try await HardwareSecurityKeyService.shared.enrollConnectedKey()
+                                await MainActor.run {
+                                    var updated = settings
+                                    updated.hardwareKeyEnabled = true
+                                    updated.hardwareKeyName = keyName
+                                    updated.hardwareKeyEnrolledDate = dateStr
+                                    settings = updated
+                                    onSaveSettings(settings)
+                                    isRegisteringHwKey = false
+                                    hwKeyFeedback = "Successfully enrolled '\(keyName)'!"
+                                    hwKeyFeedbackIsError = false
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    isRegisteringHwKey = false
+                                    hwKeyFeedback = error.localizedDescription
+                                    hwKeyFeedbackIsError = true
+                                }
+                            }
                         }
                     }) {
                         if isRegisteringHwKey {
                             HStack(spacing: 6) {
                                 ProgressView().controlSize(.small)
-                                Text("Touch your security key now...")
+                                Text("Scanning USB & NFC ports...")
                             }
                         } else {
                             Label("Register Hardware Key", systemImage: "key.fill")
@@ -361,9 +387,13 @@ public struct SettingsView: View {
                 }
 
                 if let fb = hwKeyFeedback {
-                    Text(fb)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    HStack(spacing: 6) {
+                        Image(systemName: hwKeyFeedbackIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        Text(fb)
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(hwKeyFeedbackIsError ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.emeraldAccent)
+                    .transition(.opacity)
                 }
             }
             .padding(16)
