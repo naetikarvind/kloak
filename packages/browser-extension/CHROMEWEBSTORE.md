@@ -17,62 +17,74 @@
 
 ## Detailed Description (Store-Facing Plain Text)
 
-Kloak is a fast, local-first password manager and authenticator designed for speed, privacy, and seamless autofill. Powered by your native Kloak desktop vault, Kloak keeps your passwords, passkeys, and two-factor codes securely on your own device—never on third-party cloud servers.
+Kloak is a fast, local-first password manager and 2FA authenticator designed for uncompromising speed, privacy, and seamless autofill. Powered by your native Kloak desktop vault, Kloak keeps your passwords, passkeys, and two-factor codes securely on your own device—never on third-party cloud servers.
 
-Enjoy instant, intelligent credential autofill on any website, built-in TOTP two-factor authentication countdowns, anti-phishing domain verification, and high-entropy password generation directly within Google Chrome.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHAT'S NEW IN V1.2.0
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-• TOUCH ID BIOMETRIC UNLOCK IN THE BROWSER
-Unlock your vault directly from the extension popup or the inline autofill badge using Touch ID on macOS—fast, secure, and passwordless.
-
-• INTELLIGENT HARDWARE KEY RECOGNITION
-Dynamic security key detection: Hardware key authentication options (FIDO2 / YubiKey) now only appear when a security key is actively enrolled, keeping your interface clean and intuitive.
-
-• FLUID ACCORDION TAB TRANSITIONS
-Enjoy Apple-grade animations when switching between All Items, Logins, and Favorites. Departing items collapse vertically in place before surviving items smoothly glide into position.
-
-• SECURE NOTE & TEXT FILE IMPORT
-Import unencrypted text and markdown files (.txt, .md, .note) directly into Kloak and save them automatically as encrypted Secure Notes.
-
-• INSTANT AUTOFILL REFRESH
-The inline autofill dropdown instantly refreshes and animates newly discovered credentials the moment you unlock your vault.
-
-• USER-AWARE AUTO-LOCK TIMEOUT
-The auto-lock timer now dynamically resets whenever you interact with the extension or app, preventing unexpected locks while you are actively working.
-
-• STREAMLINED INTERFACE
-Cleaner popup header with secondary account-management actions neatly tucked into the contextual Add menu.
+Enjoy instant, intelligent credential autofill on any website, built-in TOTP two-factor countdowns, Touch ID biometric unlock, anti-phishing domain verification, and high-entropy password generation directly within Google Chrome.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-KEY FEATURES
+KEY FEATURES & CAPABILITIES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• LOCAL-FIRST & ZERO-KNOWLEDGE
-Your master password and encryption keys never leave your machine. Your vault is encrypted locally with military-grade AES-256-GCM. No cloud accounts, no tracking, and zero remote data exposure.
+• 100% LOCAL-FIRST & ZERO-KNOWLEDGE SECURITY
+Your master password, credentials, and encryption keys never leave your machine. Your vault is encrypted locally with authenticated AES-256-GCM and hardened with Argon2id / PBKDF2 key derivation. No remote accounts, zero third-party cloud exposure, and zero telemetry.
 
 • INTELLIGENT 1-CLICK AUTOFILL
-Instantly detects login, registration, and payment forms. Automatically fills usernames, secure passwords, and credit card details with one click or keyboard shortcut.
+Instantly detects login, registration, and payment fields across any website. Automatically fills usernames, passwords, credit card numbers, and identities with a single click or keyboard shortcut.
 
 • INTEGRATED 2FA TOTP AUTHENTICATOR
-Eliminate the need for separate authenticator mobile apps. Kloak generates standard RFC 6238 two-factor codes with live visual countdown timers and automatically pastes them into 2FA verification prompts.
+Eliminate the need for separate mobile authenticator apps. Kloak generates standard RFC 6238 two-factor authentication codes with live visual countdown timers and automatically pastes them into 2FA verification prompts.
 
-• ADVANCED PHISHING & SPOOFING DEFENSE
-Protects you against counterfeit websites, lookalike domains, and homograph attacks. Kloak verifies the strict authenticated domain before suggesting credentials, ensuring you never accidentally leak a password to a fraudulent site.
+• TOUCH ID BIOMETRIC UNLOCK IN THE BROWSER
+Unlock your encrypted vault directly from the extension popup or inline autofill dropdown using Apple Touch ID on macOS—fast, secure, and passwordless without typing your master password every time.
+
+• HARDWARE SECURITY KEY COMPATIBILITY (FIDO2 / YUBIKEY)
+Connect physical security keys for hardware-bound authorization. Kloak dynamically detects enrolled security keys and offers one-tap physical cryptographic unlocking.
+
+• REAL-TIME PHISHING & HOMOGRAPH DEFENSE
+Protects you against counterfeit websites, lookalike domains, and homograph attacks. Kloak strictly checks the authenticated domain before suggesting credentials, ensuring you never inadvertently expose passwords to fraudulent pages.
 
 • CONVENIENT CHROME SIDE PANEL & QUICK POPUP
-Access your entire credential vault right alongside your browsing tab via Chrome's native Side Panel, or use the lightweight toolbar popup for lightning-fast credential lookups.
+Access your entire credential vault alongside any active web page via Chrome's native Side Panel, or use the lightweight toolbar popup for lightning-fast credential searches and quick copies.
 
-• HIGH-ENTROPY PASSWORD GENERATOR
-Create unbreakable passwords, alphanumeric PINs, and memorable EFF multi-word passphrases with custom rules, character sets, and instant copy.
+• SECURE NOTES & PLAIN TEXT / MARKDOWN IMPORT
+Safely store software licenses, recovery codes, server configurations, and sensitive notes. Import plain text and markdown files (.txt, .md, .note) directly into your vault with automatic Secure Note categorization.
 
-• CONNECTED ECOSYSTEM & SSO TREE
-Smart domain recognition connects related subdomains and Single Sign-On (SSO) services (such as Google, Apple, Microsoft, and Roblox ecosystems) so you always have the right login ready without duplicate entries.
+• HIGH-ENTROPY PASSWORD & PASSPHRASE GENERATOR
+Create unbreakable random passwords, alphanumeric PINs, and memorable EFF multi-word passphrases with custom length, character rules, and instant one-click copying.
 
-• NATIVE MAC DESKTOP & TOUCH ID INTEGRATION
-Seamlessly bridges with the Kloak macOS desktop application. Unlock with Touch ID or Apple Watch on compatible Macs and enjoy synchronized credential updates in real-time.
+• ADAPTIVE BRAND VISUALS & SQUIRCLE FAVICONS
+Crisp, high-resolution brand icons featuring autonomous contrast detection for dark and light themes, color-matched squircle plates, and high-DPI resolution.
+
+• CONNECTED SSO ECOSYSTEM & SUBDOMAIN INTELLIGENCE
+Smart domain recognition links related subdomains and Single Sign-On (SSO) services (such as Google, Microsoft, Apple, and corporate portals) so the correct credentials are always ready without duplicate entries.
+
+• USER-AWARE AUTO-LOCK & VOLATILE MEMORY PROTECTION
+The auto-lock timer dynamically resets upon active typing and user interaction, ensuring your vault never unexpectedly locks while in use, while strictly clearing cryptographic keys from memory when locked.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT'S NEW IN VERSION 1.2.0 (RELEASE NOTES)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• DIRECT TOUCH ID BIOMETRIC UNLOCK
+Unlock your vault directly from the extension toolbar popup or the inline autofill badge using Touch ID on macOS—fast, secure, and passwordless.
+
+• CONTEXT-AWARE HARDWARE KEY DETECTION
+Dynamic security key integration: Hardware key authentication options (FIDO2 / YubiKey) now appear automatically only when a physical key is enrolled, maintaining an uncluttered interface.
+
+• FLUID ACCORDION TAB ANIMATIONS
+Two-phase smooth transitions when switching between All Items, Logins, and Favorites. Filtered items collapse vertically in place before surviving items glide into position using native spring FLIP physics.
+
+• SECURE NOTE & TEXT FILE IMPORT
+Easily import unencrypted text and markdown files (.txt, .md, .note) directly into Kloak and save them automatically as encrypted Secure Notes.
+
+• INSTANT AUTOFILL REFRESH
+The inline autofill dropdown instantly refreshes and animates newly discovered credentials the moment your vault is unlocked.
+
+• USER-AWARE AUTO-LOCK TIMEOUT
+The auto-lock timer dynamically resets on active typing and interaction, preventing premature locks while you are actively working.
+
+• STREAMLINED INTERFACE
+Cleaner popup header with secondary account-management actions neatly consolidated into the contextual Add menu.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 HOW TO USE
