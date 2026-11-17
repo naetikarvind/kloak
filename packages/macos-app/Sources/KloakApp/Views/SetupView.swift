@@ -1347,7 +1347,7 @@ public struct SetupView: View {
             .json,
             .xml
         ]
-        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "kloak", "kdbx"]
+        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "text", "md", "markdown", "note", "kloak", "kdbx"]
         for ext in extensions {
             if let ut = UTType(filenameExtension: ext) {
                 allowedTypes.append(ut)

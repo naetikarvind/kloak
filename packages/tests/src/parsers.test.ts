@@ -118,6 +118,29 @@ https://lastpass.com,lp_user,LpSecret123!,,My notes,LastPass Portal,Personal,1`;
     assert.strictEqual(res.items[0].title, 'Stripe');
   });
 
+  it('imports text files and saves content as a secure note', () => {
+    const textContent = `AWS Production Backup Keys
+Primary Access Key: AKIAIOSFODNN7EXAMPLE
+Secret Key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+Region: us-east-1`;
+
+    const res = importFromContent(textContent, 'auto', undefined, 'AWS_Backup_Keys.txt');
+    assert.strictEqual(res.items.length, 1);
+    assert.strictEqual(res.items[0].type, 'secure_note');
+    assert.strictEqual(res.items[0].title, 'AWS_Backup_Keys');
+    assert.strictEqual(res.items[0].notes, textContent);
+    assert.ok(res.items[0].tags.includes('Secure Note'));
+  });
+
+  it('imports plain text note with title derived from markdown heading', () => {
+    const mdContent = `# Server Recovery Instructions\n\n1. SSH into primary gateway\n2. Run recovery command`;
+    const res = importFromContent(mdContent, 'text-note');
+    assert.strictEqual(res.items.length, 1);
+    assert.strictEqual(res.items[0].type, 'secure_note');
+    assert.strictEqual(res.items[0].title, 'Server Recovery Instructions');
+    assert.strictEqual(res.items[0].notes, mdContent);
+  });
+
   it('exports vault in Kloak encrypted, standard JSON, and Bitwarden-compatible formats', () => {
     const payload = {
       version: 1,

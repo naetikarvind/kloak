@@ -4,6 +4,7 @@
  */
 
 import { ImportResult } from './types.js';
+import { VaultItem } from '../models/vault.js';
 import { parseBitwardenJson, parseBitwardenCsv } from './bitwarden.js';
 import { parseOnePassword1Pux, parseOnePassword1Pif } from './onepassword.js';
 import { parseLastPassCsv } from './lastpass.js';
@@ -32,16 +33,72 @@ export type SupportedImportFormat =
   | 'keepass-csv'
   | 'proton-csv'
   | 'dashlane-csv'
-  | 'generic-csv';
+  | 'generic-csv'
+  | 'text-note'
+  | 'plain-text';
+
+/**
+ * Parses plain text / markdown files into a Secure Note VaultItem.
+ */
+export function parseTextNote(content: string, filename?: string): ImportResult {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return {
+      source: 'Secure Note (Plain Text)',
+      items: [],
+      warnings: ['Empty text content'],
+      skippedCount: 0
+    };
+  }
+
+  // Derive title from filename or first non-empty line
+  let title = 'Imported Note';
+  if (filename) {
+    const cleanName = filename.replace(/\.[^/.]+$/, '').trim();
+    if (cleanName) title = cleanName;
+  } else {
+    const firstLine = trimmed.split(/\r?\n/).map(l => l.trim()).find(l => l.length > 0);
+    if (firstLine) {
+      title = firstLine.slice(0, 80).replace(/^#+\s*/, '');
+    }
+  }
+
+  const now = new Date().toISOString();
+  const item: VaultItem = {
+    id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type: 'secure_note',
+    title,
+    notes: trimmed,
+    tags: ['Secure Note', 'Imported'],
+    urls: [],
+    favorite: false,
+    trashed: false,
+    createdAt: now,
+    updatedAt: now,
+    importSource: 'Text File'
+  };
+
+  return {
+    source: 'Secure Note (Plain Text)',
+    items: [item],
+    warnings: [],
+    skippedCount: 0
+  };
+}
 
 export function importFromContent(
   content: string,
   format: SupportedImportFormat = 'auto',
-  customMapping?: ColumnMapping
+  customMapping?: ColumnMapping,
+  filename?: string
 ): ImportResult {
   const trimmed = content.trim();
 
   if (format === 'auto') {
+    // 0. Explicit check for text file extensions
+    if (filename && /\.(txt|text|md|markdown|note)$/i.test(filename)) {
+      return parseTextNote(trimmed, filename);
+    }
     // 1. Check for JSON
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
@@ -100,12 +157,18 @@ export function importFromContent(
       return parseChromeCsv(trimmed);
     }
 
-    // Fallback to generic CSV
-    return parseGenericCsv(trimmed, customMapping);
+    // Fallback to generic CSV (or text note if not structured data)
+    const genericRes = parseGenericCsv(trimmed, customMapping);
+    if (genericRes.items.length === 0 && trimmed.length > 0) {
+      return parseTextNote(trimmed, filename);
+    }
+    return genericRes;
   }
 
   // Explicit format specified
   switch (format) {
+    case 'text-note':
+    case 'plain-text': return parseTextNote(trimmed, filename);
     case 'google-csv':
     case 'microsoft-csv':
     case 'opera-csv':

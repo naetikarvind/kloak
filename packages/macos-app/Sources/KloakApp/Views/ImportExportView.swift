@@ -26,7 +26,8 @@ public struct ImportExportView: View {
         "KeePass (XML / CSV)",
         "Proton Pass (CSV / JSON)",
         "Dashlane (CSV)",
-        "Generic CSV (Auto-Mapped)"
+        "Generic CSV (Auto-Mapped)",
+        "Text File / Secure Note (.txt / .md / .note)"
     ]
 
     public var body: some View {
@@ -241,7 +242,7 @@ public struct ImportExportView: View {
             .json,
             .xml
         ]
-        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "kloak", "kdbx"]
+        let extensions = ["csv", "json", "xml", "1pux", "1pif", "tsv", "txt", "text", "md", "markdown", "note", "kloak", "kdbx"]
         for ext in extensions {
             if let ut = UTType(filenameExtension: ext) {
                 allowedTypes.append(ut)

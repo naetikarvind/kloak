@@ -586,8 +586,19 @@ public final class KeychainManager: @unchecked Sendable {
     }
 
     public func importFromFile(url: URL) throws -> (items: [VaultItem], providerName: String) {
+        let ext = url.pathExtension.lowercased()
+        let isTextFile = ["txt", "text", "md", "markdown", "note"].contains(ext)
         let content = try Self.readFileContent(at: url)
-        return importFromContent(content, filename: url.lastPathComponent, provider: nil)
+        if isTextFile {
+            let item = Self.createSecureNoteFromText(content: content, filename: url.lastPathComponent)
+            return ([item], "Secure Note (Text File)")
+        }
+        let result = importFromContent(content, filename: url.lastPathComponent, provider: nil)
+        if result.items.isEmpty && !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let item = Self.createSecureNoteFromText(content: content, filename: url.lastPathComponent)
+            return ([item], "Secure Note (Text File)")
+        }
+        return result
     }
 
     public static func readFileContent(at url: URL) throws -> String {
@@ -777,6 +788,13 @@ public final class KeychainManager: @unchecked Sendable {
         let content = Self.stripBOM(rawContent.trimmingCharacters(in: .whitespacesAndNewlines))
         if content.isEmpty { return ([], "Empty File") }
 
+        // 0. Detect plain text / markdown files explicitly by extension
+        if let fn = filename?.lowercased(),
+           fn.hasSuffix(".txt") || fn.hasSuffix(".text") || fn.hasSuffix(".md") || fn.hasSuffix(".markdown") || fn.hasSuffix(".note") {
+            let item = Self.createSecureNoteFromText(content: rawContent, filename: filename)
+            return ([item], "Secure Note (Text File)")
+        }
+
         // 1. Detect KeePass XML
         if content.hasPrefix("<") && (content.contains("<KeePassFile>") || content.contains("<Entry>")) {
             let items = Self.parseKeePassXML(content)
@@ -795,7 +813,61 @@ public final class KeychainManager: @unchecked Sendable {
 
         // 3. RFC 4180 CSV Parsing
         let (csvItems, csvProvider) = Self.parseCSVExport(content, filename: filename, provider: provider)
-        return (csvItems, csvProvider)
+        if !csvItems.isEmpty {
+            return (csvItems, csvProvider)
+        }
+
+        // 4. Fallback for unformatted or arbitrary text files: save text as Secure Note
+        if !content.isEmpty {
+            let item = Self.createSecureNoteFromText(content: rawContent, filename: filename)
+            return ([item], "Secure Note (Text File)")
+        }
+
+        return ([], csvProvider)
+    }
+
+    public static func createSecureNoteFromText(content: String, filename: String?) -> VaultItem {
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        var title = "Imported Note"
+        if let fn = filename, !fn.isEmpty {
+            let withoutExt = URL(fileURLWithPath: fn).deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespaces)
+            if !withoutExt.isEmpty {
+                title = withoutExt
+            }
+        } else {
+            let lines = trimmed.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+            if let first = lines.first(where: { !$0.isEmpty }) {
+                var cleanFirst = first
+                while cleanFirst.hasPrefix("#") { cleanFirst.removeFirst() }
+                cleanFirst = cleanFirst.trimmingCharacters(in: .whitespaces)
+                if !cleanFirst.isEmpty {
+                    title = String(cleanFirst.prefix(80))
+                }
+            }
+        }
+
+        let now = ISO8601DateFormatter().string(from: Date())
+        return VaultItem(
+            id: UUID().uuidString,
+            type: .secureNote,
+            title: title,
+            username: nil,
+            password: nil,
+            urls: [],
+            notes: trimmed,
+            totpSecret: nil,
+            oauth: nil,
+            card: nil,
+            identity: nil,
+            alias: nil,
+            authenticatorDetails: nil,
+            customFields: nil,
+            tags: ["Secure Note", "Imported"],
+            favorite: false,
+            trashed: false,
+            createdAt: now,
+            updatedAt: now
+        )
     }
 
     private static func parseJSONExport(_ content: String, filename: String?, provider: CloudProvider?) -> (items: [VaultItem], providerName: String) {

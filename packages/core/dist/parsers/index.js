@@ -18,6 +18,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseTextNote = parseTextNote;
 exports.importFromContent = importFromContent;
 const bitwarden_js_1 = require("./bitwarden.js");
 const onepassword_js_1 = require("./onepassword.js");
@@ -28,9 +29,60 @@ const keepass_js_1 = require("./keepass.js");
 const proton_js_1 = require("./proton.js");
 const dashlane_js_1 = require("./dashlane.js");
 const generic_csv_js_1 = require("./generic-csv.js");
-function importFromContent(content, format = 'auto', customMapping) {
+/**
+ * Parses plain text / markdown files into a Secure Note VaultItem.
+ */
+function parseTextNote(content, filename) {
+    const trimmed = content.trim();
+    if (!trimmed) {
+        return {
+            source: 'Secure Note (Plain Text)',
+            items: [],
+            warnings: ['Empty text content'],
+            skippedCount: 0
+        };
+    }
+    // Derive title from filename or first non-empty line
+    let title = 'Imported Note';
+    if (filename) {
+        const cleanName = filename.replace(/\.[^/.]+$/, '').trim();
+        if (cleanName)
+            title = cleanName;
+    }
+    else {
+        const firstLine = trimmed.split(/\r?\n/).map(l => l.trim()).find(l => l.length > 0);
+        if (firstLine) {
+            title = firstLine.slice(0, 80).replace(/^#+\s*/, '');
+        }
+    }
+    const now = new Date().toISOString();
+    const item = {
+        id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: 'secure_note',
+        title,
+        notes: trimmed,
+        tags: ['Secure Note', 'Imported'],
+        urls: [],
+        favorite: false,
+        trashed: false,
+        createdAt: now,
+        updatedAt: now,
+        importSource: 'Text File'
+    };
+    return {
+        source: 'Secure Note (Plain Text)',
+        items: [item],
+        warnings: [],
+        skippedCount: 0
+    };
+}
+function importFromContent(content, format = 'auto', customMapping, filename) {
     const trimmed = content.trim();
     if (format === 'auto') {
+        // 0. Explicit check for text file extensions
+        if (filename && /\.(txt|text|md|markdown|note)$/i.test(filename)) {
+            return parseTextNote(trimmed, filename);
+        }
         // 1. Check for JSON
         if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
             try {
@@ -86,11 +138,17 @@ function importFromContent(content, format = 'auto', customMapping) {
         if (firstLine.includes('name') && firstLine.includes('url') && firstLine.includes('username') && firstLine.includes('password')) {
             return (0, chrome_js_1.parseChromeCsv)(trimmed);
         }
-        // Fallback to generic CSV
-        return (0, generic_csv_js_1.parseGenericCsv)(trimmed, customMapping);
+        // Fallback to generic CSV (or text note if not structured data)
+        const genericRes = (0, generic_csv_js_1.parseGenericCsv)(trimmed, customMapping);
+        if (genericRes.items.length === 0 && trimmed.length > 0) {
+            return parseTextNote(trimmed, filename);
+        }
+        return genericRes;
     }
     // Explicit format specified
     switch (format) {
+        case 'text-note':
+        case 'plain-text': return parseTextNote(trimmed, filename);
         case 'google-csv':
         case 'microsoft-csv':
         case 'opera-csv':

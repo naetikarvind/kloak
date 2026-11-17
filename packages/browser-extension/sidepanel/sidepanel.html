@@ -298,6 +298,23 @@
       transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.28s ease, background 0.15s, border-color 0.15s;
       will-change: transform, opacity;
     }
+    .item-card.animating-out {
+      max-height: 0 !important;
+      min-height: 0 !important;
+      opacity: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      overflow: hidden !important;
+      border: none !important;
+      pointer-events: none !important;
+      transform: scaleY(0.7) translateY(-4px) !important;
+      transition: max-height 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+                  opacity 0.18s ease-out, 
+                  padding 0.22s cubic-bezier(0.16, 1, 0.3, 1), 
+                  transform 0.22s ease-out !important;
+    }
     .item-card:hover {
       background: var(--bg-card-hover);
       border-color: rgba(109, 74, 255, 0.3);

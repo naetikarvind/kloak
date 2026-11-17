@@ -2338,7 +2338,42 @@ function renderItemAvatar(avatarEl: HTMLElement, item: any, size: number = 32) {
 }
 
 // ── Sidebar List ──
+let listTransitionTimeout: any = null;
+
 function renderSidebarList(items: any[], animate: boolean = true) {
+  const container = document.getElementById('sidebar-list');
+  if (!container) return;
+
+  if (listTransitionTimeout) {
+    clearTimeout(listTransitionTimeout);
+    listTransitionTimeout = null;
+  }
+
+  if (items.length === 0) {
+    container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">No items found.</div>';
+    return;
+  }
+
+  // Phase 1: Pre-collapse departing items vertically (smooth accordion shrink & fade out) before final FLIP
+  if (animate) {
+    const existingRows = Array.from(container.querySelectorAll<HTMLElement>('.list-item[data-item-id]'));
+    const newItemIds = new Set(items.map(i => i.id));
+    const leavingRows = existingRows.filter(r => r.dataset.itemId && !newItemIds.has(r.dataset.itemId));
+
+    if (leavingRows.length > 0 && existingRows.length > 0) {
+      leavingRows.forEach(r => r.classList.add('animating-out'));
+      listTransitionTimeout = setTimeout(() => {
+        listTransitionTimeout = null;
+        executeRenderSidebarList(items, true);
+      }, 190);
+      return;
+    }
+  }
+
+  executeRenderSidebarList(items, animate);
+}
+
+function executeRenderSidebarList(items: any[], animate: boolean = true) {
   const container = document.getElementById('sidebar-list');
   if (!container) return;
 

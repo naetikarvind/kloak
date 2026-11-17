@@ -4405,7 +4405,34 @@ ${notes}`;
     }
     renderFavicon(avatarEl, { item, size });
   }
+  var listTransitionTimeout = null;
   function renderSidebarList(items, animate = true) {
+    const container = document.getElementById("sidebar-list");
+    if (!container) return;
+    if (listTransitionTimeout) {
+      clearTimeout(listTransitionTimeout);
+      listTransitionTimeout = null;
+    }
+    if (items.length === 0) {
+      container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">No items found.</div>';
+      return;
+    }
+    if (animate) {
+      const existingRows = Array.from(container.querySelectorAll(".list-item[data-item-id]"));
+      const newItemIds = new Set(items.map((i) => i.id));
+      const leavingRows = existingRows.filter((r) => r.dataset.itemId && !newItemIds.has(r.dataset.itemId));
+      if (leavingRows.length > 0 && existingRows.length > 0) {
+        leavingRows.forEach((r) => r.classList.add("animating-out"));
+        listTransitionTimeout = setTimeout(() => {
+          listTransitionTimeout = null;
+          executeRenderSidebarList(items, true);
+        }, 190);
+        return;
+      }
+    }
+    executeRenderSidebarList(items, animate);
+  }
+  function executeRenderSidebarList(items, animate = true) {
     const container = document.getElementById("sidebar-list");
     if (!container) return;
     if (items.length === 0) {

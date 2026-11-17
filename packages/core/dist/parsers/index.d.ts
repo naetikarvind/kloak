@@ -4,8 +4,12 @@
  */
 import { ImportResult } from './types.js';
 import { ColumnMapping } from './generic-csv.js';
-export type SupportedImportFormat = 'auto' | 'google-csv' | 'microsoft-csv' | 'opera-csv' | 'edge-csv' | 'firefox-csv' | 'bitwarden-json' | 'bitwarden-csv' | '1password-1pux' | '1password-1pif' | 'lastpass-csv' | 'apple-csv' | 'chrome-csv' | 'keepass-xml' | 'keepass-csv' | 'proton-csv' | 'dashlane-csv' | 'generic-csv';
-export declare function importFromContent(content: string, format?: SupportedImportFormat, customMapping?: ColumnMapping): ImportResult;
+export type SupportedImportFormat = 'auto' | 'google-csv' | 'microsoft-csv' | 'opera-csv' | 'edge-csv' | 'firefox-csv' | 'bitwarden-json' | 'bitwarden-csv' | '1password-1pux' | '1password-1pif' | 'lastpass-csv' | 'apple-csv' | 'chrome-csv' | 'keepass-xml' | 'keepass-csv' | 'proton-csv' | 'dashlane-csv' | 'generic-csv' | 'text-note' | 'plain-text';
+/**
+ * Parses plain text / markdown files into a Secure Note VaultItem.
+ */
+export declare function parseTextNote(content: string, filename?: string): ImportResult;
+export declare function importFromContent(content: string, format?: SupportedImportFormat, customMapping?: ColumnMapping, filename?: string): ImportResult;
 export * from './types.js';
 export * from './export.js';
 export * from './merger.js';
