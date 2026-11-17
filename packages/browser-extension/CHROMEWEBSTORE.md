@@ -3,7 +3,7 @@
 ## Store Metadata
 
 - **Name**: Kloak Password Manager
-- **Version**: 1.1.0
+- **Version**: 1.2.0
 - **Category**: Productivity / Privacy & Security
 - **Short Description** (128 / 132 chars max):
   Local-first password manager with instant autofill, built-in 2FA authenticator, phishing protection, and desktop vault sync.
@@ -22,20 +22,29 @@ Kloak is a fast, local-first password manager and authenticator designed for spe
 Enjoy instant, intelligent credential autofill on any website, built-in TOTP two-factor authentication countdowns, anti-phishing domain verification, and high-entropy password generation directly within Google Chrome.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHAT'S NEW IN V1.1.0
+WHAT'S NEW IN V1.2.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-• ADAPTIVE BRAND VISUALS & FAVICONS
-Crisp, high-resolution favicons with smart color-matched squircle plates and autonomous contrast detection for dark and light icons.
+• TOUCH ID BIOMETRIC UNLOCK IN THE BROWSER
+Unlock your vault directly from the extension popup or the inline autofill badge using Touch ID on macOS—fast, secure, and passwordless.
 
-• INTELLIGENT BRAND RESOLUTION
-Automatically links service authentication subdomains (e.g., account.live.com, login.microsoftonline.com) to primary brand identities.
+• INTELLIGENT HARDWARE KEY RECOGNITION
+Dynamic security key detection: Hardware key authentication options (FIDO2 / YubiKey) now only appear when a security key is actively enrolled, keeping your interface clean and intuitive.
 
-• PERFORMANCE & SPEED
-Instant in-memory logo caching for faster autofill suggestions and side panel browsing.
+• FLUID ACCORDION TAB TRANSITIONS
+Enjoy Apple-grade animations when switching between All Items, Logins, and Favorites. Departing items collapse vertically in place before surviving items smoothly glide into position.
 
-• FORM DETECTION ENHANCEMENTS
-Refined domain matching and smoother inline autofill badges across complex multi-step login forms.
+• SECURE NOTE & TEXT FILE IMPORT
+Import unencrypted text and markdown files (.txt, .md, .note) directly into Kloak and save them automatically as encrypted Secure Notes.
+
+• INSTANT AUTOFILL REFRESH
+The inline autofill dropdown instantly refreshes and animates newly discovered credentials the moment you unlock your vault.
+
+• USER-AWARE AUTO-LOCK TIMEOUT
+The auto-lock timer now dynamically resets whenever you interact with the extension or app, preventing unexpected locks while you are actively working.
+
+• STREAMLINED INTERFACE
+Cleaner popup header with secondary account-management actions neatly tucked into the contextual Add menu.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 KEY FEATURES
@@ -136,17 +145,19 @@ Google Chrome Web Store User Data Policy mandates that the privacy policy explic
 
 ---
 
-## Version 1.1.0 Submission — Notes for Reviewer
+## Version 1.2.0 Submission — Notes for Reviewer
 
 When clicking **Submit for review** in the Chrome Web Store Developer Console, paste the following into the **Notes for the reviewer** text area:
 
 ```text
-Release Notes for Version 1.1.0:
-- Upgraded brand visual system: On-device visual adaptation (squircle background plates, contrast detection) for brand favicons in the popup, side panel, and inline autofill overlay.
-- Enhanced parent-brand domain resolution: Maps Single Sign-On and authentication subdomains (e.g., account.live.com, login.microsoftonline.com) to primary brand identities.
-- Performance: Added local in-memory caching for faster credential suggestions.
-- Form autofill refinements for multi-step authentication forms.
-- Permissions & Privacy: Zero new permissions added. All data handling and encryption remain 100% on-device and local-first with zero tracking.
+Release Notes for Version 1.2.0:
+- Biometric Touch ID Unlock: Enables direct local biometric vault unlocking from the extension popup and autofill overlay on macOS via native messaging.
+- Context-Aware Security Keys: Hardware security key (FIDO2 / YubiKey) prompt is only displayed when an enrolled key is configured.
+- UI Transitions & Fluidity: Added smooth accordion vertical collapse and spring FLIP transitions for list filtering.
+- Secure Note Import: Text and markdown files can now be imported and stored as encrypted Secure Notes.
+- Instant Autofill Refresh: Autofill overlay automatically updates upon vault unlock with discovered credentials.
+- Auto-Lock Hardening: Timeout counter reliably resets upon active user interaction.
+- Permissions & Privacy: Zero new permissions added. All data handling and encryption remain 100% on-device and local-first with zero telemetry.
 ```
 
 ---
