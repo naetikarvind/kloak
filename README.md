@@ -1,6 +1,36 @@
 # Kloak — Local-First Password Manager
 
-> **A local-first password manager with a Raycast extension, a native macOS app (Liquid Glass), a cross-browser extension (Manifest V3), and a companion website.**
+[![Release](https://img.shields.io/badge/release-v1.2.0-blue.svg)](https://github.com/naetikarvind/kloak/releases/tag/v1.2.0)
+[![macOS 14+](https://img.shields.io/badge/macOS-14%2B%20Sonoma%20%7C%2015%2B%20Sequoia-38bdf8.svg)](https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-v1.2.0%20Official-10b981.svg)](https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+> **A 100% local-first, zero-knowledge password manager and 2FA authenticator with a native macOS app (Liquid Glass + Touch ID), a cross-browser extension (Manifest V3), a Raycast extension, and an offline cryptographic CLI.**
+
+---
+
+## ⚡ Key Features & Capabilities
+
+- **100% Local-First & Zero-Knowledge**: Vault is encrypted locally on disk at `~/.kloak/vault.kloak` using authenticated AES-256-GCM and Argon2id / PBKDF2 key derivation. Your master keys never leave your machine; zero cloud accounts, zero remote tracking.
+- **Biometric Touch ID Web Unlock**: Unlock your encrypted vault in 100 milliseconds directly from the macOS app, browser extension popup, and inline autofill overlay using Apple Touch ID.
+- **Hardware Security Key Integration (FIDO2 / YubiKey)**: Dynamic context-aware security key detection. Connect your physical YubiKey or FIDO2 hardware key for zero-knowledge cryptographic authentication.
+- **Intelligent 1-Click Autofill**: Automatically detects login, registration, and payment fields with instant post-unlock refresh and smooth entrance animations.
+- **Built-in 2FA TOTP Authenticator**: Standard RFC 6238 two-factor code generation with live 30-second visual countdown rings and automatic paste into 2FA prompts.
+- **Encrypted Secure Notes & Text File Import**: Safely store sensitive notes, recovery codes, and configurations. Import unencrypted plain text and markdown files (`.txt`, `.md`, `.note`) directly into encrypted Secure Notes.
+- **Real-Time Phishing & Homograph Defense**: Validates authenticated domains against DNS/RDAP and lookalike attacks before offering credentials.
+- **Fluid Accordion Tab Transitions**: Two-phase smooth animation when switching between All Items, Logins, and Favorites—departing items collapse vertically in place before surviving items glide into position via spring FLIP motion.
+- **User-Aware Auto-Lock Protection**: Auto-lock timeout dynamically resets on any active typing or user interaction so the vault never locks while actively in use.
+- **Adaptive Brand Visuals & Favicons (JEV AI)**: Autonomous contrast detection and Apple-style continuous squircles for high-DPI brand icons across dark and light surfaces.
+- **Universal Importer & Auto-Merge**: Seamless 1-click migration from 10+ password managers (1Password, Bitwarden, Apple Passwords, Chrome, LastPass, KeePass) with duplicate account deduplication.
+
+---
+
+## 📦 Downloads & Installation
+
+- **macOS Native App**: [Download Kloak-macOS-v1.2.0.dmg](https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg) (Apple Silicon M1–M4 & Intel Universal)
+- **Chrome Extension**: [Add to Chrome via Web Store](https://chrome.google.com/webstore/detail/kloak-password-manager/hajgkgmajepndkhjhcgjenjnfojlphod) or [Download Extension Package .zip](https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.2.0.zip)
+- **Official Website & Docs**: [https://naetikarvind.github.io/kloak/](https://naetikarvind.github.io/kloak/)
+- **Privacy Policy**: [https://naetikarvind.github.io/kloak/privacy.html](https://naetikarvind.github.io/kloak/privacy.html)
 
 ---
 

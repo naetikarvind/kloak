@@ -87,7 +87,7 @@ export const DownloadsSection: React.FC = () => {
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Kloak for macOS</h3>
                   <p style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 600 }}>
-                    <ShinyText text="v1.0.0 Universal DMG (4.9 MB)" speed={3.5} />
+                    <ShinyText text="v1.2.0 Universal DMG (5.8 MB)" speed={3.5} />
                   </p>
                 </div>
               </div>
@@ -107,15 +107,19 @@ export const DownloadsSection: React.FC = () => {
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                  <span>In-App Auto-Updater via GitHub Releases</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                  <span>Zero-Knowledge iCloud Multi-Device Sync</span>
-                </li>
-                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
                   <span>Touch ID &amp; Apple Watch Biometrics</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                  <span>FIDO2 / YubiKey Hardware Security Keys</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                  <span>Encrypted Secure Notes &amp; Text / Markdown Import</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                  <span>In-App Auto-Updater via GitHub Releases</span>
                 </li>
               </ul>
             </div>
@@ -133,7 +137,7 @@ export const DownloadsSection: React.FC = () => {
               </MagnetButton>
 
               <a
-                href="https://github.com/naetikarvind/kloak/releases/tag/v1.0.0"
+                href="https://github.com/naetikarvind/kloak/releases/tag/v1.2.0"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="download-card-sublink"
@@ -200,7 +204,7 @@ export const DownloadsSection: React.FC = () => {
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Chrome Extension</h3>
                   <p style={{ fontSize: '13px', color: '#34d399', fontWeight: 600 }}>
-                    <ShinyText text="v1.1.0 Web Store Official" speed={3.5} />
+                    <ShinyText text="v1.2.0 Web Store Official" speed={3.5} />
                   </p>
                 </div>
               </div>
@@ -212,15 +216,19 @@ export const DownloadsSection: React.FC = () => {
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', color: 'var(--text-main)', marginBottom: '16px' }}>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                  <span>1-Click Install from Chrome Web Store</span>
+                  <span>Direct Touch ID Web Unlock in Browser</span>
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                  <span>Google Manifest V3 Security Compliant</span>
+                  <span>Adaptive Hardware Key (FIDO2 / YubiKey) Detection</span>
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
-                  <span>Intelligent Local Favicons &amp; URL Shield</span>
+                  <span>Fluid Accordion Tab Transitions &amp; FLIP Motion</span>
+                </li>
+                <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
+                  <span>Instant Autofill Refresh &amp; URL Shield</span>
                 </li>
                 <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Check size={16} color="#10b981" style={{ flexShrink: 0 }} />
@@ -244,7 +252,7 @@ export const DownloadsSection: React.FC = () => {
               </MagnetButton>
 
               <a
-                href="https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.1.0.zip"
+                href="https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.2.0.zip"
                 className="download-card-sublink"
               >
                 <span>Or download .zip package</span>
