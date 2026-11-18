@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 3: Password & Passphrase Generator</title>
+  <style>
+    
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --bg-base: #16151D;
+  --bg-sidebar: #191823;
+  --bg-active: #28233C;
+  --bg-card: #211F2D;
+  --bg-card-hover: #292738;
+  --bg-input: #111017;
+  --bg-btn: #272535;
+  --bg-btn-hover: #333045;
+  --bg-url: #241D3B;
+  
+  --border: #2C293D;
+  --border-card: #2F2C3F;
+  
+  --accent: #6D4AFF;
+  --accent-hover: #7E5EFF;
+  --accent-muted: rgba(109, 74, 255, 0.16);
+  
+  --color-login: #6D4AFF;
+  --color-alias: #00D2B4;
+  --color-card: #FF884D;
+  --color-note: #4D96FF;
+  
+  --text-main: #FFFFFF;
+  --text-muted: #9E9AA8;
+  --text-subtle: #736F80;
+  --text-url: #B098FF;
+  
+  --success: #29C98F;
+  --warning: #FFB800;
+  --danger: #F54A4A;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  background: #0C0B12;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-main);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* Background Ambient Lighting */
+.ambient-glow-purple {
+  position: absolute;
+  top: -120px;
+  left: 20%;
+  width: 650px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(109, 74, 255, 0.18) 0%, rgba(109, 74, 255, 0) 70%);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ambient-glow-green {
+  position: absolute;
+  bottom: -100px;
+  right: 15%;
+  width: 550px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(41, 201, 143, 0.14) 0%, rgba(41, 201, 143, 0) 70%);
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.studio-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header Banner (1280x800 layout) */
+.hero-header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 30px 40px 14px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(109, 74, 255, 0.18);
+  border: 1px solid rgba(109, 74, 255, 0.4);
+  color: #B8A5FF;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.hero-badge.emerald {
+  background: rgba(41, 201, 143, 0.16);
+  border-color: rgba(41, 201, 143, 0.38);
+  color: #29C98F;
+}
+
+.hero-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  max-width: 780px;
+  line-height: 1.45;
+}
+
+/* Center Stage Container */
+.stage-container {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px 28px 40px;
+}
+
+
+    .generator-box {
+      width: 680px;
+      background: var(--bg-card);
+      border-radius: 12px;
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      box-shadow: 0 28px 80px rgba(0,0,0,0.8), 0 0 24px rgba(109, 74, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 24px;
+      gap: 18px;
+    }
+
+    .gen-toggle-row {
+      display: flex;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .gen-toggle-btn {
+      flex: 1;
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .gen-toggle-btn.active {
+      background: var(--accent);
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(109, 74, 255, 0.4);
+    }
+
+    /* Password Display Card */
+    .password-display-card {
+      background: linear-gradient(135deg, rgba(109, 74, 255, 0.14) 0%, rgba(22, 21, 29, 0.98) 100%);
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .password-text-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .password-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      word-break: break-all;
+      flex: 1;
+    }
+    .char-sym { color: #FF884D; font-weight: 800; }
+    .char-num { color: #00D2B4; font-weight: 800; }
+    .char-upper { color: #A78BFA; }
+    .char-lower { color: #FFFFFF; }
+
+    .password-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-gen-action {
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      background: var(--bg-btn);
+      border: 1px solid var(--border);
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-gen-action.copied {
+      background: #29C98F;
+      border-color: #29C98F;
+      color: #FFFFFF;
+      box-shadow: 0 2px 8px rgba(41, 201, 143, 0.4);
+    }
+
+    /* Entropy & Strength Meter */
+    .entropy-bar-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .entropy-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+    }
+    .entropy-label { color: #29C98F; font-weight: 700; }
+    .entropy-val { color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+    .entropy-track {
+      display: flex;
+      gap: 4px;
+      height: 5px;
+    }
+    .entropy-seg {
+      flex: 1;
+      height: 100%;
+      background: #29C98F;
+      border-radius: 2px;
+      box-shadow: 0 0 6px rgba(41, 201, 143, 0.4);
+    }
+
+    /* Configuration Panel */
+    .config-card {
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .slider-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(109, 74, 255, 0.16);
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(109, 74, 255, 0.35);
+    }
+
+    .slider-track {
+      height: 6px;
+      background: #312E40;
+      border-radius: 3px;
+      position: relative;
+    }
+    .slider-fill {
+      width: 48%;
+      height: 100%;
+      background: var(--accent);
+      border-radius: 3px;
+      box-shadow: 0 0 8px rgba(109, 74, 255, 0.5);
+    }
+    .slider-thumb {
+      position: absolute;
+      left: 48%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #FFFFFF;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    }
+
+    /* Character toggles */
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .toggle-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(109, 74, 255, 0.16);
+      border: 1px solid var(--accent);
+      color: #A78BFA;
+    }
+    .toggle-chip.secondary {
+      background: var(--bg-btn);
+      border-color: var(--border);
+      color: var(--text-muted);
+    }
+
+    /* EFF Passphrase preview banner */
+    .eff-preview-box {
+      background: rgba(0, 210, 180, 0.08);
+      border: 1px solid rgba(0, 210, 180, 0.25);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .eff-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #00D2B4;
+    }
+    .eff-passphrase {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow-purple"></div>
+  <div class="ambient-glow-green"></div>
+  <div class="studio-grid"></div>
+
+  <!-- Header Section -->
+  <header class="hero-header">
+    <div class="hero-badge emerald">
+      <span>🔐 Cryptographic Password & Passphrase Studio</span>
+    </div>
+    <h1 class="hero-title">High-Entropy Passwords & EFF Passphrases</h1>
+    <p class="hero-subtitle">Generate uncrackable passwords and memorable Diceware passphrases in local memory with real-time entropy scoring.</p>
+  </header>
+
+  <!-- Center Stage Container -->
+  <div class="stage-container">
+    <div class="generator-box">
+      <!-- Mode Toggle -->
+      <div class="gen-toggle-row">
+        <button class="gen-toggle-btn active">🔑 Password Generator</button>
+        <button class="gen-toggle-btn">💬 EFF Passphrase Studio</button>
+      </div>
+
+      <!-- Main Display -->
+      <div class="password-display-card">
+        <div class="password-text-row">
+          <div class="password-code">
+            <span class="char-upper">K</span><span class="char-lower">p</span><span class="char-num">9</span><span class="char-sym">#</span><span class="char-lower">v</span><span class="char-upper">X</span><span class="char-num">2</span><span class="char-sym">$</span><span class="char-lower">m</span><span class="char-upper">Q</span><span class="char-num">8</span><span class="char-sym">!</span><span class="char-lower">z</span><span class="char-upper">L</span><span class="char-num">4</span><span class="char-sym">@</span><span class="char-lower">t</span><span class="char-upper">W</span><span class="char-num">5</span><span class="char-sym">^</span><span class="char-lower">y</span><span class="char-upper">R</span><span class="char-num">7</span><span class="char-sym">&amp;</span>
+          </div>
+          <div class="password-actions">
+            <button class="btn-gen-action" title="Regenerate">🔄</button>
+            <button class="btn-gen-action copied">✓ Copied!</button>
+          </div>
+        </div>
+
+        <!-- Entropy Meter -->
+        <div class="entropy-bar-wrapper">
+          <div class="entropy-header">
+            <span class="entropy-label">Military Grade Strength</span>
+            <span class="entropy-val">128 bits entropy</span>
+          </div>
+          <div class="entropy-track">
+            <div class="entropy-seg"></div>
+            <div class="entropy-seg"></div>
+            <div class="entropy-seg"></div>
+            <div class="entropy-seg"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="config-card">
+        <div class="slider-header">
+          <span>Password Length</span>
+          <span class="slider-badge">24 characters</span>
+        </div>
+
+        <div class="slider-track">
+          <div class="slider-fill"></div>
+          <div class="slider-thumb"></div>
+        </div>
+
+        <div class="chips-row">
+          <div class="toggle-chip">✓ A-Z Uppercase</div>
+          <div class="toggle-chip">✓ a-z Lowercase</div>
+          <div class="toggle-chip">✓ 0-9 Digits</div>
+          <div class="toggle-chip">✓ !@#$%^&amp;* Symbols</div>
+          <div class="toggle-chip secondary">Avoid Ambiguous (1, l, O, 0)</div>
+        </div>
+      </div>
+
+      <!-- EFF Passphrase Preview -->
+      <div class="eff-preview-box">
+        <div>
+          <div class="eff-title">EFF DICEWARE ALTERNATIVE</div>
+          <div class="eff-passphrase">correct-horse-battery-staple</div>
+        </div>
+        <span style="font-size: 11px; color: #00D2B4; background: rgba(0,210,180,0.15); padding: 3px 8px; border-radius: 4px; font-weight: 600;">77 bits entropy</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

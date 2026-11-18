@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 1: 1-Click Autofill & Touch ID</title>
+  <style>
+    
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --bg-base: #16151D;
+  --bg-sidebar: #191823;
+  --bg-active: #28233C;
+  --bg-card: #211F2D;
+  --bg-card-hover: #292738;
+  --bg-input: #111017;
+  --bg-btn: #272535;
+  --bg-btn-hover: #333045;
+  --bg-url: #241D3B;
+  
+  --border: #2C293D;
+  --border-card: #2F2C3F;
+  
+  --accent: #6D4AFF;
+  --accent-hover: #7E5EFF;
+  --accent-muted: rgba(109, 74, 255, 0.16);
+  
+  --color-login: #6D4AFF;
+  --color-alias: #00D2B4;
+  --color-card: #FF884D;
+  --color-note: #4D96FF;
+  
+  --text-main: #FFFFFF;
+  --text-muted: #9E9AA8;
+  --text-subtle: #736F80;
+  --text-url: #B098FF;
+  
+  --success: #29C98F;
+  --warning: #FFB800;
+  --danger: #F54A4A;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  background: #0C0B12;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-main);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* Background Ambient Lighting */
+.ambient-glow-purple {
+  position: absolute;
+  top: -120px;
+  left: 20%;
+  width: 650px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(109, 74, 255, 0.18) 0%, rgba(109, 74, 255, 0) 70%);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ambient-glow-green {
+  position: absolute;
+  bottom: -100px;
+  right: 15%;
+  width: 550px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(41, 201, 143, 0.14) 0%, rgba(41, 201, 143, 0) 70%);
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.studio-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header Banner (1280x800 layout) */
+.hero-header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 30px 40px 14px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(109, 74, 255, 0.18);
+  border: 1px solid rgba(109, 74, 255, 0.4);
+  color: #B8A5FF;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.hero-badge.emerald {
+  background: rgba(41, 201, 143, 0.16);
+  border-color: rgba(41, 201, 143, 0.38);
+  color: #29C98F;
+}
+
+.hero-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  max-width: 780px;
+  line-height: 1.45;
+}
+
+/* Center Stage Container */
+.stage-container {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px 28px 40px;
+}
+
+    
+    /* Mock Browser Window */
+    .browser-window {
+      width: 980px;
+      height: 560px;
+      background: #0D1117;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(109, 74, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .browser-titlebar {
+      height: 40px;
+      background: #161B22;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 14px;
+    }
+    
+    .window-dots {
+      display: flex;
+      gap: 7px;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; }
+    .dot-red { background: #FF5F56; }
+    .dot-yellow { background: #FFBD2E; }
+    .dot-green { background: #27C93F; }
+    
+    .address-bar {
+      flex: 1;
+      max-width: 520px;
+      height: 26px;
+      background: #090D13;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      gap: 7px;
+      font-size: 11.5px;
+      color: #7D8590;
+      margin: 0 auto;
+    }
+    .address-bar .lock-icon { width: 12px; height: 12px; fill: #29C98F; }
+    .address-bar .url-domain { color: #FFFFFF; font-weight: 500; }
+    .address-bar .url-path { color: #7D8590; }
+    .verified-pill {
+      margin-left: auto;
+      font-size: 9px;
+      font-weight: 700;
+      color: #29C98F;
+      background: rgba(41, 201, 143, 0.15);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(41, 201, 143, 0.3);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    
+    .browser-extensions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ext-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(109, 74, 255, 0.2);
+      border: 1px solid rgba(109, 74, 255, 0.4);
+    }
+    
+    /* GitHub Login Form in Browser Page */
+    .page-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+    }
+    
+    .gh-logo {
+      width: 44px;
+      height: 44px;
+      margin-bottom: 12px;
+      fill: #FFFFFF;
+    }
+    
+    .gh-heading {
+      font-size: 21px;
+      font-weight: 400;
+      letter-spacing: -0.3px;
+      margin-bottom: 16px;
+      color: #FFFFFF;
+    }
+    
+    .gh-card {
+      width: 320px;
+      background: #161B22;
+      border: 1px solid #30363D;
+      border-radius: 6px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+    }
+    
+    .gh-field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      position: relative;
+    }
+    
+    .gh-label {
+      font-size: 13px;
+      color: #E6EDF3;
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .gh-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    
+    .gh-input {
+      width: 100%;
+      height: 34px;
+      background: #0D1117;
+      border: 1.5px solid #6D4AFF;
+      box-shadow: 0 0 0 3px rgba(109, 74, 255, 0.35);
+      border-radius: 6px;
+      color: #FFFFFF;
+      font-size: 13px;
+      padding: 0 36px 0 10px;
+      outline: none;
+    }
+    
+    .kloak-field-badge {
+      position: absolute;
+      right: 8px;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      background: #191823;
+      border: 1px solid #6D4AFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(109, 74, 255, 0.5);
+    }
+    
+    .gh-btn-submit {
+      height: 32px;
+      background: #238636;
+      border: 1px solid rgba(240, 246, 252, 0.1);
+      border-radius: 6px;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    /* ── AUTHENTIC KLOAK BENTO POPUP OVERLAY ── */
+    .kloak-popup {
+      position: absolute;
+      top: 60px;
+      left: 0;
+      width: 324px;
+      background: rgba(18, 16, 28, 0.98);
+      border: 1px solid rgba(124, 92, 255, 0.45);
+      border-radius: 12px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.85), 0 0 24px rgba(109, 74, 255, 0.25), inset 0 1px 0 rgba(255,255,255,0.1);
+      color: #FFFFFF;
+      z-index: 100;
+      font-size: 11.5px;
+      backdrop-filter: blur(28px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .kloak-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 11px;
+      background: rgba(255, 255, 255, 0.04);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .kloak-brand {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 700;
+      color: #B5A8FF;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .kloak-close-btn {
+      color: #8C8899;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    .kloak-context-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 11px;
+      font-size: 10px;
+      background: rgba(109, 74, 255, 0.09);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      color: #B5A8FF;
+    }
+    .kloak-context-tag {
+      font-size: 8.5px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 700;
+      text-transform: uppercase;
+      background: rgba(41, 201, 143, 0.2);
+      color: #29C98F;
+      border: 1px solid rgba(41, 201, 143, 0.4);
+    }
+    
+    .kloak-body {
+      padding: 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .kloak-bento-card {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    
+    .kloak-bento-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .kloak-id-group {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .kloak-avatar {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .kloak-bento-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+    .kloak-fill-all-btn {
+      background: linear-gradient(135deg, #6D4AFF 0%, #7E5EFF 100%);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(109, 74, 255, 0.45);
+    }
+    
+    .kloak-bento-inputs {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .kloak-bento-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 11px;
+      color: #E2E8F0;
+    }
+    .kloak-bento-row .copy-icon {
+      color: #8C8899;
+      font-size: 11px;
+    }
+    
+    .totp-pill-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(41, 201, 143, 0.15);
+      border: 1px solid rgba(41, 201, 143, 0.3);
+      padding: 2px 7px;
+      border-radius: 5px;
+      color: #29C98F;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    .touch-id-banner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      background: rgba(109, 74, 255, 0.15);
+      border: 1px solid rgba(109, 74, 255, 0.35);
+      border-radius: 7px;
+      padding: 7px 10px;
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .touch-id-banner:hover {
+      background: rgba(109, 74, 255, 0.28);
+    }
+    .touch-id-banner svg {
+      width: 15px;
+      height: 15px;
+      fill: none;
+      stroke: #A78BFA;
+      stroke-width: 2.2;
+    }
+
+    .kloak-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 11px;
+      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 9.5px;
+      color: #8C8899;
+    }
+    .kloak-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #29C98F;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #29C98F;
+      box-shadow: 0 0 6px #29C98F;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow-purple"></div>
+  <div class="ambient-glow-green"></div>
+  <div class="studio-grid"></div>
+
+  <!-- Header Section -->
+  <header class="hero-header">
+    <div class="hero-badge">
+      <span>⚡ 1-Click Secure Autofill & Touch ID</span>
+    </div>
+    <h1 class="hero-title">Instant In-Page Credential Autofill</h1>
+    <p class="hero-subtitle">Context-aware credential detection with verified domain defense and direct macOS Touch ID biometric unlock.</p>
+  </header>
+
+  <!-- Center Mockup Stage -->
+  <div class="stage-container">
+    <div class="browser-window">
+      <!-- Titlebar -->
+      <div class="browser-titlebar">
+        <div class="window-dots">
+          <div class="dot dot-red"></div>
+          <div class="dot dot-yellow"></div>
+          <div class="dot dot-green"></div>
+        </div>
+        <div class="address-bar">
+          <svg class="lock-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+          <span class="url-domain">https://github.com</span><span class="url-path">/login</span>
+          <span class="verified-pill">🛡️ Verified Domain</span>
+        </div>
+        <div class="browser-extensions">
+          <div class="ext-icon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" fill="url(#kloakGrad)" stroke="#7C5CFF" stroke-width="0.8"/><path d="M12 7c1.66 0 3 1.34 3 3v1h1c.55 0 1 .45 1 1v5c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1v-5c0-.55.45-1 1-1h1v-1c0-1.66 1.34-3 3-3zm0 2c-.55 0-1 .45-1 1v1h2v-1c0-.55-.45-1-1-1z" fill="#FFFFFF"/><defs><linearGradient id="kloakGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#6D4AFF"/><stop offset="1" stop-color="#341266"/></linearGradient></defs></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Page Content -->
+      <div class="page-body">
+        <svg class="gh-logo" viewBox="0 0 24 24"><path fill="currentColor" d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <h2 class="gh-heading">Sign in to GitHub</h2>
+
+        <div class="gh-card">
+          <div class="gh-field-group">
+            <label class="gh-label">Username or email address</label>
+            <div class="gh-input-wrap">
+              <input type="text" class="gh-input" value="naetik.arvnd@gmail.com" readonly>
+              <div class="kloak-field-badge">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" fill="url(#kloakGrad)" stroke="#7C5CFF" stroke-width="0.8"/><path d="M12 7c1.66 0 3 1.34 3 3v1h1c.55 0 1 .45 1 1v5c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1v-5c0-.55.45-1 1-1h1v-1c0-1.66 1.34-3 3-3zm0 2c-.55 0-1 .45-1 1v1h2v-1c0-.55-.45-1-1-1z" fill="#FFFFFF"/><defs><linearGradient id="kloakGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#6D4AFF"/><stop offset="1" stop-color="#341266"/></linearGradient></defs></svg>
+              </div>
+
+              <!-- Kloak Bento Popup Overlay -->
+              <div class="kloak-popup">
+                <div class="kloak-header">
+                  <div class="kloak-brand">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" fill="url(#kloakGrad)" stroke="#7C5CFF" stroke-width="0.8"/><path d="M12 7c1.66 0 3 1.34 3 3v1h1c.55 0 1 .45 1 1v5c0 .55-.45 1-1 1H8c-.55 0-1-.45-1-1v-5c0-.55.45-1 1-1h1v-1c0-1.66 1.34-3 3-3zm0 2c-.55 0-1 .45-1 1v1h2v-1c0-.55-.45-1-1-1z" fill="#FFFFFF"/><defs><linearGradient id="kloakGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#6D4AFF"/><stop offset="1" stop-color="#341266"/></linearGradient></defs></svg>
+                    <span>KLOAK AUTOFILL</span>
+                  </div>
+                  <span class="kloak-close-btn">✕</span>
+                </div>
+
+                <div class="kloak-context-bar">
+                  <span>github.com</span>
+                  <span class="kloak-context-tag">✓ Verified Domain</span>
+                </div>
+
+                <div class="kloak-body">
+                  <!-- Bento Account Card -->
+                  <div class="kloak-bento-card">
+                    <div class="kloak-bento-card-top">
+                      <div class="kloak-id-group">
+                        <div class="kloak-avatar">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="#FFFFFF"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+                        </div>
+                        <span class="kloak-bento-title">GitHub</span>
+                      </div>
+                      <button class="kloak-fill-all-btn">
+                        <span>⚡ Fill All</span>
+                      </button>
+                    </div>
+
+                    <div class="kloak-bento-inputs">
+                      <div class="kloak-bento-row">
+                        <span>naetik.arvnd@gmail.com</span>
+                        <span class="copy-icon">📋</span>
+                      </div>
+                      <div class="kloak-bento-row">
+                        <span>••••••••••••••••</span>
+                        <span class="copy-icon">📋</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2FA Live Token Badge -->
+                  <div class="kloak-bento-row" style="background: rgba(41,201,143,0.1); border-color: rgba(41,201,143,0.3);">
+                    <span style="font-size: 10px; color: #29C98F; font-weight: 600;">2FA TOTP TOKEN</span>
+                    <span class="totp-pill-live">
+                      <span>⏱️ 11s</span>
+                      <span>225 271</span>
+                    </span>
+                  </div>
+
+                  <!-- Touch ID Biometric Button -->
+                  <div class="touch-id-banner">
+                    <svg viewBox="0 0 24 24"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>
+                    <span>Unlock Vault with Touch ID</span>
+                  </div>
+                </div>
+
+                <div class="kloak-footer">
+                  <span class="kloak-status-pill"><span class="status-dot"></span> Local Daemon Synced</span>
+                  <span>AES-256-GCM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="gh-field-group">
+            <label class="gh-label">
+              <span>Password</span>
+              <a href="#" style="font-size: 11px; color: #2F81F7; text-decoration: none;">Forgot password?</a>
+            </label>
+            <input type="password" class="gh-input" value="kloak-strong-vault-pwd" style="border-color: #30363D; box-shadow: none;" readonly>
+          </div>
+
+          <button class="gh-btn-submit" type="button">Sign in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

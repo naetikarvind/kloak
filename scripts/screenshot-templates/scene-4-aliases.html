@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Screenshot 4: 2FA & Privacy Aliases</title>
+  <style>
+    
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --bg-base: #16151D;
+  --bg-sidebar: #191823;
+  --bg-active: #28233C;
+  --bg-card: #211F2D;
+  --bg-card-hover: #292738;
+  --bg-input: #111017;
+  --bg-btn: #272535;
+  --bg-btn-hover: #333045;
+  --bg-url: #241D3B;
+  
+  --border: #2C293D;
+  --border-card: #2F2C3F;
+  
+  --accent: #6D4AFF;
+  --accent-hover: #7E5EFF;
+  --accent-muted: rgba(109, 74, 255, 0.16);
+  
+  --color-login: #6D4AFF;
+  --color-alias: #00D2B4;
+  --color-card: #FF884D;
+  --color-note: #4D96FF;
+  
+  --text-main: #FFFFFF;
+  --text-muted: #9E9AA8;
+  --text-subtle: #736F80;
+  --text-url: #B098FF;
+  
+  --success: #29C98F;
+  --warning: #FFB800;
+  --danger: #F54A4A;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  background: #0C0B12;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--text-main);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+/* Background Ambient Lighting */
+.ambient-glow-purple {
+  position: absolute;
+  top: -120px;
+  left: 20%;
+  width: 650px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(109, 74, 255, 0.18) 0%, rgba(109, 74, 255, 0) 70%);
+  filter: blur(60px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ambient-glow-green {
+  position: absolute;
+  bottom: -100px;
+  right: 15%;
+  width: 550px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(41, 201, 143, 0.14) 0%, rgba(41, 201, 143, 0) 70%);
+  filter: blur(70px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.studio-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header Banner (1280x800 layout) */
+.hero-header {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  padding: 30px 40px 14px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(109, 74, 255, 0.18);
+  border: 1px solid rgba(109, 74, 255, 0.4);
+  color: #B8A5FF;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.hero-badge.emerald {
+  background: rgba(41, 201, 143, 0.16);
+  border-color: rgba(41, 201, 143, 0.38);
+  color: #29C98F;
+}
+
+.hero-title {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #FFFFFF;
+  line-height: 1.2;
+}
+
+.hero-subtitle {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  max-width: 780px;
+  line-height: 1.45;
+}
+
+/* Center Stage Container */
+.stage-container {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 40px 28px 40px;
+}
+
+
+    .dual-showcase {
+      display: flex;
+      gap: 24px;
+      width: 960px;
+    }
+
+    .showcase-card {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7);
+    }
+
+    .card-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .card-badge-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .card-head-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #FFFFFF;
+    }
+    .card-head-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* 2FA Card Styling */
+    .totp-box {
+      background: linear-gradient(135deg, rgba(41, 201, 143, 0.12) 0%, rgba(20, 19, 27, 0.98) 100%);
+      border: 1px solid rgba(41, 201, 143, 0.35);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .totp-time-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .totp-digits-large {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 5px;
+      color: #FFFFFF;
+      text-shadow: 0 0 16px rgba(41, 201, 143, 0.4);
+    }
+    .totp-countdown-circle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #29C98F;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 4px 10px;
+      border-radius: 14px;
+      border: 1px solid rgba(41, 201, 143, 0.3);
+    }
+
+    /* Alias Card Styling */
+    .alias-box {
+      background: linear-gradient(135deg, rgba(0, 210, 180, 0.1) 0%, rgba(20, 19, 27, 0.98) 100%);
+      border: 1px solid rgba(0, 210, 180, 0.3);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .alias-email-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #00D2B4;
+    }
+    .alias-forward-text {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    .bullet-feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12px;
+      color: #E2E8F0;
+      line-height: 1.4;
+    }
+    .bullet-icon {
+      color: #29C98F;
+      font-weight: 700;
+    }
+    .bullet-icon.teal { color: #00D2B4; }
+
+    .btn-action-full {
+      height: 38px;
+      border-radius: 8px;
+      border: none;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-action-full.green {
+      background: #29C98F;
+      color: #FFFFFF;
+      box-shadow: 0 2px 10px rgba(41, 201, 143, 0.4);
+    }
+    .btn-action-full.purple {
+      background: var(--accent);
+      color: #FFFFFF;
+      box-shadow: 0 2px 10px rgba(109, 74, 255, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow-purple"></div>
+  <div class="ambient-glow-green"></div>
+  <div class="studio-grid"></div>
+
+  <!-- Header Section -->
+  <header class="hero-header">
+    <div class="hero-badge">
+      <span>🛡️ Integrated 2FA & Privacy Shield</span>
+    </div>
+    <h1 class="hero-title">Live 2FA Authenticator & Disposable Email Aliases</h1>
+    <p class="hero-subtitle">Replace external authenticator apps with auto-copying TOTP codes and keep your personal email address safe with private alias relays.</p>
+  </header>
+
+  <!-- Center Stage Container -->
+  <div class="stage-container">
+    <div class="dual-showcase">
+      <!-- 2FA Card -->
+      <div class="showcase-card">
+        <div class="card-top">
+          <div class="card-badge-icon" style="background: rgba(41, 201, 143, 0.18); color: #29C98F;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          </div>
+          <div>
+            <div class="card-head-title">Built-in 2FA Authenticator</div>
+            <div class="card-head-sub">Standard RFC 6238 TOTP Engine</div>
+          </div>
+        </div>
+
+        <div class="totp-box">
+          <div class="totp-time-row">
+            <span style="font-size: 11px; font-weight: 700; color: #29C98F; text-transform: uppercase;">GitHub Verification</span>
+            <div class="totp-countdown-circle">
+              <span>⏱️ 11s left</span>
+            </div>
+          </div>
+          <div class="totp-digits-large">225 271</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="bullet-feature">
+            <span class="bullet-icon">✓</span>
+            <span>Automatically detects 2FA input fields and autofills code with 1 click.</span>
+          </div>
+          <div class="bullet-feature">
+            <span class="bullet-icon">✓</span>
+            <span>Encrypted locally alongside your login credentials at ~/.kloak/vault.</span>
+          </div>
+          <div class="bullet-feature">
+            <span class="bullet-icon">✓</span>
+            <span>No external mobile app or internet connection required.</span>
+          </div>
+        </div>
+
+        <button class="btn-action-full green">📋 Copy TOTP Code (Instant)</button>
+      </div>
+
+      <!-- Aliases Card -->
+      <div class="showcase-card">
+        <div class="card-top">
+          <div class="card-badge-icon" style="background: rgba(0, 210, 180, 0.18); color: #00D2B4;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.88-11.71c-.36-.45-.91-.7-1.5-.7-1.25 0-2.38 1.05-2.38 2.41 0 1.34 1.13 2.41 2.38 2.41.59 0 1.14-.25 1.5-.7v.58c0 .88-.72 1.6-1.6 1.6-.74 0-1.39-.5-1.55-1.21l-1.36.32c.28 1.25 1.41 2.09 2.91 2.09 1.65 0 2.8-1.15 2.8-2.8V9.5h-1.2v.79zm-1.5 2.82c-.66 0-1.2-.54-1.2-1.21 0-.66.54-1.2 1.2-1.2.66 0 1.2.54 1.2 1.2 0 .67-.54 1.21-1.2 1.21z"/></svg>
+          </div>
+          <div>
+            <div class="card-head-title">Disposable Email Aliases</div>
+            <div class="card-head-sub">Keep your real email address hidden</div>
+          </div>
+        </div>
+
+        <div class="alias-box">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 10px; font-weight: 700; color: #00D2B4; text-transform: uppercase;">GENERATED ALIAS RELAY</span>
+            <span style="font-size: 9.5px; background: rgba(0,210,180,0.18); color: #00D2B4; padding: 1px 6px; border-radius: 4px; font-weight: 700;">ACTIVE</span>
+          </div>
+          <div class="alias-email-text">github.pr7x2@kloak.alias</div>
+          <div class="alias-forward-text">Forwarding to: <strong>security@proton.me</strong></div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <div class="bullet-feature">
+            <span class="bullet-icon teal">✓</span>
+            <span>Blocks trackers, spammers, and marketing profiling before reaching your inbox.</span>
+          </div>
+          <div class="bullet-feature">
+            <span class="bullet-icon teal">✓</span>
+            <span>Disable or regenerate aliases instantly if a service gets compromised.</span>
+          </div>
+          <div class="bullet-feature">
+            <span class="bullet-icon teal">✓</span>
+            <span>1-Click generate and autofill into web registration forms.</span>
+          </div>
+        </div>
+
+        <button class="btn-action-full purple">➕ Create Disposable Alias</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
