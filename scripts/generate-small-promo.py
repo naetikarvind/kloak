@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 """
 generate_small_promo.py
-Generates the HTML template and Swift renderer for the Chrome Web Store small promo tile (440x280).
+Generates the HTML template and Swift renderer for the Chrome Web Store small promo tile (440x280)
+using the NEW official Kloak Liquid Glass App Icon (kloak-logo.png / AppIcon.icns).
 """
 
 import os
+import base64
 
 TEMPLATES_DIR = "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/scripts/screenshot-templates"
 os.makedirs(TEMPLATES_DIR, exist_ok=True)
 
-# Read the official SVG logo
-logo_svg_path = "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/packages/website/public/kloak-logo.svg"
-with open(logo_svg_path, "r") as f:
-    logo_svg = f.read()
+# Read the NEW official Kloak App Icon PNG (1024x1024)
+logo_png_path = "/Users/naetikarvind/.gemini/antigravity/scratch/kloak/packages/website/public/kloak-logo.png"
+with open(logo_png_path, "rb") as f:
+    logo_b64 = base64.b64encode(f.read()).decode('utf-8')
 
-# Make the SVG fit nicely by wrapping it or adjusting its width/height
 small_promo_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,7 +30,7 @@ small_promo_html = f"""<!DOCTYPE html>
       width: 440px;
       height: 280px;
       overflow: hidden;
-      background: #0D0C15;
+      background: #0C0B14;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       position: relative;
       display: flex;
@@ -42,12 +43,12 @@ small_promo_html = f"""<!DOCTYPE html>
     /* Ambient Lighting */
     .ambient-glow-purple {{
       position: absolute;
-      top: -40px;
+      top: -30px;
       left: 50%;
       transform: translateX(-50%);
-      width: 320px;
+      width: 340px;
       height: 220px;
-      background: radial-gradient(circle, rgba(109, 74, 255, 0.35) 0%, rgba(109, 74, 255, 0) 70%);
+      background: radial-gradient(circle, rgba(123, 57, 253, 0.4) 0%, rgba(109, 74, 255, 0) 70%);
       filter: blur(40px);
       pointer-events: none;
       z-index: 1;
@@ -55,11 +56,11 @@ small_promo_html = f"""<!DOCTYPE html>
 
     .ambient-glow-green {{
       position: absolute;
-      bottom: -30px;
-      right: 15%;
+      bottom: -40px;
+      right: 12%;
       width: 220px;
       height: 160px;
-      background: radial-gradient(circle, rgba(41, 201, 143, 0.2) 0%, rgba(41, 201, 143, 0) 70%);
+      background: radial-gradient(circle, rgba(41, 201, 143, 0.22) 0%, rgba(41, 201, 143, 0) 70%);
       filter: blur(40px);
       pointer-events: none;
       z-index: 1;
@@ -87,23 +88,28 @@ small_promo_html = f"""<!DOCTYPE html>
       padding: 0 20px;
     }}
 
+    /* NEW OFFICIAL KLOAK LOGO CONTAINER */
     .logo-box {{
-      width: 76px;
-      height: 76px;
-      filter: drop-shadow(0 10px 24px rgba(109, 74, 255, 0.55));
-      margin-bottom: 8px;
+      width: 88px;
+      height: 88px;
+      filter: drop-shadow(0 12px 28px rgba(109, 74, 255, 0.65));
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }}
-    .logo-box svg {{
+    .logo-box img {{
       width: 100%;
       height: 100%;
+      object-fit: contain;
     }}
 
     .brand-title {{
       font-size: 26px;
       font-weight: 800;
-      letter-spacing: 2.2px;
+      letter-spacing: 2.5px;
       color: #FFFFFF;
-      text-shadow: 0 2px 12px rgba(0,0,0,0.6);
+      text-shadow: 0 2px 14px rgba(0,0,0,0.7);
       line-height: 1.15;
     }}
 
@@ -175,7 +181,7 @@ small_promo_html = f"""<!DOCTYPE html>
 
   <div class="tile-container">
     <div class="logo-box">
-      {logo_svg}
+      <img src="data:image/png;base64,{logo_b64}" alt="Kloak App Icon">
     </div>
 
     <h1 class="brand-title">K L O A K</h1>
@@ -204,4 +210,4 @@ small_promo_html = f"""<!DOCTYPE html>
 html_path = f"{TEMPLATES_DIR}/small-promo-440x280.html"
 with open(html_path, "w") as f:
     f.write(small_promo_html)
-print(f"✓ Created {html_path}")
+print(f"✓ Created {html_path} with the NEW official Kloak logo!")
