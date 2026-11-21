@@ -35,7 +35,7 @@ export const Hero: React.FC = () => {
         <div style={{ display: 'inline-flex', marginBottom: '24px' }}>
           <div className="badge-pill">
             <span className="badge-dot" />
-            <ShinyText text="v1.2.0 Live" className="badge-shiny" style={{ fontWeight: 700 }} />
+            <ShinyText text="v1.2.1 Live" className="badge-shiny" style={{ fontWeight: 700 }} />
             <span style={{ opacity: 0.5 }}>•</span>
             <span>macOS Universal (.dmg) &amp; Chrome Web Store</span>
             <Sparkles size={14} color="#f59e0b" />

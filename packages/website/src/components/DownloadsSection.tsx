@@ -87,7 +87,7 @@ export const DownloadsSection: React.FC = () => {
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Kloak for macOS</h3>
                   <p style={{ fontSize: '13px', color: '#60a5fa', fontWeight: 600 }}>
-                    <ShinyText text="v1.2.0 Universal DMG (5.8 MB)" speed={3.5} />
+                    <ShinyText text="v1.2.1 Universal DMG (5.8 MB)" speed={3.5} />
                   </p>
                 </div>
               </div>
@@ -137,7 +137,7 @@ export const DownloadsSection: React.FC = () => {
               </MagnetButton>
 
               <a
-                href="https://github.com/naetikarvind/kloak/releases/tag/v1.2.0"
+                href="https://github.com/naetikarvind/kloak/releases/tag/v1.2.1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="download-card-sublink"
@@ -204,7 +204,7 @@ export const DownloadsSection: React.FC = () => {
                 <div>
                   <h3 style={{ fontSize: '20px', fontWeight: 800 }}>Chrome Extension</h3>
                   <p style={{ fontSize: '13px', color: '#34d399', fontWeight: 600 }}>
-                    <ShinyText text="v1.2.0 Web Store Official" speed={3.5} />
+                    <ShinyText text="v1.2.1 Web Store Official" speed={3.5} />
                   </p>
                 </div>
               </div>
@@ -252,7 +252,7 @@ export const DownloadsSection: React.FC = () => {
               </MagnetButton>
 
               <a
-                href="https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.2.0.zip"
+                href="https://github.com/naetikarvind/kloak/releases/latest/download/kloak-browser-extension-v1.2.1.zip"
                 className="download-card-sublink"
               >
                 <span>Or download .zip package</span>

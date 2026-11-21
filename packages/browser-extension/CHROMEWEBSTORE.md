@@ -3,7 +3,7 @@
 ## Store Metadata
 
 - **Name**: Kloak Password Manager
-- **Version**: 1.2.0
+- **Version**: 1.2.1
 - **Category**: Productivity / Privacy & Security
 - **Short Description** (128 / 132 chars max):
   Local-first password manager with instant autofill, built-in 2FA authenticator, phishing protection, and desktop vault sync.
@@ -62,8 +62,14 @@ Smart domain recognition links related subdomains and Single Sign-On (SSO) servi
 The auto-lock timer dynamically resets upon active typing and user interaction, ensuring your vault never unexpectedly locks while in use, while strictly clearing cryptographic keys from memory when locked.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-WHAT'S NEW IN VERSION 1.2.0 (RELEASE NOTES)
+WHAT'S NEW IN VERSION 1.2.1 (RELEASE NOTES)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+• REAL-TIME BI-DIRECTIONAL LOCK SYNCHRONIZATION
+Seamless desktop-browser vault state coordination. Locking your vault in the macOS desktop app automatically locks the Chrome extension in real time (clearing plaintext credentials from memory and resetting tab badges). Locking the extension from the toolbar popup or side panel immediately locks the desktop app.
+
+• PRIVATE NETWORK ACCESS (PNA) HARDENING
+Full compliance with Chrome's Private Network Access security standard for ultra-fast direct local communication between the browser extension and the native macOS app daemon.
 
 • DIRECT TOUCH ID BIOMETRIC UNLOCK
 Unlock your vault directly from the extension toolbar popup or the inline autofill badge using Touch ID on macOS—fast, secure, and passwordless.
@@ -157,12 +163,14 @@ Google Chrome Web Store User Data Policy mandates that the privacy policy explic
 
 ---
 
-## Version 1.2.0 Submission — Notes for Reviewer
+## Version 1.2.1 Submission — Notes for Reviewer
 
 When clicking **Submit for review** in the Chrome Web Store Developer Console, paste the following into the **Notes for the reviewer** text area:
 
 ```text
-Release Notes for Version 1.2.0:
+Release Notes for Version 1.2.1:
+- Real-Time Bi-Directional Lock Sync: Synchronizes vault lock/unlock states between the macOS desktop app and the Chrome extension in real time, securely wiping in-memory credentials upon locking.
+- Private Network Access (PNA) Support: Added standard PNA CORS headers for reliable local communication between browser extension and local desktop bridge.
 - Biometric Touch ID Unlock: Enables direct local biometric vault unlocking from the extension popup and autofill overlay on macOS via native messaging.
 - Context-Aware Security Keys: Hardware security key (FIDO2 / YubiKey) prompt is only displayed when an enrolled key is configured.
 - UI Transitions & Fluidity: Added smooth accordion vertical collapse and spring FLIP transitions for list filtering.

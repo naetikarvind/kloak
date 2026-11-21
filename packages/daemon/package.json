@@ -1,6 +1,6 @@
 {
   "name": "@kloak/daemon",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Kloak Daemon — IPC Socket Server, Native Messaging Host & CLI",
   "main": "dist/index.js",
   "bin": {
