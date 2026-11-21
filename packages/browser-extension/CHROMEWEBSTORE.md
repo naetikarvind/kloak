@@ -165,19 +165,83 @@ Google Chrome Web Store User Data Policy mandates that the privacy policy explic
 
 ## Version 1.2.1 Submission — Notes for Reviewer
 
-When clicking **Submit for review** in the Chrome Web Store Developer Console, paste the following into the **Notes for the reviewer** text area:
+When clicking **Submit for review** in the Chrome Web Store Developer Console, paste the following text into the **Notes for the reviewer** text area:
 
 ```text
-Release Notes for Version 1.2.1:
+Dear Chrome Web Store Review Team,
+
+Thank you for reviewing Kloak Password Manager (Version 1.2.1).
+
+Below is the complete testing guide, verification steps, permission justifications, and release highlights for this update.
+
+============================================================
+1. TESTING GUIDE (NO ACCOUNT OR SIGNUP REQUIRED)
+============================================================
+Kloak is 100% local-first and zero-knowledge. You do not need an account, email, cloud registration, or payment to test the extension.
+
+A. Initial Setup & Vault Unlock:
+1. Click the Kloak extension icon in the Chrome toolbar.
+2. If opening for the first time, set a test Master Password (e.g., "KloakTest2026!").
+3. The vault will open in unlocked state showing the main dashboard with Logins, Cards, and Secure Notes tabs.
+
+B. Testing Credential Creation & Autofill:
+1. Click the "+" button to add a new login:
+   - Title: Example Test
+   - Website / Domain: example.com
+   - Username: testuser@example.com
+   - Password: Click the key icon to generate a strong password (or enter "SecretPassword123!").
+   - Click "Save".
+2. Navigate to https://example.com in any Chrome tab.
+3. Observe the inline Kloak shield/keyhole badge inside the login input fields.
+4. Click the badge or select the suggested login to trigger 1-click autofill.
+
+C. Testing Bi-Directional Lock & Memory Wipe:
+1. Open the Kloak toolbar popup or side panel.
+2. Click the Lock icon in the upper-right corner.
+3. The extension immediately wipes all decrypted credential secrets from active memory and returns to the locked master password screen.
+4. Entering your master password (or using macOS Touch ID if paired with companion app) instantly unlocks the vault again.
+
+============================================================
+2. OPTIONAL DESKTOP COMPANION APP INTEGRATION
+============================================================
+Kloak also supports an optional native companion app for macOS:
+- Download URL: https://github.com/naetikarvind/kloak/releases/latest/download/Kloak-macOS.dmg
+- Communication: Extension communicates strictly over standard Chrome nativeMessaging (com.kloak.daemon) and localhost loopback (127.0.0.1:24127).
+- Compliance: Complies with Chrome's Private Network Access (PNA) specifications with standard preflight CORS headers.
+- Zero Cloud: 100% local IPC. Zero internet servers, zero data exfiltration, zero cloud telemetry.
+
+============================================================
+3. PERMISSION JUSTIFICATIONS (SINGLE PURPOSE POLICY)
+============================================================
+Kloak strictly adheres to the Chrome Web Store Single Purpose Policy:
+- "storage": Saves user local configuration and encrypted vault settings in chrome.storage.local.
+- "tabs" & "activeTab": Inspects the domain of the active tab to query matching vault credentials for autofill, and to perform phishing/homograph domain defense.
+- "clipboardWrite": Allows one-click copying of passwords, usernames, and 2FA TOTP codes directly from the popup and side panel.
+- "sidePanel": Renders the Chrome Side Panel interface for side-by-side vault searching while browsing.
+- "nativeMessaging": Enables zero-latency IPC with the local desktop daemon (com.kloak.daemon) for Touch ID biometric unlock and vault synchronization.
+- Host Permissions ("<all_urls>"): Required for content scripts (dist/content.js) to detect input fields and render the inline autofill badge on web pages.
+
+============================================================
+4. WHAT'S NEW IN VERSION 1.2.1
+============================================================
 - Real-Time Bi-Directional Lock Sync: Synchronizes vault lock/unlock states between the macOS desktop app and the Chrome extension in real time, securely wiping in-memory credentials upon locking.
-- Private Network Access (PNA) Support: Added standard PNA CORS headers for reliable local communication between browser extension and local desktop bridge.
+- Private Network Access (PNA) Support: Added standard PNA CORS headers (Access-Control-Allow-Private-Network) for reliable local communication between browser extension and local desktop bridge.
 - Biometric Touch ID Unlock: Enables direct local biometric vault unlocking from the extension popup and autofill overlay on macOS via native messaging.
 - Context-Aware Security Keys: Hardware security key (FIDO2 / YubiKey) prompt is only displayed when an enrolled key is configured.
 - UI Transitions & Fluidity: Added smooth accordion vertical collapse and spring FLIP transitions for list filtering.
-- Secure Note Import: Text and markdown files can now be imported and stored as encrypted Secure Notes.
-- Instant Autofill Refresh: Autofill overlay automatically updates upon vault unlock with discovered credentials.
-- Auto-Lock Hardening: Timeout counter reliably resets upon active user interaction.
-- Permissions & Privacy: Zero new permissions added. All data handling and encryption remain 100% on-device and local-first with zero telemetry.
+- Dynamic Auto-Lock Resets: Auto-lock timer dynamically resets on active typing to avoid premature locks during active credential use.
+- Secure Notes Importer: Added drag-and-drop import support for .txt, .md, and .note files into encrypted Secure Notes.
+
+============================================================
+5. PRIVACY & COMPLIANCE CONFIRMATION
+============================================================
+- Privacy Policy: https://naetikarvind.github.io/kloak/privacy.html
+- No external analytics, tracking, advertising, or remote code execution.
+- All dependencies bundled statically in dist/ via esbuild.
+
+If you have any questions or require additional details, please contact:
+Developer Email: privacy@kloak.app / arvind@kloak.app
+GitHub Repository: https://github.com/naetikarvind/kloak
 ```
 
 ---
