@@ -1179,17 +1179,36 @@
       if (Array.isArray(itemsRes)) {
         cachedItems = itemsRes;
       }
+    } else {
+      cachedItems = [];
     }
     if (previousState !== isVaultUnlocked) {
+      if (!isVaultUnlocked) {
+        try {
+          const tabs = await chrome.tabs.query({});
+          for (const tab of tabs) {
+            if (tab.id) {
+              chrome.action.setBadgeText({ tabId: tab.id, text: "" }).catch(() => {
+              });
+            }
+          }
+        } catch {
+        }
+      }
       broadcastVaultState(isVaultUnlocked);
     }
   }
   refreshVaultState();
+  setInterval(async () => {
+    await refreshVaultState();
+  }, 2500);
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status !== "complete" || !tab.url) return;
+    await refreshVaultState();
     await updateBadgeForTab(tabId, tab.url);
   });
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    await refreshVaultState();
     const tab = await chrome.tabs.get(activeInfo.tabId);
     if (tab?.url) {
       await updateBadgeForTab(tab.id, tab.url);
@@ -1590,16 +1609,30 @@
         case "LOCK_VAULT": {
           try {
             await sendNativeRequest("vault.lock");
-            isVaultUnlocked = false;
-            cachedItems = [];
-            if (lastActiveTabId) {
-              await chrome.action.setBadgeText({ tabId: lastActiveTabId, text: "" });
-            }
-            broadcastVaultState(false);
-            sendResponse({ success: true, isUnlocked: false });
-          } catch (err) {
-            sendResponse({ success: false, error: err.message || "Lock failed" });
+          } catch {
           }
+          try {
+            await fetch("http://127.0.0.1:53152/rpc", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method: "vault.lock" })
+            });
+          } catch {
+          }
+          isVaultUnlocked = false;
+          cachedItems = [];
+          try {
+            const tabs = await chrome.tabs.query({});
+            for (const tab of tabs) {
+              if (tab.id) {
+                chrome.action.setBadgeText({ tabId: tab.id, text: "" }).catch(() => {
+                });
+              }
+            }
+          } catch {
+          }
+          broadcastVaultState(false);
+          sendResponse({ success: true, isUnlocked: false });
           break;
         }
         case "AUTOFILL_CREDENTIALS": {

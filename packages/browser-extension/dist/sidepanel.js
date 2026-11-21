@@ -2424,6 +2424,16 @@
       cachedSideItems = [];
       showLocked();
     });
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === "VAULT_STATE_CHANGED") {
+        if (!message.isUnlocked) {
+          cachedSideItems = [];
+          showLocked();
+        } else {
+          loadVault();
+        }
+      }
+    });
     searchInput?.addEventListener("input", () => {
       const q = searchInput.value.toLowerCase().trim();
       if (!q) {

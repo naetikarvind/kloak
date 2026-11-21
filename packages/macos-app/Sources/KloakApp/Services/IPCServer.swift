@@ -5,6 +5,7 @@ import Combine
 // MARK: - Notification Names
 extension Notification.Name {
     static let kloakBrowserUrlChanged = Notification.Name("app.kloak.browserUrlChanged")
+    static let kloakVaultLockStateChanged = Notification.Name("app.kloak.vaultLockStateChanged")
 }
 
 // MARK: - eTLD+1 Helper
@@ -121,8 +122,19 @@ public final class IPCServer: ObservableObject {
 
     public init() {}
 
+    private func terminateOrphanedDaemons() {
+        let task = Process()
+        task.launchPath = "/bin/sh"
+        task.arguments = ["-c", "pkill -f 'daemon/dist/index.js' 2>/dev/null || true"]
+        try? task.run()
+        task.waitUntilExit()
+    }
+
     public func start(port: UInt16 = IPCServer.defaultPort) {
         guard tcpListener == nil else { return }
+
+        // Clean up any rogue/orphaned node daemons holding port 53152 on macOS
+        terminateOrphanedDaemons()
 
         do {
             let nwPort = NWEndpoint.Port(rawValue: port) ?? NWEndpoint.Port(integerLiteral: IPCServer.defaultPort)
@@ -141,7 +153,12 @@ public final class IPCServer: ObservableObject {
                         print("[Kloak IPC] TCP Server listening on 127.0.0.1:\(port)")
                     case .failed(let err):
                         self.isRunning = false
-                        print("[Kloak IPC] TCP Server failed: \(err)")
+                        print("[Kloak IPC] TCP Server failed: \(err). Retrying in 2 seconds...")
+                        self.tcpListener?.cancel()
+                        self.tcpListener = nil
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                            self?.start(port: port)
+                        }
                     case .cancelled:
                         self.isRunning = false
                     default:
@@ -195,7 +212,7 @@ public final class IPCServer: ObservableObject {
                 // Check for HTTP requests (OPTIONS / POST / GET)
                 if let str = String(data: currentBuffer, encoding: .utf8), (str.hasPrefix("OPTIONS ") || str.hasPrefix("POST ") || str.hasPrefix("GET ")) {
                     if str.hasPrefix("OPTIONS ") {
-                        let httpResp = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: 0\r\n\r\n"
+                        let httpResp = "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: 0\r\n\r\n"
                         if let respData = httpResp.data(using: .utf8) {
                             connection.send(content: respData, completion: .contentProcessed({ _ in }))
                         }
@@ -787,7 +804,7 @@ public final class IPCServer: ObservableObject {
         let resp = JsonRpcResponse(jsonrpc: "2.0", id: id, result: result, error: nil)
         if let data = try? JSONEncoder().encode(resp) {
             if isHttp {
-                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
+                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
                 var fullData = header.data(using: .utf8) ?? Data()
                 fullData.append(data)
                 connection.send(content: fullData, completion: .contentProcessed({ _ in
@@ -810,7 +827,7 @@ public final class IPCServer: ObservableObject {
         )
         if let data = try? JSONEncoder().encode(resp) {
             if isHttp {
-                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
+                let header = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: POST, GET, OPTIONS\r\nAccess-Control-Allow-Headers: *\r\nAccess-Control-Allow-Private-Network: true\r\nContent-Length: \(data.count)\r\nConnection: close\r\n\r\n"
                 var fullData = header.data(using: .utf8) ?? Data()
                 fullData.append(data)
                 connection.send(content: fullData, completion: .contentProcessed({ _ in
@@ -820,6 +837,108 @@ public final class IPCServer: ObservableObject {
                 var fullData = data
                 fullData.append(UInt8(ascii: "\n"))
                 connection.send(content: fullData, completion: .contentProcessed({ _ in }))
+            }
+        }
+    }
+
+    // MARK: - Native Messaging Host Auto-Registration
+    public static func installNativeMessagingManifests() {
+        let fileManager = FileManager.default
+        let home = fileManager.homeDirectoryForCurrentUser
+        let kloakDir = home.appendingPathComponent(".kloak")
+        try? fileManager.createDirectory(at: kloakDir, withIntermediateDirectories: true)
+
+        let bridgeScriptURL = kloakDir.appendingPathComponent("kloak-native-bridge.sh")
+        let pythonBridge = """
+        #!/usr/bin/env python3
+        import sys, socket, struct
+
+        PORT = 53152
+        HOST = '127.0.0.1'
+
+        def main():
+            while True:
+                header = sys.stdin.buffer.read(4)
+                if not header or len(header) < 4:
+                    break
+                length = struct.unpack('<I', header)[0]
+                raw_msg = sys.stdin.buffer.read(length)
+                if not raw_msg or len(raw_msg) < length:
+                    break
+
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(5.0)
+                    s.connect((HOST, PORT))
+                    s.sendall(raw_msg + b'\\n')
+
+                    resp_data = b''
+                    while True:
+                        chunk = s.recv(4096)
+                        if not chunk:
+                            break
+                        resp_data += chunk
+                        if b'\\n' in resp_data:
+                            break
+                    s.close()
+
+                    resp_msg = resp_data.strip()
+                    if resp_msg:
+                        out_header = struct.pack('<I', len(resp_msg))
+                        sys.stdout.buffer.write(out_header + resp_msg)
+                        sys.stdout.buffer.flush()
+                except Exception as e:
+                    err_json = f'{{"jsonrpc":"2.0","error":{{"code":-32000,"message":"Kloak desktop app not reachable: {str(e)}"}}}}'.encode('utf-8')
+                    out_header = struct.pack('<I', len(err_json))
+                    sys.stdout.buffer.write(out_header + err_json)
+                    sys.stdout.buffer.flush()
+
+        if __name__ == '__main__':
+            main()
+        """
+
+        try? pythonBridge.write(to: bridgeScriptURL, atomically: true, encoding: .utf8)
+        try? fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bridgeScriptURL.path)
+
+        let allowedOrigins = [
+            "chrome-extension://gikdgameggdmlfnchmeejfmhdgfbmfcl/",
+            "chrome-extension://hajgkgmajepndkhjhcgjenjnfojlphod/"
+        ]
+
+        let chromeManifest: [String: Any] = [
+            "name": "app.kloak.native",
+            "description": "Kloak Password Manager Native Messaging Host",
+            "path": bridgeScriptURL.path,
+            "type": "stdio",
+            "allowed_origins": allowedOrigins
+        ]
+
+        let firefoxManifest: [String: Any] = [
+            "name": "app.kloak.native",
+            "description": "Kloak Password Manager Native Messaging Host",
+            "path": bridgeScriptURL.path,
+            "type": "stdio",
+            "allowed_extensions": ["kloak@passwords.app", "kloak-extension@local"]
+        ]
+
+        let browserDirs: [(path: String, isFirefox: Bool)] = [
+            ("Library/Application Support/Google/Chrome/NativeMessagingHosts", false),
+            ("Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts", false),
+            ("Library/Application Support/Microsoft Edge/NativeMessagingHosts", false),
+            ("Library/Application Support/Arc/User Data/NativeMessagingHosts", false),
+            ("Library/Application Support/com.operasoftware.Opera/NativeMessagingHosts", false),
+            ("Library/Application Support/com.operasoftware.OperaGX/NativeMessagingHosts", false),
+            ("Library/Application Support/Chromium/NativeMessagingHosts", false),
+            ("Library/Application Support/Mozilla/NativeMessagingHosts", true)
+        ]
+
+        for item in browserDirs {
+            let targetDir = home.appendingPathComponent(item.path)
+            try? fileManager.createDirectory(at: targetDir, withIntermediateDirectories: true)
+            let manifestURL = targetDir.appendingPathComponent("app.kloak.native.json")
+            let manifestDict = item.isFirefox ? firefoxManifest : chromeManifest
+            if let jsonData = try? JSONSerialization.data(withJSONObject: manifestDict, options: [.prettyPrinted]) {
+                try? jsonData.write(to: manifestURL)
             }
         }
     }

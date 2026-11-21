@@ -4345,6 +4345,21 @@ ${notes}`;
         showUnlockView();
       });
     }
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message.type === "VAULT_STATE_CHANGED") {
+        if (!message.isUnlocked) {
+          allItems = [];
+          activeItem = null;
+          const sidebarList = document.getElementById("sidebar-list");
+          if (sidebarList) sidebarList.innerHTML = "";
+          const detailPane = document.getElementById("detail-pane");
+          if (detailPane) detailPane.innerHTML = '<div class="detail-empty">Vault locked</div>';
+          showUnlockView();
+        } else {
+          loadLogins();
+        }
+      }
+    });
   }
   async function loadLogins(retryCount = 0) {
     const direct = await fetchVaultItemsDirect();

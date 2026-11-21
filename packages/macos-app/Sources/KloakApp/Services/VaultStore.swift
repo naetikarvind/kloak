@@ -371,6 +371,7 @@ public final class VaultStore: ObservableObject {
             }
 
             startAutoLockTimer()
+            NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": true])
             return true
         } catch {
             self.lastError = "Failed to unlock vault: \(error.localizedDescription)"
@@ -482,6 +483,7 @@ public final class VaultStore: ObservableObject {
                         }
 
                         self.startAutoLockTimer()
+                        NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": true])
                         continuation.resume(returning: true)
                     } catch {
                         self.lastError = "Decryption error"
@@ -498,6 +500,7 @@ public final class VaultStore: ObservableObject {
         self.vaultKey = nil
         self.isUnlocked = false
         stopAutoLockTimer()
+        NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": false])
     }
 
     // MARK: - Persistence (Save Vault)

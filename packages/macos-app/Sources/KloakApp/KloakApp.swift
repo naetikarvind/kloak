@@ -109,6 +109,7 @@ public struct KloakApp: App {
     public init() {
         NSWindow.allowsAutomaticWindowTabbing = false
         IPCServer.shared.start()
+        IPCServer.installNativeMessagingManifests()
     }
 
     public var body: some Scene {

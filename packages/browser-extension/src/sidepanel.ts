@@ -492,6 +492,18 @@ document.addEventListener('DOMContentLoaded', () => {
     showLocked();
   });
 
+  // Real-time synchronization: listen for vault lock/unlock events broadcast by background worker
+  chrome.runtime.onMessage.addListener((message) => {
+    if (message.type === 'VAULT_STATE_CHANGED') {
+      if (!message.isUnlocked) {
+        cachedSideItems = [];
+        showLocked();
+      } else {
+        loadVault();
+      }
+    }
+  });
+
   // Search filter
   searchInput?.addEventListener('input', () => {
     const q = searchInput.value.toLowerCase().trim();

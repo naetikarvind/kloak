@@ -127,6 +127,8 @@ class IpcSocketServer {
                     'Access-Control-Allow-Origin: *\r\n' +
                     'Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n' +
                     'Access-Control-Allow-Headers: *\r\n' +
+                    'Access-Control-Allow-Private-Network: true\r\n' +
+                    'Content-Length: 0\r\n' +
                     'Connection: close\r\n\r\n';
                 socket.write(corsResponse, () => socket.end());
                 buffer = '';
@@ -154,6 +156,7 @@ class IpcSocketServer {
                         'Access-Control-Allow-Origin: *\r\n' +
                         'Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n' +
                         'Access-Control-Allow-Headers: *\r\n' +
+                        'Access-Control-Allow-Private-Network: true\r\n' +
                         `Content-Length: ${Buffer.byteLength(respStr, 'utf-8')}\r\n` +
                         'Connection: close\r\n\r\n' +
                         respStr;
@@ -165,6 +168,7 @@ class IpcSocketServer {
                     const httpResp = 'HTTP/1.1 400 Bad Request\r\n' +
                         'Content-Type: application/json\r\n' +
                         'Access-Control-Allow-Origin: *\r\n' +
+                        'Access-Control-Allow-Private-Network: true\r\n' +
                         `Content-Length: ${Buffer.byteLength(errStr, 'utf-8')}\r\n` +
                         'Connection: close\r\n\r\n' +
                         errStr;

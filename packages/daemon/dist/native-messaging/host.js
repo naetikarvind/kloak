@@ -113,7 +113,7 @@ class NativeMessagingHost {
             const client = new net.Socket();
             let responseData = '';
             let isResolved = false;
-            client.setTimeout(250);
+            client.setTimeout(2000);
             client.connect(IPC_PORT, '127.0.0.1', () => {
                 client.write(JSON.stringify(request) + '\n');
             });
@@ -149,6 +149,18 @@ class NativeMessagingHost {
         });
     }
     spawnBackgroundDaemon() {
+        // On macOS, if Kloak.app is installed or running, DO NOT spawn a background node daemon!
+        // Spawning a background node daemon creates a rogue process that hijacks port 53152.
+        if (process.platform === 'darwin') {
+            const macAppPath = '/Applications/Kloak.app';
+            if (fs.existsSync(macAppPath)) {
+                try {
+                    childProcess.spawn('open', ['-g', macAppPath], { detached: true, stdio: 'ignore' }).unref();
+                }
+                catch { }
+                return;
+            }
+        }
         try {
             const daemonScript = path.resolve(__dirname, '../index.js');
             if (fs.existsSync(daemonScript)) {
