@@ -4573,12 +4573,9 @@ ${notes}`;
   }
   function isRecoveryCodeNote(item) {
     if (!item) return false;
-    if (item.type !== "secure_note" && item.type !== "note") {
-      if (item.type && item.type !== "login") return false;
-      if (!item.notes || item.password) return false;
-    }
     const tags = item.tags || [];
     if (tags.some((t) => /recovery/i.test(t))) return true;
+    if (Array.isArray(item.usedRecoveryCodes) && item.usedRecoveryCodes.length > 0) return true;
     const lowerTitle = (item.title || "").toLowerCase();
     if (lowerTitle.includes("recovery code") || lowerTitle.includes("recovery codes") || lowerTitle.includes("backup code") || lowerTitle.includes("backup codes") || lowerTitle.includes("recovery key") || lowerTitle.includes("emergency kit") || lowerTitle.includes("2fa backup") || lowerTitle.includes("recovery")) {
       return true;
@@ -4598,10 +4595,17 @@ ${notes}`;
   }
   function getRecoveryCodesList(noteItem) {
     if (!noteItem || !noteItem.notes) return [];
-    return noteItem.notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//") && !l.toLowerCase().startsWith("note:"));
+    const lines = noteItem.notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//") && !l.toLowerCase().startsWith("note:"));
+    const codeRegex = /^[a-zA-Z0-9]{3,}(-[a-zA-Z0-9]{2,})*$/;
+    const codeLines = lines.filter((l) => codeRegex.test(l.replace(/\s+/g, "")));
+    return codeLines.length > 0 ? codeLines : lines;
   }
   function findAssociatedRecoveryNote(item, items) {
-    if (!item || !items || items.length === 0) return null;
+    if (!item) return null;
+    if (getRecoveryCodesList(item).length > 0 && (isRecoveryCodeNote(item) || item.tags && item.tags.some((t) => /recovery/i.test(t)))) {
+      return item;
+    }
+    if (!items || items.length === 0) return null;
     const brandTerms = [];
     if (item.title) {
       const cleanTitle = item.title.replace(/\([^)]*\)/g, "").trim();
@@ -4716,13 +4720,14 @@ ${notes}`;
       </div>
     `;
       bentoGrid.appendChild(totpCell);
-      const matchedRecoveryNote = findAssociatedRecoveryNote(item, allItems);
+      const matchedRecoveryNote2 = findAssociatedRecoveryNote(item, allItems);
       const recoveryCell = document.createElement("div");
       recoveryCell.className = "bento-cell bento-recovery-cell";
-      if (matchedRecoveryNote) {
-        const codes = getRecoveryCodesList(matchedRecoveryNote);
+      if (matchedRecoveryNote2) {
+        const codes = getRecoveryCodesList(matchedRecoveryNote2);
+        const isEmbedded = matchedRecoveryNote2.id === item.id;
         recoveryCell.style.cursor = "pointer";
-        recoveryCell.title = `View associated note: ${matchedRecoveryNote.title || "Recovery Codes"}`;
+        recoveryCell.title = isEmbedded ? `Contains ${codes.length} embedded recovery codes` : `View associated note: ${matchedRecoveryNote2.title || "Recovery Codes"}`;
         recoveryCell.innerHTML = `
         <div class="bento-cell-header">
           <div style="display: flex; align-items: center; gap: 5px;">
@@ -4734,15 +4739,22 @@ ${notes}`;
           </span>
         </div>
         <div style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          ${escHtml(matchedRecoveryNote.title || "Backup Codes")}
+          ${escHtml(isEmbedded ? "Embedded in Credential" : matchedRecoveryNote2.title || "Backup Codes")}
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
-          <span style="font-size: 9.5px; color: #10B981; font-weight: 600;">\u2713 Linked Kit</span>
-          <button class="btn-pill" id="btn-jump-recovery" style="height: 22px; padding: 0 8px; font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">View</button>
+          <span style="font-size: 9.5px; color: #10B981; font-weight: 600;">\u2713 ${isEmbedded ? "Combined" : "Linked Kit"}</span>
+          <button class="btn-pill" id="btn-jump-recovery" style="height: 22px; padding: 0 8px; font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">${isEmbedded ? "Codes" : "View"}</button>
         </div>
       `;
         recoveryCell.addEventListener("click", () => {
-          selectItem(matchedRecoveryNote);
+          if (!isEmbedded) {
+            selectItem(matchedRecoveryNote2);
+          } else {
+            const trackerCard = container.querySelector(".recovery-tracker-card");
+            if (trackerCard) {
+              trackerCard.scrollIntoView({ behavior: "smooth" });
+            }
+          }
         });
       } else {
         recoveryCell.innerHTML = `
@@ -4961,6 +4973,89 @@ ${notes}`;
       container.appendChild(noteCard);
       const notesVal = document.getElementById("notes-val");
       if (notesVal) notesVal.textContent = notes;
+    }
+    const effectiveRecoveryItem = getRecoveryCodesList(item).length > 0 ? item : matchedRecoveryNote;
+    if (effectiveRecoveryItem) {
+      const codes = getRecoveryCodesList(effectiveRecoveryItem);
+      if (codes.length > 0) {
+        const recItemId = effectiveRecoveryItem.id || item.id;
+        const storageKey = `recovery_used_${recItemId}`;
+        const recCard = document.createElement("div");
+        recCard.className = "card recovery-tracker-card";
+        recCard.innerHTML = `
+        <div class="recovery-tracker-header">
+          <div class="recovery-tracker-title-group">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            <span class="recovery-tracker-title">Recovery Codes</span>
+          </div>
+          <span class="recovery-tracker-badge" id="tracker-badge-${recItemId}">${codes.length} Codes</span>
+        </div>
+        <div class="recovery-tracker-list" id="tracker-list-${recItemId}">
+          ${codes.map((c, idx) => `
+            <div class="recovery-tracker-item" id="tracker-item-${recItemId}-${idx}">
+              <input type="checkbox" class="recovery-tracker-check" data-index="${idx}" id="tracker-check-${recItemId}-${idx}">
+              <span class="recovery-tracker-code" data-code="${c}" title="Click to copy">${escHtml(c)}</span>
+              <button class="recovery-tracker-copy" data-code="${c}" title="Copy Code">\u{1F4CB}</button>
+            </div>
+          `).join("")}
+        </div>
+      `;
+        container.appendChild(recCard);
+        chrome.storage.local.get([storageKey], (res) => {
+          const localUsed = res[storageKey] || [];
+          const vaultUsed = Array.isArray(effectiveRecoveryItem.usedRecoveryCodes) ? effectiveRecoveryItem.usedRecoveryCodes : [];
+          const used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed]));
+          used.forEach((idx) => {
+            const itemEl = recCard.querySelector(`#tracker-item-${recItemId}-${idx}`);
+            const chkEl = recCard.querySelector(`#tracker-check-${recItemId}-${idx}`);
+            if (chkEl) chkEl.checked = true;
+            if (itemEl) itemEl.classList.add("used");
+          });
+          const badge = recCard.querySelector(`#tracker-badge-${recItemId}`);
+          if (badge) {
+            const remaining = Math.max(0, codes.length - used.length);
+            badge.textContent = `${remaining}/${codes.length} Left`;
+          }
+        });
+        recCard.querySelectorAll(".recovery-tracker-check").forEach((chk) => {
+          chk.addEventListener("change", (e) => {
+            const checkbox = e.target;
+            const codeIdx = parseInt(checkbox.dataset.index || "0", 10);
+            chrome.storage.local.get([storageKey], (res) => {
+              const localUsed = res[storageKey] || [];
+              const vaultUsed = Array.isArray(effectiveRecoveryItem.usedRecoveryCodes) ? effectiveRecoveryItem.usedRecoveryCodes : [];
+              let used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed]));
+              if (checkbox.checked) {
+                if (!used.includes(codeIdx)) used.push(codeIdx);
+              } else {
+                used = used.filter((i) => i !== codeIdx);
+              }
+              chrome.storage.local.set({ [storageKey]: used });
+              const itemEl = recCard.querySelector(`#tracker-item-${recItemId}-${codeIdx}`);
+              if (checkbox.checked) {
+                itemEl?.classList.add("used");
+              } else {
+                itemEl?.classList.remove("used");
+              }
+              const badge = recCard.querySelector(`#tracker-badge-${recItemId}`);
+              if (badge) {
+                const remaining = Math.max(0, codes.length - used.length);
+                badge.textContent = `${remaining}/${codes.length} Left`;
+              }
+            });
+          });
+        });
+        recCard.querySelectorAll(".recovery-tracker-code, .recovery-tracker-copy").forEach((el) => {
+          el.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const code = el.getAttribute("data-code") || el.textContent || "";
+            if (code) {
+              await copyToClipboardText(code.trim());
+              showToast(`Copied recovery code: ${code.trim()}`);
+            }
+          });
+        });
+      }
     }
     if (item.createdAt || item.updatedAt || item.importSource) {
       const metaCard = document.createElement("div");
