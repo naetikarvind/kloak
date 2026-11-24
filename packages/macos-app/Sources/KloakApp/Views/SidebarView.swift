@@ -15,6 +15,7 @@ public enum NavigationSection: Hashable {
     case duplicates
     case passwordHealth
     case generator
+    case combineCredentials
     case importExport
     case settings
     case trash
@@ -77,12 +78,13 @@ public struct SidebarView: View {
             .tag(NavigationSection.category(.authenticator))
 
             Button(action: { selection = .twoFASubtype(.authenticator) }) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(LiquidGlassTheme.primaryAccent)
-                        .frame(width: 5, height: 5)
+                HStack(spacing: 7) {
+                    Image(systemName: "timer")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                        .frame(width: 14)
                     Text("Authenticator")
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: selection == .twoFASubtype(.authenticator) ? .semibold : .regular))
                         .foregroundColor(selection == .twoFASubtype(.authenticator) ? .primary : .secondary)
                     Spacer()
                     if authCount > 0 {
@@ -98,12 +100,13 @@ public struct SidebarView: View {
             .tag(NavigationSection.twoFASubtype(.authenticator))
 
             Button(action: { selection = .twoFASubtype(.recoveryCodes) }) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(LiquidGlassTheme.emeraldAccent)
-                        .frame(width: 5, height: 5)
+                HStack(spacing: 7) {
+                    Image(systemName: "key.horizontal.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .frame(width: 14)
                     Text("Recovery Codes")
-                        .font(.system(size: 11))
+                        .font(.system(size: 11, weight: selection == .twoFASubtype(.recoveryCodes) ? .semibold : .regular))
                         .foregroundColor(selection == .twoFASubtype(.recoveryCodes) ? .primary : .secondary)
                     Spacer()
                     if recoveryCount > 0 {
@@ -237,6 +240,18 @@ public struct SidebarView: View {
                         Label("Password Generator", systemImage: "dice.fill")
                     }
                     .tag(NavigationSection.generator)
+
+                    let combinableCount = CredentialCombinerService.shared.findCombinableGroups(in: items).count
+                    NavigationLink(value: NavigationSection.combineCredentials) {
+                        Label {
+                            Text("Combine Credentials")
+                        } icon: {
+                            Image(systemName: "arrow.triangle.merge")
+                                .foregroundColor(combinableCount > 0 ? LiquidGlassTheme.primaryAccent : .secondary)
+                        }
+                        .badge(combinableCount)
+                    }
+                    .tag(NavigationSection.combineCredentials)
 
                     NavigationLink(value: NavigationSection.importExport) {
                         Label("Import & Export", systemImage: "arrow.triangle.2.circlepath")

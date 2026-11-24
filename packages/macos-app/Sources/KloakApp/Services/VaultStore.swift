@@ -771,6 +771,22 @@ public final class VaultStore: ObservableObject {
         return exactGroups.count
     }
 
+    public func combineCredentialGroup(_ group: CombinableCredentialGroup) {
+        _ = CredentialCombinerService.shared.combine(group: group, in: &items)
+        recordUserActivity()
+        saveVault()
+    }
+
+    @discardableResult
+    public func combineAllCredentialGroups() -> Int {
+        let groups = CredentialCombinerService.shared.findCombinableGroups(in: items)
+        guard !groups.isEmpty else { return 0 }
+        let count = CredentialCombinerService.shared.combineAll(groups: groups, in: &items)
+        recordUserActivity()
+        saveVault()
+        return count
+    }
+
     @discardableResult
     public func bulkImportWithResolution(toAdd: [VaultItem], toUpdate: [VaultItem]) -> Int {
         var modifiedCount = 0

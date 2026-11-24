@@ -439,23 +439,28 @@ public struct ItemDetailView: View {
                             secureNoteViewSection
                         }
 
-                        // Notes in view mode
-                        if let notes = item.notes, !notes.isEmpty,
+                        // Notes & Recovery Codes in view mode
+                        if item.type != .secureNote,
+                           let notes = item.notes, !notes.isEmpty,
                            !notes.contains("Discovered from macOS Keychain"),
                            !notes.contains("Import via Passwords.csv"),
                            notes != "Imported from Apple Passwords" {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("NOTES")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.secondary)
+                            if item.isRecoveryCode {
+                                recoveryCodesViewSection(notes: notes)
+                            } else {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("NOTES")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.secondary)
 
-                                Text(notes)
-                                    .font(.system(size: 12))
-                                    .textSelection(.enabled)
-                                    .padding(10)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.black.opacity(0.25))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    Text(notes)
+                                        .font(.system(size: 12))
+                                        .textSelection(.enabled)
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Color.black.opacity(0.25))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
                             }
                         }
 

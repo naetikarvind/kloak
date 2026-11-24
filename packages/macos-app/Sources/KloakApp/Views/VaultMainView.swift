@@ -49,7 +49,7 @@ public struct VaultMainView: View {
 
     private var isUtilitySection: Bool {
         switch selection {
-        case .generator, .importExport, .settings, .duplicates, .passwordHealth:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials:
             return true
         default:
             return false
@@ -85,7 +85,7 @@ public struct VaultMainView: View {
             }
         case .trash:
             base = items.filter { $0.trashed }
-        case .generator, .importExport, .settings, .duplicates, .passwordHealth:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials:
             base = []
         }
 
@@ -202,6 +202,16 @@ public struct VaultMainView: View {
             }
         case .generator:
             GeneratorView()
+        case .combineCredentials:
+            CombineCredentialsView(
+                items: $items,
+                onCombineGroup: { group in
+                    VaultStore.shared.combineCredentialGroup(group)
+                },
+                onCombineAll: {
+                    VaultStore.shared.combineAllCredentialGroups()
+                }
+            )
         case .importExport:
             ImportExportView(
                 items: $items,
@@ -454,7 +464,7 @@ public struct VaultMainView: View {
 
     private func triggerWindowResize(for sec: NavigationSection, animated: Bool = true) {
         switch sec {
-        case .settings, .duplicates:
+        case .settings, .duplicates, .combineCredentials:
             WindowSizeManager.shared.resize(to: .vaultSettings, animated: animated)
         case .generator:
             WindowSizeManager.shared.resize(to: .vaultGenerator, animated: animated)
