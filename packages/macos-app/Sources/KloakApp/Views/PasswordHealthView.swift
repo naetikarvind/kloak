@@ -21,13 +21,19 @@ public struct PasswordHealthView: View {
     private var reusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
             .filter { !vaultStore.ignoredHealthIssueIds.contains($0.id) }
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return all }
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         return all.filter { group in
-            group.items.contains {
-                $0.title.lowercased().contains(q) ||
-                ($0.username?.lowercased().contains(q) ?? false) ||
-                $0.urls.contains { $0.lowercased().contains(q) }
+            group.items.contains { item in
+                let title = item.title.lowercased()
+                let username = item.username?.lowercased() ?? ""
+                let urls = item.urls.map { $0.lowercased() }
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    urls.contains { $0.contains(term) }
+                }
             }
         }
     }
@@ -35,13 +41,19 @@ public struct PasswordHealthView: View {
     private var ignoredReusedGroups: [ReusedPasswordGroup] {
         let all = DuplicateDetectorService.shared.findReusedPasswords(in: items)
             .filter { vaultStore.ignoredHealthIssueIds.contains($0.id) }
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return all }
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         return all.filter { group in
-            group.items.contains {
-                $0.title.lowercased().contains(q) ||
-                ($0.username?.lowercased().contains(q) ?? false) ||
-                $0.urls.contains { $0.lowercased().contains(q) }
+            group.items.contains { item in
+                let title = item.title.lowercased()
+                let username = item.username?.lowercased() ?? ""
+                let urls = item.urls.map { $0.lowercased() }
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    urls.contains { $0.contains(term) }
+                }
             }
         }
     }
@@ -49,35 +61,53 @@ public struct PasswordHealthView: View {
     private var weakPasswords: [WeakPasswordItem] {
         let all = DuplicateDetectorService.shared.findWeakPasswords(in: items)
             .filter { !vaultStore.ignoredHealthIssueIds.contains($0.id) && !vaultStore.ignoredHealthIssueIds.contains($0.item.id) }
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
-        return all.filter {
-            $0.item.title.lowercased().contains(q) ||
-            ($0.item.username?.lowercased().contains(q) ?? false) ||
-            $0.item.urls.contains { $0.lowercased().contains(q) }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return all }
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        return all.filter { item in
+            let title = item.item.title.lowercased()
+            let username = item.item.username?.lowercased() ?? ""
+            let urls = item.item.urls.map { $0.lowercased() }
+            return terms.allSatisfy { term in
+                title.contains(term) ||
+                username.contains(term) ||
+                urls.contains { $0.contains(term) }
+            }
         }
     }
 
     private var ignoredWeakPasswords: [WeakPasswordItem] {
         let all = DuplicateDetectorService.shared.findWeakPasswords(in: items)
             .filter { vaultStore.ignoredHealthIssueIds.contains($0.id) || vaultStore.ignoredHealthIssueIds.contains($0.item.id) }
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
-        return all.filter {
-            $0.item.title.lowercased().contains(q) ||
-            ($0.item.username?.lowercased().contains(q) ?? false) ||
-            $0.item.urls.contains { $0.lowercased().contains(q) }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return all }
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        return all.filter { item in
+            let title = item.item.title.lowercased()
+            let username = item.item.username?.lowercased() ?? ""
+            let urls = item.item.urls.map { $0.lowercased() }
+            return terms.allSatisfy { term in
+                title.contains(term) ||
+                username.contains(term) ||
+                urls.contains { $0.contains(term) }
+            }
         }
     }
 
     private var missing2FA: [Missing2FAItem] {
         let all = DuplicateDetectorService.shared.findMissing2FA(in: items)
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
-        return all.filter {
-            $0.item.title.lowercased().contains(q) ||
-            ($0.item.username?.lowercased().contains(q) ?? false) ||
-            $0.item.urls.contains { $0.lowercased().contains(q) }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return all }
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        return all.filter { item in
+            let title = item.item.title.lowercased()
+            let username = item.item.username?.lowercased() ?? ""
+            let urls = item.item.urls.map { $0.lowercased() }
+            return terms.allSatisfy { term in
+                title.contains(term) ||
+                username.contains(term) ||
+                urls.contains { $0.contains(term) }
+            }
         }
     }
 

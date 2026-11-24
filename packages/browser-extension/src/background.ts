@@ -475,7 +475,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       case 'SEARCH_VAULT': {
-        const q = (message.query || '').toLowerCase();
+        const q = (message.query || '').trim().toLowerCase();
         await refreshVaultState();
         if (!isVaultUnlocked) {
           sendResponse({ success: true, isUnlocked: false, items: [] });
@@ -489,26 +489,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
+        const terms = q ? q.split(/\s+/).filter(Boolean) : [];
+        const matchesQuery = (item: any) => {
+          if (terms.length === 0) return true;
+          const title = (item.title || '').toLowerCase();
+          const username = (item.username || '').toLowerCase();
+          const urls = (item.urls || []).map((u: string) => u.toLowerCase());
+          return terms.every(t => title.includes(t) || username.includes(t) || urls.some(u => u.includes(t)));
+        };
+
         const nativeItems = await sendNativeRequest('vault.getItems');
         if (Array.isArray(nativeItems) && nativeItems.length > 0) {
           cachedItems = nativeItems;
-          const filtered = q
-            ? nativeItems.filter(item =>
-                (item.title || '').toLowerCase().includes(q) ||
-                (item.username || '').toLowerCase().includes(q) ||
-                (item.urls || []).some((u: string) => u.toLowerCase().includes(q))
-              )
-            : nativeItems;
+          const filtered = nativeItems.filter(matchesQuery);
           sendResponse({ success: true, isUnlocked: true, items: filtered });
           return;
         }
 
         // 2. Fallback search
-        const results = cachedItems.filter(item =>
-          item.title.toLowerCase().includes(q) ||
-          (item.username && item.username.toLowerCase().includes(q)) ||
-          item.urls.some((u: string) => u.toLowerCase().includes(q))
-        );
+        const results = cachedItems.filter(matchesQuery);
         sendResponse({ success: true, isUnlocked: true, items: results });
         break;
       }

@@ -105,16 +105,27 @@ public struct MenuBarView: View {
             return []
         }
 
-        if !searchText.isEmpty {
-            let q = searchText.lowercased()
-            return base.filter {
-                $0.title.lowercased().contains(q) ||
-                ($0.username?.lowercased().contains(q) ?? false) ||
-                ($0.identity?.fullName?.lowercased().contains(q) ?? false) ||
-                ($0.card?.cardholderName?.lowercased().contains(q) ?? false) ||
-                ($0.alias?.aliasEmail?.lowercased().contains(q) ?? false) ||
-                ($0.authenticatorDetails?.issuer?.lowercased().contains(q) ?? false) ||
-                $0.urls.contains { $0.lowercased().contains(q) }
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedQuery.isEmpty {
+            let terms = trimmedQuery.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            return base.filter { item in
+                let title = item.title.lowercased()
+                let username = item.username?.lowercased() ?? ""
+                let fullName = item.identity?.fullName?.lowercased() ?? ""
+                let cardholder = item.card?.cardholderName?.lowercased() ?? ""
+                let aliasEmail = item.alias?.aliasEmail?.lowercased() ?? ""
+                let issuer = item.authenticatorDetails?.issuer?.lowercased() ?? ""
+                let urls = item.urls.map { $0.lowercased() }
+
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    fullName.contains(term) ||
+                    cardholder.contains(term) ||
+                    aliasEmail.contains(term) ||
+                    issuer.contains(term) ||
+                    urls.contains { $0.contains(term) }
+                }
             }
         }
         return base
@@ -507,7 +518,7 @@ public struct MenuBarView: View {
                         ScrollView {
                             LazyVStack(spacing: 6) {
                                 // Smart Suggestion Hero Card when matching context exists
-                                if let ctx = activeContext, !smartSuggestions.isEmpty && searchText.isEmpty && selectedFilter == .suggestions {
+                                if let ctx = activeContext, !smartSuggestions.isEmpty && searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedFilter == .suggestions {
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 5) {
                                             // Live browser context indicator
@@ -626,7 +637,7 @@ public struct MenuBarView: View {
                                                     .font(.system(size: 10))
                                                     .foregroundColor(.secondary.opacity(0.6))
                                             } else {
-                                                Text(searchText.isEmpty ? "No items found" : "No matches")
+                                                Text(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "No items found" : "No matches")
                                                     .font(.system(size: 11))
                                                     .foregroundColor(.secondary)
                                             }

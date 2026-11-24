@@ -2559,17 +2559,23 @@
   }
   function applyFilterAndSort(animate = true) {
     const searchInput = document.getElementById("search-input");
-    const query = (searchInput?.value || "").toLowerCase();
+    const rawQuery = (searchInput?.value || "").trim().toLowerCase();
     let filtered = allItems;
     if (currentFilterMode === "favorites") {
       filtered = filtered.filter((item) => Boolean(item.favorite));
     } else if (currentFilterMode === "logins") {
       filtered = filtered.filter((item) => item.type === "login" || !item.type);
     }
-    if (query) {
-      filtered = filtered.filter(
-        (item) => (item.title || "").toLowerCase().includes(query) || (item.username || "").toLowerCase().includes(query) || (item.urls || []).some((u) => u.toLowerCase().includes(query))
-      );
+    if (rawQuery) {
+      const terms = rawQuery.split(/\s+/).filter(Boolean);
+      filtered = filtered.filter((item) => {
+        const title = (item.title || "").toLowerCase();
+        const username = (item.username || "").toLowerCase();
+        const urls = (item.urls || []).map((u) => u.toLowerCase());
+        return terms.every(
+          (term) => title.includes(term) || username.includes(term) || urls.some((u) => u.includes(term))
+        );
+      });
     }
     const sorted = sortItems(filtered);
     renderSidebarList(sorted, animate);

@@ -87,19 +87,33 @@ public struct VaultMainView: View {
             base = []
         }
 
-        if !searchText.isEmpty {
-            let q = searchText.lowercased()
-            return base.filter {
-                $0.title.lowercased().contains(q) ||
-                ($0.username?.lowercased().contains(q) ?? false) ||
-                ($0.identity?.fullName?.lowercased().contains(q) ?? false) ||
-                ($0.identity?.email?.lowercased().contains(q) ?? false) ||
-                ($0.card?.cardholderName?.lowercased().contains(q) ?? false) ||
-                ($0.alias?.aliasEmail?.lowercased().contains(q) ?? false) ||
-                ($0.alias?.forwardTo?.lowercased().contains(q) ?? false) ||
-                ($0.authenticatorDetails?.issuer?.lowercased().contains(q) ?? false) ||
-                $0.urls.contains { $0.lowercased().contains(q) } ||
-                ($0.notes?.lowercased().contains(q) ?? false)
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedQuery.isEmpty {
+            let terms = trimmedQuery.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            return base.filter { item in
+                let title = item.title.lowercased()
+                let username = item.username?.lowercased() ?? ""
+                let fullName = item.identity?.fullName?.lowercased() ?? ""
+                let email = item.identity?.email?.lowercased() ?? ""
+                let cardholder = item.card?.cardholderName?.lowercased() ?? ""
+                let aliasEmail = item.alias?.aliasEmail?.lowercased() ?? ""
+                let forwardTo = item.alias?.forwardTo?.lowercased() ?? ""
+                let issuer = item.authenticatorDetails?.issuer?.lowercased() ?? ""
+                let urls = item.urls.map { $0.lowercased() }
+                let notes = item.notes?.lowercased() ?? ""
+
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    fullName.contains(term) ||
+                    email.contains(term) ||
+                    cardholder.contains(term) ||
+                    aliasEmail.contains(term) ||
+                    forwardTo.contains(term) ||
+                    issuer.contains(term) ||
+                    urls.contains { $0.contains(term) } ||
+                    notes.contains(term)
+                }
             }
         }
         return base

@@ -315,18 +315,18 @@ class VaultManager {
         const q = query.trim().toLowerCase();
         if (!q)
             return this.getItems();
+        const terms = q.split(/\s+/).filter(Boolean);
         return this.getItems().filter(item => {
-            if (item.title.toLowerCase().includes(q))
-                return true;
-            if (item.username && item.username.toLowerCase().includes(q))
-                return true;
-            if (item.urls.some(u => u.toLowerCase().includes(q)))
-                return true;
-            if (item.tags.some(t => t.toLowerCase().includes(q)))
-                return true;
-            if (item.notes && item.notes.toLowerCase().includes(q))
-                return true;
-            return false;
+            const title = item.title.toLowerCase();
+            const username = (item.username || '').toLowerCase();
+            const urls = (item.urls || []).map(u => u.toLowerCase());
+            const tags = (item.tags || []).map(t => t.toLowerCase());
+            const notes = (item.notes || '').toLowerCase();
+            return terms.every(term => title.includes(term) ||
+                username.includes(term) ||
+                urls.some(u => u.includes(term)) ||
+                tags.some(t => t.includes(term)) ||
+                notes.includes(term));
         });
     }
     /**

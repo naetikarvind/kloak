@@ -721,14 +721,20 @@ export default function SearchVaultCommand() {
         if (item.type !== category) return false;
       }
 
-      if (!searchText) return true;
-      const q = searchText.toLowerCase();
-      return (
-        item.title.toLowerCase().includes(q) ||
-        (item.username?.toLowerCase().includes(q) ?? false) ||
-        (item.notes?.toLowerCase().includes(q) ?? false) ||
-        item.urls.some((u) => u.toLowerCase().includes(q)) ||
-        (item.tags && item.tags.some((t) => t.toLowerCase().includes(q)))
+      const trimmed = searchText.trim().toLowerCase();
+      if (!trimmed) return true;
+      const terms = trimmed.split(/\s+/).filter(Boolean);
+      const title = item.title.toLowerCase();
+      const username = (item.username || "").toLowerCase();
+      const notes = (item.notes || "").toLowerCase();
+      const urls = (item.urls || []).map((u) => u.toLowerCase());
+      const tags = (item.tags && item.tags.map((t) => t.toLowerCase())) || [];
+      return terms.every((term) =>
+        title.includes(term) ||
+        username.includes(term) ||
+        notes.includes(term) ||
+        urls.some((u) => u.includes(term)) ||
+        tags.some((t) => t.includes(term))
       );
     });
   }, [items, category, searchText]);

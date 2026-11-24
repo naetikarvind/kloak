@@ -389,15 +389,21 @@ public final class IPCServer: ObservableObject {
                 return
             }
             store.recordUserActivity()
-            let q = (params?["query"]?.stringValue ?? "").lowercased()
+            let trimmed = (params?["query"]?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
             let filtered = store.items.filter { item in
                 guard !item.trashed else { return false }
-                if q.isEmpty { return true }
-                if item.title.lowercased().contains(q) { return true }
-                if let u = item.username, u.lowercased().contains(q) { return true }
-                if item.urls.contains(where: { $0.lowercased().contains(q) }) { return true }
-                if item.tags.contains(where: { $0.lowercased().contains(q) }) { return true }
-                return false
+                if terms.isEmpty { return true }
+                let title = item.title.lowercased()
+                let username = item.username?.lowercased() ?? ""
+                let urls = item.urls.map { $0.lowercased() }
+                let tags = item.tags.map { $0.lowercased() }
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    urls.contains { $0.contains(term) } ||
+                    tags.contains { $0.contains(term) }
+                }
             }
 
             if let encodedData = try? JSONEncoder().encode(filtered),

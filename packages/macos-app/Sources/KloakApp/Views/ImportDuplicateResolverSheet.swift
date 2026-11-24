@@ -16,12 +16,18 @@ public struct ImportDuplicateResolverSheet: View {
         if let filter = selectedFilter {
             list = list.filter { $0.status == filter }
         }
-        if !searchText.isEmpty {
-            let q = searchText.lowercased()
-            list = list.filter {
-                $0.fileItem.title.lowercased().contains(q) ||
-                ($0.fileItem.username?.lowercased().contains(q) ?? false) ||
-                $0.fileItem.urls.contains { $0.lowercased().contains(q) }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+            list = list.filter { row in
+                let title = row.fileItem.title.lowercased()
+                let username = row.fileItem.username?.lowercased() ?? ""
+                let urls = row.fileItem.urls.map { $0.lowercased() }
+                return terms.allSatisfy { term in
+                    title.contains(term) ||
+                    username.contains(term) ||
+                    urls.contains { $0.contains(term) }
+                }
             }
         }
         return list

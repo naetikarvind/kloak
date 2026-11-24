@@ -511,11 +511,17 @@ document.addEventListener('DOMContentLoaded', () => {
       renderItems(cachedSideItems);
       return;
     }
-    const filtered = cachedSideItems.filter(item =>
-      (item.title || '').toLowerCase().includes(q) ||
-      (item.username || '').toLowerCase().includes(q) ||
-      (item.urls || []).some((u: string) => u.toLowerCase().includes(q))
-    );
+    const terms = q.split(/\s+/).filter(Boolean);
+    const filtered = cachedSideItems.filter(item => {
+      const title = (item.title || '').toLowerCase();
+      const username = (item.username || '').toLowerCase();
+      const urls = (item.urls || []).map((u: string) => u.toLowerCase());
+      return terms.every(term =>
+        title.includes(term) ||
+        username.includes(term) ||
+        urls.some(u => u.includes(term))
+      );
+    });
     renderItems(filtered);
   });
 

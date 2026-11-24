@@ -105,13 +105,14 @@ public struct ItemListView: View {
                         .font(.system(size: 32))
                         .foregroundColor(.secondary.opacity(0.5))
 
+                    let trimmedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
                     Text(currentSection == .trash
-                         ? (searchText.isEmpty ? "Trash is Empty" : "No trash matches for \"\(searchText)\"")
-                         : (searchText.isEmpty ? "No items in this section" : "No matches for \"\(searchText)\""))
+                         ? (trimmedSearch.isEmpty ? "Trash is Empty" : "No trash matches for \"\(trimmedSearch)\"")
+                         : (trimmedSearch.isEmpty ? "No items in this section" : "No matches for \"\(trimmedSearch)\""))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.secondary)
 
-                    if currentSection == .trash && searchText.isEmpty {
+                    if currentSection == .trash && trimmedSearch.isEmpty {
                         Text("Deleted credentials will be kept here until permanently purged.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary.opacity(0.6))

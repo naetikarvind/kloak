@@ -14,12 +14,18 @@ public struct DuplicateManagerView: View {
 
     private var duplicateGroups: [DuplicateAccountGroup] {
         let all = DuplicateDetectorService.shared.findDuplicateAccounts(in: items)
-        if searchText.isEmpty { return all }
-        let q = searchText.lowercased()
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedQuery.isEmpty { return all }
+        let terms = trimmedQuery.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         return all.filter { group in
-            group.title.lowercased().contains(q) ||
-            group.username.lowercased().contains(q) ||
-            group.items.contains { $0.urls.contains { $0.lowercased().contains(q) } }
+            let title = group.title.lowercased()
+            let username = group.username.lowercased()
+            let urls = group.items.flatMap { $0.urls }.map { $0.lowercased() }
+            return terms.allSatisfy { term in
+                title.contains(term) ||
+                username.contains(term) ||
+                urls.contains { $0.contains(term) }
+            }
         }
     }
 

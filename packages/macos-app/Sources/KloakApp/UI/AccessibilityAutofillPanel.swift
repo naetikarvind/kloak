@@ -159,20 +159,27 @@ public struct AccessibilityAutofillPopupView: View {
 
     private var filteredItems: [VaultItem] {
         let all = vaultStore.items.filter { !$0.trashed }
-        if searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
             return all
         }
-        let q = searchText.lowercased()
-        return all.filter {
-            $0.title.lowercased().contains(q) ||
-            ($0.username?.lowercased().contains(q) ?? false) ||
-            $0.urls.contains(where: { $0.lowercased().contains(q) }) ||
-            $0.tags.contains(where: { $0.lowercased().contains(q) })
+        let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        return all.filter { item in
+            let title = item.title.lowercased()
+            let username = item.username?.lowercased() ?? ""
+            let urls = item.urls.map { $0.lowercased() }
+            let tags = item.tags.map { $0.lowercased() }
+            return terms.allSatisfy { term in
+                title.contains(term) ||
+                username.contains(term) ||
+                urls.contains { $0.contains(term) } ||
+                tags.contains { $0.contains(term) }
+            }
         }
     }
 
     private var displayedSuggestions: [VaultItem] {
-        if !searchText.isEmpty {
+        if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return []
         }
         return autofillService.smartSuggestions
@@ -340,7 +347,7 @@ public struct AccessibilityAutofillPopupView: View {
                     }
 
                     // All Items or Search Results
-                    let others = searchText.isEmpty
+                    let others = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? filteredItems.filter { item in !displayedSuggestions.contains(where: { $0.id == item.id }) }
                         : filteredItems
 
@@ -505,7 +512,8 @@ public struct AccessibilityAutofillPopupView: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
 
-            Text("No saved passwords found for \"\(searchText.isEmpty ? targetAppName : searchText)\". Use the search bar above to find any item in your vault.")
+            let queryForDisplay = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            Text("No saved passwords found for \"\(queryForDisplay.isEmpty ? targetAppName : queryForDisplay)\". Use the search bar above to find any item in your vault.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
