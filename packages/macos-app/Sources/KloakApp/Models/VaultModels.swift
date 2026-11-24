@@ -17,7 +17,7 @@ public enum ItemType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .card: return "Payment Card"
         case .identity: return "Identity"
         case .emailAlias: return "Email Alias"
-        case .authenticator: return "Authenticator"
+        case .authenticator: return "2FA"
         }
     }
 
@@ -275,6 +275,10 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
     }
 
     public var displaySubtitle: String {
+        if isRecoveryCode {
+            let count = recoveryCodesCount
+            return count > 0 ? "\(count) Recovery Codes" : "Recovery Codes"
+        }
         if let u = username, !u.isEmpty { return u }
         if let fn = identity?.fullName, !fn.isEmpty { return fn }
         if let ch = card?.cardholderName, !ch.isEmpty { return ch }
@@ -657,6 +661,64 @@ public struct FileImportComparisonResult: Identifiable, Sendable {
 
     public var duplicateCount: Int {
         exactMatchCount + conflictCount
+    }
+}
+
+// MARK: - 2FA & Recovery Codes Helpers
+
+extension VaultItem {
+    /// Determines whether this item represents a set of 2FA recovery / backup codes.
+    public var isRecoveryCode: Bool {
+        if tags.contains(where: { $0.caseInsensitiveCompare("Recovery Codes") == .orderedSame || $0.caseInsensitiveCompare("Recovery") == .orderedSame }) {
+            return true
+        }
+        let lowerTitle = title.lowercased()
+        if lowerTitle.contains("recovery code") || lowerTitle.contains("recovery codes") ||
+           lowerTitle.contains("backup code") || lowerTitle.contains("backup codes") ||
+           lowerTitle.contains("recovery key") || lowerTitle.contains("recovery keys") ||
+           lowerTitle.contains("emergency kit") || lowerTitle.contains("2fa backup") {
+            return true
+        }
+        if let notes = notes, !notes.isEmpty {
+            let lines = notes.components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("//") }
+            if lines.count >= 2 && lines.count <= 36 {
+                let sample = Array(lines.prefix(8))
+                let regex = try? NSRegularExpression(pattern: "^[a-zA-Z0-9]{4,}(-[a-zA-Z0-9]{3,})*$")
+                let matches = sample.filter { line in
+                    let range = NSRange(location: 0, length: line.utf16.count)
+                    return regex?.firstMatch(in: line, range: range) != nil
+                }.count
+                if matches >= max(1, sample.count / 2) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    /// Determines whether this item has a live TOTP software authenticator attached or is an authenticator item.
+    public var isAuthenticator: Bool {
+        return self.type == .authenticator || !(self.totpSecret ?? "").isEmpty
+    }
+
+    /// Determines whether this item falls under the overarching 2FA category.
+    public var is2FA: Bool {
+        return isAuthenticator || isRecoveryCode
+    }
+
+    /// Extracted list of recovery codes if this item is a recovery code note.
+    public var recoveryCodesList: [String] {
+        guard let notes = notes, !notes.isEmpty else { return [] }
+        return notes.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("//") }
+    }
+
+    /// Count of individual recovery codes.
+    public var recoveryCodesCount: Int {
+        recoveryCodesList.count
     }
 }
 

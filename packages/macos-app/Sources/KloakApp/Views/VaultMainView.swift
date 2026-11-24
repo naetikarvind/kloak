@@ -65,15 +65,22 @@ public struct VaultMainView: View {
             base = items.filter { $0.favorite && !$0.trashed }
         case .category(let type):
             if type == .authenticator {
-                // Show standalone authenticators + any login that has 2FA attached
-                base = items.filter {
-                    !$0.trashed && (
-                        $0.type == .authenticator ||
-                        ($0.type == .login && !($0.totpSecret ?? "").isEmpty)
-                    )
-                }
+                // Show all 2FA items: authenticators + recovery codes
+                base = items.filter { !$0.trashed && $0.is2FA }
+            } else if type == .secureNote {
+                // Show standard secure notes (recovery codes live under 2FA)
+                base = items.filter { $0.type == .secureNote && !$0.trashed && !$0.isRecoveryCode }
             } else {
                 base = items.filter { $0.type == type && !$0.trashed }
+            }
+        case .twoFASubtype(let subtype):
+            switch subtype {
+            case .all:
+                base = items.filter { !$0.trashed && $0.is2FA }
+            case .authenticator:
+                base = items.filter { !$0.trashed && $0.isAuthenticator }
+            case .recoveryCodes:
+                base = items.filter { !$0.trashed && $0.isRecoveryCode }
             }
         case .folder(let folderId):
             if let targetFolder = folders.first(where: { $0.id == folderId }) {
@@ -426,6 +433,7 @@ public struct VaultMainView: View {
             NewItemSheet(
                 initialType: {
                     if case .category(let t) = selection { return t }
+                    if case .twoFASubtype = selection { return .authenticator }
                     return .login
                 }(),
                 folders: folders,

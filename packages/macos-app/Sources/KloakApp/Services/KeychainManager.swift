@@ -830,10 +830,7 @@ public final class KeychainManager: @unchecked Sendable {
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         var title = "Imported Note"
         if let fn = filename, !fn.isEmpty {
-            let withoutExt = URL(fileURLWithPath: fn).deletingPathExtension().lastPathComponent.trimmingCharacters(in: .whitespaces)
-            if !withoutExt.isEmpty {
-                title = withoutExt
-            }
+            title = BrandTitleService.cleanFilenameOrSlugTitle(fn)
         } else {
             let lines = trimmed.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
             if let first = lines.first(where: { !$0.isEmpty }) {
@@ -841,9 +838,21 @@ public final class KeychainManager: @unchecked Sendable {
                 while cleanFirst.hasPrefix("#") { cleanFirst.removeFirst() }
                 cleanFirst = cleanFirst.trimmingCharacters(in: .whitespaces)
                 if !cleanFirst.isEmpty {
-                    title = String(cleanFirst.prefix(80))
+                    title = BrandTitleService.cleanFilenameOrSlugTitle(String(cleanFirst.prefix(80)))
                 }
             }
+        }
+
+        var tags = ["Secure Note", "Imported"]
+        let lowerFn = (filename ?? "").lowercased()
+        let lowerTitle = title.lowercased()
+        let lowerContent = trimmed.lowercased()
+        let isRecovery = lowerFn.contains("recovery") || lowerFn.contains("backup") || lowerFn.contains("codes") || lowerFn.contains("2fa") ||
+                         lowerTitle.contains("recovery") || lowerTitle.contains("backup") || lowerTitle.contains("codes") ||
+                         lowerContent.contains("recovery code") || lowerContent.contains("backup code")
+        if isRecovery {
+            tags.append("Recovery Codes")
+            tags.append("2FA")
         }
 
         let now = ISO8601DateFormatter().string(from: Date())

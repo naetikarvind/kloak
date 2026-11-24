@@ -1,9 +1,16 @@
 import SwiftUI
 
+public enum TwoFASubtype: String, Hashable, CaseIterable, Sendable {
+    case all = "All 2FA"
+    case authenticator = "Authenticator"
+    case recoveryCodes = "Recovery Codes"
+}
+
 public enum NavigationSection: Hashable {
     case allItems
     case favorites
     case category(ItemType)
+    case twoFASubtype(TwoFASubtype)
     case folder(String)
     case duplicates
     case passwordHealth
@@ -53,6 +60,52 @@ public struct SidebarView: View {
         }
     }
 
+    private var twoFASidebarSection: some View {
+        let authCount = items.filter { !$0.trashed && $0.isAuthenticator }.count
+        let recoveryCount = items.filter { !$0.trashed && $0.isRecoveryCode }.count
+        let totalCount = items.filter { !$0.trashed && $0.is2FA }.count
+
+        return Group {
+            NavigationLink(value: NavigationSection.category(.authenticator)) {
+                Label {
+                    Text("2FA")
+                } icon: {
+                    Image(systemName: "lock.shield.fill").foregroundColor(LiquidGlassTheme.primaryAccent)
+                }
+                .badge(totalCount)
+            }
+            .tag(NavigationSection.category(.authenticator))
+
+            NavigationLink(value: NavigationSection.twoFASubtype(.authenticator)) {
+                Label {
+                    Text("Authenticator")
+                        .font(.system(size: 12))
+                } icon: {
+                    Image(systemName: "timer")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.leading, 12)
+                .badge(authCount)
+            }
+            .tag(NavigationSection.twoFASubtype(.authenticator))
+
+            NavigationLink(value: NavigationSection.twoFASubtype(.recoveryCodes)) {
+                Label {
+                    Text("Recovery Codes")
+                        .font(.system(size: 12))
+                } icon: {
+                    Image(systemName: "key.horizontal.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.leading, 12)
+                .badge(recoveryCount)
+            }
+            .tag(NavigationSection.twoFASubtype(.recoveryCodes))
+        }
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             // Traffic lights clearance for hiddenTitleBar window style
@@ -84,18 +137,22 @@ public struct SidebarView: View {
 
                 Section(header: sectionHeader("Categories")) {
                     ForEach(ItemType.allCases) { type in
-                        NavigationLink(value: NavigationSection.category(type)) {
-                            Label {
-                                Text(type == .login ? "Logins" : type.displayName)
-                            } icon: {
-                                Image(systemName: type.iconName).foregroundColor(.secondary)
+                        if type == .authenticator {
+                            twoFASidebarSection
+                        } else {
+                            NavigationLink(value: NavigationSection.category(type)) {
+                                Label {
+                                    Text(type == .login ? "Logins" : type.displayName)
+                                } icon: {
+                                    Image(systemName: type.iconName).foregroundColor(.secondary)
+                                }
+                                .badge(type == .secureNote
+                                    ? items.filter { $0.type == .secureNote && !$0.trashed && !$0.isRecoveryCode }.count
+                                    : items.filter { $0.type == type && !$0.trashed }.count
+                                )
                             }
-                            .badge(type == .authenticator
-                                ? items.filter { !$0.trashed && ($0.type == .authenticator || ($0.type == .login && !($0.totpSecret ?? "").isEmpty)) }.count
-                                : items.filter { $0.type == type && !$0.trashed }.count
-                            )
+                            .tag(NavigationSection.category(type))
                         }
-                        .tag(NavigationSection.category(type))
                     }
                 }
 

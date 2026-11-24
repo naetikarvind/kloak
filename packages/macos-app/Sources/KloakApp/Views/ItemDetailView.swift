@@ -1536,31 +1536,110 @@ public struct ItemDetailView: View {
     @ViewBuilder
     private var secureNoteViewSection: some View {
         if let notes = item.notes, !notes.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("ENCRYPTED CONTENT")
+            if item.isRecoveryCode {
+                recoveryCodesViewSection(notes: notes)
+            } else {
+                standardNoteViewSection(notes: notes)
+            }
+        }
+    }
+
+    private func standardNoteViewSection(notes: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("ENCRYPTED CONTENT")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button(action: { copyToClipboard(notes, "note_content") }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: copiedField == "note_content" ? "checkmark" : "doc.on.doc")
+                        Text("Copy Note")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(notes)
+                .font(.system(size: 13))
+                .textSelection(.enabled)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.black.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private func recoveryCodesViewSection(notes: String) -> some View {
+        let codes = item.recoveryCodesList
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                HStack(spacing: 5) {
+                    Image(systemName: "key.horizontal.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    Text("RECOVERY CODES (\(codes.count))")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.secondary)
-                    Spacer()
-                    Button(action: { copyToClipboard(notes, "note_content") }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: copiedField == "note_content" ? "checkmark" : "doc.on.doc")
-                            Text("Copy Note")
-                        }
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(LiquidGlassTheme.primaryAccent)
-                    }
-                    .buttonStyle(.plain)
                 }
-
-                Text(notes)
-                    .font(.system(size: 13))
-                    .textSelection(.enabled)
-                    .padding(12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.black.opacity(0.3))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                Spacer()
+                Button(action: { copyToClipboard(codes.joined(separator: "\n"), "all_recovery_codes") }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: copiedField == "all_recovery_codes" ? "checkmark" : "doc.on.doc")
+                        Text(copiedField == "all_recovery_codes" ? "Copied All" : "Copy All Codes")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                }
+                .buttonStyle(.plain)
             }
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 8)], spacing: 8) {
+                ForEach(Array(codes.enumerated()), id: \.offset) { idx, code in
+                    let fieldId = "code_\(idx)"
+                    HStack(spacing: 6) {
+                        Text("\(idx + 1)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .frame(width: 16, alignment: .trailing)
+
+                        Text(code)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .lineLimit(1)
+                            .foregroundColor(.white)
+
+                        Spacer(minLength: 2)
+
+                        Image(systemName: copiedField == fieldId ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 10))
+                            .foregroundColor(copiedField == fieldId ? LiquidGlassTheme.emeraldAccent : .secondary.opacity(0.6))
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 7)
+                    .background(Color.black.opacity(0.35))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(copiedField == fieldId ? LiquidGlassTheme.emeraldAccent.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 0.8)
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        copyToClipboard(code, fieldId)
+                    }
+                    .help("Click to copy recovery code #\(idx + 1)")
+                }
+            }
+
+            HStack(spacing: 4) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 9))
+                Text("Stored securely in your encrypted Kloak vault • Zero-knowledge")
+                    .font(.system(size: 10))
+            }
+            .foregroundColor(.secondary.opacity(0.6))
+            .padding(.top, 2)
         }
     }
 

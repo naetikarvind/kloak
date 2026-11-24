@@ -16,6 +16,101 @@ public struct ItemListView: View {
     var onEmptyTrash: (() -> Void)? = nil
 
     @State private var isShowingEmptyTrashConfirm: Bool = false
+    @State private var active2FASubtype: TwoFASubtype = .all
+
+    private var is2FASection: Bool {
+        if case .category(let t) = currentSection, t == .authenticator { return true }
+        if case .twoFASubtype = currentSection { return true }
+        return false
+    }
+
+    private var current2FASubtype: TwoFASubtype {
+        if case .twoFASubtype(let s) = currentSection {
+            return s
+        }
+        return active2FASubtype
+    }
+
+    private var authenticatorItems: [VaultItem] {
+        items.filter { $0.isAuthenticator }
+    }
+
+    private var recoveryItems: [VaultItem] {
+        items.filter { $0.isRecoveryCode && !$0.isAuthenticator }
+    }
+
+    private func twoFASectionHeader(title: String, count: Int, icon: String, color: Color) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(color)
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.secondary)
+            Spacer()
+            Text("\(count)")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(.secondary.opacity(0.8))
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1)
+                .background(Color.white.opacity(0.06))
+                .clipShape(Capsule())
+        }
+        .padding(.vertical, 3)
+    }
+
+    private func twoFAPillButton(_ title: String, count: Int, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.76)) {
+                action()
+            }
+        }) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 11, weight: isSelected ? .bold : .medium))
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(size: 10, weight: .semibold))
+                        .opacity(isSelected ? 0.95 : 0.6)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(isSelected ? LiquidGlassTheme.primaryAccent.opacity(0.2) : Color.white.opacity(0.05))
+            .foregroundColor(isSelected ? LiquidGlassTheme.primaryAccent : .secondary)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? LiquidGlassTheme.primaryAccent.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 0.75)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func itemRow(_ item: VaultItem) -> some View {
+        ItemRowView(
+            item: item,
+            folders: folders,
+            currentSection: currentSection,
+            onToggleFavorite: {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+                    onToggleFavorite(item.id)
+                }
+            },
+            onMoveToFolder: onMoveToFolder,
+            onDeleteItem: onDeleteItem,
+            onRestoreItem: onRestoreItem,
+            onDeletePermanently: onDeletePermanently
+        )
+        .tag(item.id)
+        .transition(
+            .asymmetric(
+                insertion: .opacity.combined(with: .offset(y: 8)),
+                removal: .opacity.combined(with: .offset(y: -8))
+            )
+        )
+    }
 
     public var body: some View {
         VStack(spacing: 0) {
@@ -97,6 +192,26 @@ public struct ItemListView: View {
 
             Divider().opacity(0.12)
 
+            // Sub-headings filter pills for 2FA
+            if is2FASection {
+                HStack(spacing: 6) {
+                    twoFAPillButton("All 2FA", count: items.filter { $0.is2FA }.count, isSelected: current2FASubtype == .all) {
+                        active2FASubtype = .all
+                    }
+                    twoFAPillButton("Authenticator", count: authenticatorItems.count, isSelected: current2FASubtype == .authenticator) {
+                        active2FASubtype = .authenticator
+                    }
+                    twoFAPillButton("Recovery Codes", count: recoveryItems.count, isSelected: current2FASubtype == .recoveryCodes) {
+                        active2FASubtype = .recoveryCodes
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+
+                Divider().opacity(0.08)
+            }
+
             // Items List
             if items.isEmpty {
                 VStack(spacing: 12) {
@@ -126,28 +241,46 @@ public struct ItemListView: View {
                 .transition(.opacity)
             } else {
                 List(selection: $selectedItemId) {
-                    ForEach(items) { item in
-                        ItemRowView(
-                            item: item,
-                            folders: folders,
-                            currentSection: currentSection,
-                            onToggleFavorite: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
-                                    onToggleFavorite(item.id)
+                    if is2FASection && current2FASubtype == .all && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
+                        if !authenticatorItems.isEmpty {
+                            Section {
+                                ForEach(authenticatorItems) { item in
+                                    itemRow(item)
                                 }
-                            },
-                            onMoveToFolder: onMoveToFolder,
-                            onDeleteItem: onDeleteItem,
-                            onRestoreItem: onRestoreItem,
-                            onDeletePermanently: onDeletePermanently
-                        )
-                        .tag(item.id)
-                        .transition(
-                            .asymmetric(
-                                insertion: .opacity.combined(with: .offset(y: 8)),
-                                removal: .opacity.combined(with: .offset(y: -8))
-                            )
-                        )
+                            } header: {
+                                twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
+                            }
+                        }
+
+                        if !recoveryItems.isEmpty {
+                            Section {
+                                ForEach(recoveryItems) { item in
+                                    itemRow(item)
+                                }
+                            } header: {
+                                twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
+                            }
+                        }
+                    } else if is2FASection && current2FASubtype == .authenticator {
+                        Section {
+                            ForEach(authenticatorItems) { item in
+                                itemRow(item)
+                            }
+                        } header: {
+                            twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
+                        }
+                    } else if is2FASection && current2FASubtype == .recoveryCodes {
+                        Section {
+                            ForEach(recoveryItems) { item in
+                                itemRow(item)
+                            }
+                        } header: {
+                            twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
+                        }
+                    } else {
+                        ForEach(items) { item in
+                            itemRow(item)
+                        }
                     }
                 }
                 .listStyle(.inset)
@@ -206,6 +339,10 @@ public struct ItemRowView: View {
         case .authenticator:
             return item.authenticatorDetails?.issuer ?? item.username ?? "2FA Code"
         case .secureNote:
+            if item.isRecoveryCode {
+                let count = item.recoveryCodesCount
+                return count > 0 ? "\(count) Recovery Codes" : (item.notes?.components(separatedBy: .newlines).first ?? "Recovery Codes")
+            }
             return item.notes?.components(separatedBy: .newlines).first ?? "Secure Note"
         case .login:
             return item.username ?? item.urls.first ?? item.type.displayName
@@ -264,6 +401,18 @@ public struct ItemRowView: View {
             HStack(spacing: 6) {
                 if let totp = item.totpSecret, !totp.isEmpty {
                     MiniTOTPRowView(secret: totp)
+                } else if item.isRecoveryCode {
+                    HStack(spacing: 3) {
+                        Image(systemName: "key.horizontal.fill")
+                            .font(.system(size: 8))
+                        Text("\(item.recoveryCodesCount)")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                    .clipShape(Capsule())
                 } else if isWeakPassword && !item.trashed {
                     Text("weak")
                         .font(.system(size: 8, weight: .bold))

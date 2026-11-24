@@ -706,6 +706,16 @@ public final class VaultStore: ObservableObject {
                 self.items[i].updatedAt = ISO8601DateFormatter().string(from: Date())
                 didModify = true
             }
+            if self.items[i].isRecoveryCode {
+                if !self.items[i].tags.contains("Recovery Codes") {
+                    self.items[i].tags.append("Recovery Codes")
+                    didModify = true
+                }
+                if !self.items[i].tags.contains("2FA") {
+                    self.items[i].tags.append("2FA")
+                    didModify = true
+                }
+            }
         }
         if didModify {
             recordUserActivity()

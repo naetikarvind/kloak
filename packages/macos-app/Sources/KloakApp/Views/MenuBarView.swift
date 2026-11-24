@@ -83,7 +83,7 @@ public struct MenuBarView: View {
         case suggestions = "✨ Suggested"
         case all = "All"
         case logins = "Logins"
-        case totp = "Authenticator"
+        case totp = "2FA"
         case generator = "Generator"
 
         public var id: String { rawValue }
@@ -100,7 +100,7 @@ public struct MenuBarView: View {
         case .logins:
             base = base.filter { $0.type == .login }
         case .totp:
-            base = base.filter { $0.totpSecret != nil && !($0.totpSecret?.isEmpty ?? true) }
+            base = base.filter { $0.is2FA }
         case .generator:
             return []
         }
@@ -1279,12 +1279,31 @@ public struct MenuBarItemRow: View {
 
     private func notesSection(notes: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text("NOTES")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundColor(.secondary)
+            HStack {
+                Text(item.isRecoveryCode ? "RECOVERY CODES" : "NOTES")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(item.isRecoveryCode ? LiquidGlassTheme.emeraldAccent : .secondary)
+
+                Spacer()
+
+                if item.isRecoveryCode {
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(notes, forType: .string)
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "doc.on.doc")
+                            Text("Copy All")
+                        }
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             Text(notes)
-                .font(.system(size: 10.5))
+                .font(.system(size: item.isRecoveryCode ? 10 : 10.5, design: item.isRecoveryCode ? .monospaced : .default))
                 .foregroundColor(.secondary)
                 .textSelection(.enabled)
                 .padding(8)

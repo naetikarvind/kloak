@@ -220,8 +220,94 @@ public final class BrandTitleService: @unchecked Sendable {
             return formatDomainToBrand(str)
         }
 
+        // If the title contains hyphens or underscores (like a slug, filename, or recovery code note),
+        // or contains redundant "2fa" strings, sanitize it into clean human-readable title
+        if str.contains("-") || str.contains("_") || str.lowercased().contains("2fa") {
+            let cleaned = cleanFilenameOrSlugTitle(str)
+            if !cleaned.isEmpty {
+                return cleaned
+            }
+        }
+
         // Otherwise, it's already a custom human title (e.g. "Work Account", "Chase Checking")
         return str
+    }
+
+    /// Cleans an imported filename, slug, or note title (e.g. "github-recovery-codes" -> "GitHub Recovery Codes",
+    /// "proton_2FA_recovery_codes" -> "Proton Recovery Codes") by replacing hyphens and underscores with spaces,
+    /// removing redundant/unnecessary words like "2fa", and applying proper brand capitalization.
+    public static func cleanFilenameOrSlugTitle(_ input: String) -> String {
+        var str = input.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // 1. Strip file extension if present (.txt, .md, .note, etc.)
+        let knownExtensions = ["txt", "text", "md", "markdown", "note", "csv", "json", "xml", "bak", "backup", "codes", "keys"]
+        for ext in knownExtensions {
+            if str.lowercased().hasSuffix("." + ext) {
+                str = String(str.dropLast(ext.count + 1))
+                break
+            }
+        }
+
+        // 2. Strip standard prefixes like "kloak — ", "kloakapp", etc.
+        let separators = CharacterSet(charactersIn: "-—–: \t\r\n")
+        while true {
+            let lower = str.lowercased()
+            if lower.hasPrefix("kloakapp") {
+                str = String(str.dropFirst(8)).trimmingCharacters(in: separators)
+                continue
+            } else if lower.hasPrefix("kloak") {
+                str = String(str.dropFirst(5)).trimmingCharacters(in: separators)
+                continue
+            }
+            break
+        }
+
+        // 3. Replace hyphens and underscores with spaces
+        str = str.replacingOccurrences(of: "_", with: " ")
+                 .replacingOccurrences(of: "-", with: " ")
+
+        // 4. Split into words
+        var words = str.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        guard !words.isEmpty else { return input }
+
+        // 5. Remove redundant/unnecessary 2FA words like "2fa", "2-fa", "totp", "mfa"
+        // But only remove them if other words remain (so a title isn't left empty)
+        let redundantWords = Set(["2fa", "2-fa", "totp", "mfa", "two-factor", "twofactor"])
+        let filteredWords = words.filter { !redundantWords.contains($0.lowercased()) }
+        if !filteredWords.isEmpty {
+            words = filteredWords
+        }
+
+        // 6. Recognize brand names and properly format words
+        var formattedWords: [String] = []
+        for word in words {
+            let lower = word.lowercased()
+            if let brand = canonicalBrands[lower] ?? canonicalBrands["\(lower).com"] {
+                formattedWords.append(brand)
+            } else if lower == "codes" || lower == "code" {
+                formattedWords.append("Codes")
+            } else if lower == "recovery" {
+                formattedWords.append("Recovery")
+            } else if lower == "backup" {
+                formattedWords.append("Backup")
+            } else if lower == "key" || lower == "keys" {
+                formattedWords.append("Keys")
+            } else if lower == "secret" || lower == "secrets" {
+                formattedWords.append("Secret")
+            } else if lower == "note" || lower == "notes" {
+                formattedWords.append("Notes")
+            } else if lower == "emergency" {
+                formattedWords.append("Emergency")
+            } else if lower == "kit" {
+                formattedWords.append("Kit")
+            } else if lower == "token" || lower == "tokens" {
+                formattedWords.append("Token")
+            } else {
+                formattedWords.append(formatBrandWord(word))
+            }
+        }
+
+        return formattedWords.joined(separator: " ")
     }
 
     /// Determines if a string appears to be a domain name, hostname, or URL.
@@ -327,7 +413,7 @@ public final class BrandTitleService: @unchecked Sendable {
     }
 
     /// Capitalizes and cleans an extracted domain root word.
-    private static func formatBrandWord(_ word: String) -> String {
+    public static func formatBrandWord(_ word: String) -> String {
         guard !word.isEmpty else { return "" }
 
         // Specific well-known casing
@@ -348,7 +434,32 @@ public final class BrandTitleService: @unchecked Sendable {
             "codeskool": "CodeSkool",
             "openai": "OpenAI",
             "chatgpt": "ChatGPT",
-            "devpost": "Devpost"
+            "devpost": "Devpost",
+            "proton": "Proton",
+            "protonmail": "Proton Mail",
+            "protonpass": "Proton Pass",
+            "aws": "AWS",
+            "google": "Google",
+            "apple": "Apple",
+            "microsoft": "Microsoft",
+            "discord": "Discord",
+            "bitbucket": "Bitbucket",
+            "binance": "Binance",
+            "coinbase": "Coinbase",
+            "kraken": "Kraken",
+            "steam": "Steam",
+            "facebook": "Facebook",
+            "twitter": "Twitter",
+            "reddit": "Reddit",
+            "netflix": "Netflix",
+            "dropbox": "Dropbox",
+            "stripe": "Stripe",
+            "notion": "Notion",
+            "linear": "Linear",
+            "figma": "Figma",
+            "slack": "Slack",
+            "1password": "1Password",
+            "bitwarden": "Bitwarden"
         ]
 
         if let special = specialCasing[word.lowercased()] {
