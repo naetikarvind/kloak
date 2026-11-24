@@ -7,6 +7,8 @@ public struct ItemListView: View {
     var currentSection: NavigationSection = .allItems
     @Binding var selectedItemId: String?
     @Binding var searchText: String
+    var twoFAScrollTrigger: Int = 0
+    var requestedTwoFASubtype: TwoFASubtype? = nil
     var onToggleFavorite: (String) -> Void
     var onAddItem: (() -> Void)? = nil
     var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
@@ -219,23 +221,7 @@ public struct ItemListView: View {
             } else {
                 ScrollViewReader { proxy in
                     List(selection: $selectedItemId) {
-                        if currentSection == .twoFASubtype(.authenticator) {
-                            Section {
-                                ForEach(items) { item in
-                                    itemRow(item)
-                                }
-                            } header: {
-                                twoFASectionHeader(title: "AUTHENTICATOR", count: items.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
-                            }
-                        } else if currentSection == .twoFASubtype(.recoveryCodes) {
-                            Section {
-                                ForEach(items) { item in
-                                    itemRow(item)
-                                }
-                            } header: {
-                                twoFASectionHeader(title: "RECOVERY CODES", count: items.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
-                            }
-                        } else if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
+                        if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
                             if !authenticatorItems.isEmpty {
                                 Section {
                                     ForEach(authenticatorItems) { item in
@@ -269,25 +255,22 @@ public struct ItemListView: View {
                     .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items)
                     .onChange(of: currentSection) { _, newSection in
                         if case .twoFASubtype(let sub) = newSection {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                if sub == .recoveryCodes {
-                                    proxy.scrollTo("section_recovery", anchor: .top)
-                                } else if sub == .authenticator {
-                                    proxy.scrollTo("section_authenticator", anchor: .top)
-                                }
-                            }
+                            performScrollToSubtype(sub, proxy: proxy)
+                        } else if case .category(let cat) = newSection, cat == .authenticator {
+                            performScrollToSubtype(.authenticator, proxy: proxy)
+                        }
+                    }
+                    .onChange(of: twoFAScrollTrigger) { _, _ in
+                        if let target = requestedTwoFASubtype {
+                            performScrollToSubtype(target, proxy: proxy)
+                        } else if case .twoFASubtype(let sub) = currentSection {
+                            performScrollToSubtype(sub, proxy: proxy)
                         }
                     }
                     .onAppear {
                         if case .twoFASubtype(let sub) = currentSection {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                    if sub == .recoveryCodes {
-                                        proxy.scrollTo("section_recovery", anchor: .top)
-                                    } else if sub == .authenticator {
-                                        proxy.scrollTo("section_authenticator", anchor: .top)
-                                    }
-                                }
+                                performScrollToSubtype(sub, proxy: proxy)
                             }
                         }
                     }
@@ -295,6 +278,29 @@ public struct ItemListView: View {
             }
         }
         .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items.isEmpty)
+    }
+
+    private func performScrollToSubtype(_ sub: TwoFASubtype, proxy: ScrollViewProxy) {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
+            switch sub {
+            case .authenticator, .all:
+                if let firstId = authenticatorItems.first?.id {
+                    proxy.scrollTo(firstId, anchor: .top)
+                } else {
+                    proxy.scrollTo("section_authenticator", anchor: .top)
+                }
+            case .recoveryCodes:
+                // Move the list up to see the RECOVERY CODES sub-heading on the top
+                // with the previous password (if there above the sub-heading) shown!
+                if let lastAuthId = authenticatorItems.last?.id {
+                    proxy.scrollTo(lastAuthId, anchor: .top)
+                } else if let firstRecId = recoveryItems.first?.id {
+                    proxy.scrollTo(firstRecId, anchor: .top)
+                } else {
+                    proxy.scrollTo("section_recovery", anchor: .top)
+                }
+            }
+        }
     }
 }
 

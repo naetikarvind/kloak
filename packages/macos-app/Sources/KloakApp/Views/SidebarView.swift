@@ -29,6 +29,7 @@ public struct SidebarView: View {
     var onAddItem: () -> Void
     var onCreateFolder: ((String) -> Void)? = nil
     var onDeleteFolder: ((String) -> Void)? = nil
+    var onSelectTwoFASubtype: ((TwoFASubtype) -> Void)? = nil
 
     @State private var isShowingNewFolderAlert: Bool = false
     @State private var newFolderName: String = ""
@@ -76,6 +77,9 @@ public struct SidebarView: View {
                 .badge(totalCount)
             }
             .tag(NavigationSection.category(.authenticator))
+            .simultaneousGesture(TapGesture().onEnded {
+                onSelectTwoFASubtype?(.all)
+            })
 
             NavigationLink(value: NavigationSection.twoFASubtype(.authenticator)) {
                 HStack(spacing: 7) {
@@ -90,6 +94,9 @@ public struct SidebarView: View {
             }
             .badge(authCount)
             .tag(NavigationSection.twoFASubtype(.authenticator))
+            .simultaneousGesture(TapGesture().onEnded {
+                onSelectTwoFASubtype?(.authenticator)
+            })
 
             NavigationLink(value: NavigationSection.twoFASubtype(.recoveryCodes)) {
                 HStack(spacing: 7) {
@@ -104,6 +111,9 @@ public struct SidebarView: View {
             }
             .badge(recoveryCount)
             .tag(NavigationSection.twoFASubtype(.recoveryCodes))
+            .simultaneousGesture(TapGesture().onEnded {
+                onSelectTwoFASubtype?(.recoveryCodes)
+            })
         }
     }
 

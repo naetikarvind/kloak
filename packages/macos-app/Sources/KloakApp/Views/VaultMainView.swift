@@ -18,6 +18,8 @@ public struct VaultMainView: View {
     @State private var focus2FAOnItemId: String? = nil
     @State private var preselectedCombineItemIds: Set<String> = []
     @State private var searchText: String = ""
+    @State private var twoFAScrollTrigger: Int = 0
+    @State private var requestedTwoFASubtype: TwoFASubtype? = nil
     @State private var isShowingNewItemSheet: Bool = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @ObservedObject private var updater = UpdaterService.shared
@@ -74,15 +76,10 @@ public struct VaultMainView: View {
             } else {
                 base = items.filter { $0.type == type && !$0.trashed }
             }
-        case .twoFASubtype(let sub):
-            switch sub {
-            case .all:
-                base = items.filter { !$0.trashed && $0.is2FA }
-            case .authenticator:
-                base = items.filter { !$0.trashed && $0.isAuthenticator }
-            case .recoveryCodes:
-                base = items.filter { !$0.trashed && $0.isRecoveryCode }
-            }
+        case .twoFASubtype:
+            // Subtypes in sidebar are jump markers (like website anchor links) that scroll
+            // the continuous list to the respective sub-heading; all 2FA items remain in the single list!
+            base = items.filter { !$0.trashed && $0.is2FA }
         case .folder(let folderId):
             if let targetFolder = folders.first(where: { $0.id == folderId }) {
                 base = items.filter { $0.belongsTo(folder: targetFolder, allFolders: folders) }
@@ -309,6 +306,10 @@ public struct VaultMainView: View {
                             selection = .allItems
                         }
                     }
+                },
+                onSelectTwoFASubtype: { sub in
+                    requestedTwoFASubtype = sub
+                    twoFAScrollTrigger += 1
                 }
             )
             .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 270)
@@ -332,6 +333,8 @@ public struct VaultMainView: View {
                             currentSection: selection,
                             selectedItemId: $selectedItemId,
                             searchText: $searchText,
+                            twoFAScrollTrigger: twoFAScrollTrigger,
+                            requestedTwoFASubtype: requestedTwoFASubtype,
                             onToggleFavorite: { id in
                                 withAnimation(.spring(response: 0.36, dampingFraction: 0.72)) {
                                     if let idx = items.firstIndex(where: { $0.id == id }) {
