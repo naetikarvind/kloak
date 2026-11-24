@@ -231,6 +231,7 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
     public var trashed: Bool
     public var createdAt: String
     public var updatedAt: String
+    public var usedRecoveryCodes: [Int]  // indices (0-based) of codes that have been used/ticked
 
     public init(
         id: String = UUID().uuidString,
@@ -251,7 +252,8 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         favorite: Bool = false,
         trashed: Bool = false,
         createdAt: String = ISO8601DateFormatter().string(from: Date()),
-        updatedAt: String = ISO8601DateFormatter().string(from: Date())
+        updatedAt: String = ISO8601DateFormatter().string(from: Date()),
+        usedRecoveryCodes: [Int] = []
     ) {
         self.id = id
         self.type = type
@@ -272,6 +274,31 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.trashed = trashed
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.usedRecoveryCodes = usedRecoveryCodes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.type = try container.decode(ItemType.self, forKey: .type)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.username = try container.decodeIfPresent(String.self, forKey: .username)
+        self.password = try container.decodeIfPresent(String.self, forKey: .password)
+        self.urls = (try? container.decode([String].self, forKey: .urls)) ?? []
+        self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        self.totpSecret = try container.decodeIfPresent(String.self, forKey: .totpSecret)
+        self.oauth = try container.decodeIfPresent(OAuthDetails.self, forKey: .oauth)
+        self.card = try container.decodeIfPresent(CardDetails.self, forKey: .card)
+        self.identity = try container.decodeIfPresent(IdentityDetails.self, forKey: .identity)
+        self.alias = try container.decodeIfPresent(AliasDetails.self, forKey: .alias)
+        self.authenticatorDetails = try container.decodeIfPresent(AuthenticatorDetails.self, forKey: .authenticatorDetails)
+        self.customFields = try container.decodeIfPresent([CustomField].self, forKey: .customFields)
+        self.tags = (try? container.decode([String].self, forKey: .tags)) ?? []
+        self.favorite = (try? container.decode(Bool.self, forKey: .favorite)) ?? false
+        self.trashed = (try? container.decode(Bool.self, forKey: .trashed)) ?? false
+        self.createdAt = (try? container.decode(String.self, forKey: .createdAt)) ?? ISO8601DateFormatter().string(from: Date())
+        self.updatedAt = (try? container.decode(String.self, forKey: .updatedAt)) ?? ISO8601DateFormatter().string(from: Date())
+        self.usedRecoveryCodes = (try? container.decode([Int].self, forKey: .usedRecoveryCodes)) ?? []
     }
 
     public var displaySubtitle: String {

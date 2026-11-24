@@ -73,15 +73,10 @@ public struct VaultMainView: View {
             } else {
                 base = items.filter { $0.type == type && !$0.trashed }
             }
-        case .twoFASubtype(let subtype):
-            switch subtype {
-            case .all:
-                base = items.filter { !$0.trashed && $0.is2FA }
-            case .authenticator:
-                base = items.filter { !$0.trashed && $0.isAuthenticator }
-            case .recoveryCodes:
-                base = items.filter { !$0.trashed && $0.isRecoveryCode }
-            }
+        case .twoFASubtype:
+            // Subtypes in sidebar are markers that scroll the list to the selected sub-heading;
+            // all 2FA items remain in the list so preceding items are still visible when scrolled up
+            base = items.filter { !$0.trashed && $0.is2FA }
         case .folder(let folderId):
             if let targetFolder = folders.first(where: { $0.id == folderId }) {
                 base = items.filter { $0.belongsTo(folder: targetFolder, allFolders: folders) }

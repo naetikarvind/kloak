@@ -695,6 +695,18 @@ public final class VaultStore: ObservableObject {
         return (addedCount, [])
     }
 
+    public func toggleRecoveryCodeUsed(itemId: String, index: Int) {
+        guard let idx = items.firstIndex(where: { $0.id == itemId }) else { return }
+        var item = items[idx]
+        if item.usedRecoveryCodes.contains(index) {
+            item.usedRecoveryCodes.removeAll { $0 == index }
+        } else {
+            item.usedRecoveryCodes.append(index)
+        }
+        items[idx] = item
+        saveVault()
+    }
+
     // MARK: - Title Sanitization & Brand Canonicalization
 
     public func sanitizeAllItemTitles() {

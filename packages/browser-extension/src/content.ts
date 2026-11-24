@@ -22,6 +22,7 @@ let shadowRoot: ShadowRoot | null = null;
 let activePopup: HTMLElement | null = null;
 let currentTargetInput: HTMLInputElement | null = null;
 let cachedCredentialsForSite: any[] = [];
+let allVaultItems: any[] = [];
 let hasFetchedCredentials = false;
 let currentPasswordLength = 18;
 let currentGeneratedPassword = '';
@@ -29,6 +30,13 @@ let isRevealingPasswordMap: { [key: string]: boolean } = {};
 let cachedAiEvaluation: any = null;
 let isAiDrawerExpanded = false;
 let activeLockedPollTimer: any = null;
+
+// Initial sync of all vault items for cross-referencing recovery notes
+chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (res) => {
+  if (res && Array.isArray(res.items)) {
+    allVaultItems = res.items;
+  }
+});
 
 // ── Active URL Sync ──
 function pushActiveUrl() {
@@ -508,7 +516,7 @@ const POPUP_STYLES = `
     flex-direction: column;
     padding: 7px;
     gap: 6px;
-    max-height: 380px;
+    max-height: 480px;
     overflow-y: auto;
   }
 
@@ -739,6 +747,191 @@ const POPUP_STYLES = `
     font-weight: 700;
     color: #FBBF24;
     margin-right: 2px;
+  }
+
+  /* ── Japanese Bento 2FA Authenticator & Recovery Containers ── */
+  .kloak-bento-auth-container {
+    background: linear-gradient(135deg, rgba(41, 201, 143, 0.08) 0%, rgba(20, 18, 30, 0.85) 100%);
+    border: 1px solid rgba(41, 201, 143, 0.3);
+    border-radius: 6px;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    transition: all 0.15s ease;
+    margin-top: 4px;
+  }
+  .kloak-bento-auth-container:hover {
+    background: linear-gradient(135deg, rgba(41, 201, 143, 0.14) 0%, rgba(28, 26, 42, 0.95) 100%);
+    border-color: rgba(41, 201, 143, 0.55);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  }
+  .kloak-bento-auth-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .kloak-bento-auth-icon {
+    width: 14px;
+    height: 14px;
+    fill: #29C98F;
+    flex-shrink: 0;
+  }
+  .kloak-bento-auth-title {
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #29C98F;
+  }
+  .kloak-bento-auth-code {
+    font-family: 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(41, 201, 143, 0.4);
+  }
+  .kloak-bento-auth-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .kloak-bento-auth-countdown {
+    font-family: 'SF Mono', monospace;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #29C98F;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(41, 201, 143, 0.25);
+    padding: 1.5px 5px;
+    border-radius: 8px;
+  }
+  .kloak-bento-auth-countdown.warn {
+    color: #F59E0B;
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  .kloak-bento-auth-countdown.danger {
+    color: #EF4444;
+    border-color: rgba(239, 68, 68, 0.4);
+  }
+  .kloak-bento-auth-copy-pill {
+    font-size: 8px;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: rgba(41, 201, 143, 0.2);
+    border: 1px solid rgba(41, 201, 143, 0.35);
+    color: #29C98F;
+    padding: 2px 5px;
+    border-radius: 4px;
+    transition: all 0.12s;
+  }
+  .kloak-bento-auth-copy-pill.copied {
+    background: #10B981;
+    color: #FFFFFF;
+  }
+
+  /* ── Japanese Bento Recovery Codes Container ── */
+  .kloak-bento-recovery-container {
+    background: rgba(18, 16, 28, 0.85);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    border-radius: 6px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    margin-top: 4px;
+  }
+  .kloak-bento-recovery-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .kloak-bento-recovery-title-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .kloak-bento-recovery-title {
+    font-size: 8px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #34D399;
+  }
+  .kloak-bento-recovery-badge {
+    font-size: 8px;
+    font-weight: 700;
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #34D399;
+    padding: 1px 4px;
+    border-radius: 6px;
+  }
+  .kloak-bento-recovery-list {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-height: 85px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+  .kloak-bento-recovery-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    padding: 2px 5px;
+    gap: 6px;
+    transition: background 0.12s;
+  }
+  .kloak-bento-recovery-item:hover {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(16, 185, 129, 0.2);
+  }
+  .kloak-bento-recovery-item.used {
+    opacity: 0.45;
+  }
+  .kloak-bento-recovery-item.used .kloak-bento-recovery-code {
+    text-decoration: line-through;
+  }
+  .kloak-bento-recovery-checkbox {
+    cursor: pointer;
+    accent-color: #10B981;
+    width: 11px;
+    height: 11px;
+  }
+  .kloak-bento-recovery-code {
+    font-family: 'SF Mono', 'Fira Code', Menlo, monospace;
+    font-size: 9.5px;
+    color: #E2E8F0;
+    letter-spacing: 0.8px;
+    flex: 1;
+    cursor: pointer;
+  }
+  .kloak-bento-recovery-copy {
+    background: transparent;
+    border: none;
+    color: #94A3B8;
+    cursor: pointer;
+    font-size: 8.5px;
+    padding: 1px 3px;
+    border-radius: 2px;
+  }
+  .kloak-bento-recovery-copy:hover {
+    color: #FFFFFF;
+    background: rgba(255,255,255,0.08);
   }
 
   /* ── Shrunk Bottom Bento Compartments (Generator & Alias) ── */
@@ -1021,6 +1214,120 @@ function updateActivePopupPosition() {
   activePopup.style.left = `${left}px`;
 }
 
+// ── Lightweight Client-Side TOTP Generator ──
+async function generateTOTP(base32Secret: string): Promise<string> {
+  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const cleanSecret = base32Secret.replace(/\s+/g, '').toUpperCase();
+  let bits = 0, value = 0;
+  const bytes: number[] = [];
+  for (const char of cleanSecret) {
+    if (char === '=') continue;
+    const charIdx = base32Chars.indexOf(char);
+    if (charIdx === -1) continue;
+    value = (value << 5) | charIdx;
+    bits += 5;
+    if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  const keyBuffer = new Uint8Array(bytes);
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  const counterBuffer = new ArrayBuffer(8);
+  const counterView = new DataView(counterBuffer);
+  counterView.setUint32(4, counter, false);
+  const cryptoKey = await crypto.subtle.importKey('raw', keyBuffer, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const hmac = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, counterBuffer));
+  const offset = hmac[hmac.length - 1] & 0xf;
+  const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset+1] << 16 | hmac[offset+2] << 8 | hmac[offset+3]) % 1_000_000;
+  return code.toString().padStart(6, '0');
+}
+
+// ── Recovery Code Note Matchers ──
+function isRecoveryCodeNote(item: any): boolean {
+  if (!item) return false;
+  if (item.type !== 'secure_note' && item.type !== 'note') {
+    if (item.type && item.type !== 'login') return false;
+    if (!item.notes || item.password) return false;
+  }
+  const tags: string[] = item.tags || [];
+  if (tags.some((t: string) => /recovery/i.test(t))) return true;
+  const lowerTitle = (item.title || '').toLowerCase();
+  if (
+    lowerTitle.includes('recovery code') ||
+    lowerTitle.includes('recovery codes') ||
+    lowerTitle.includes('backup code') ||
+    lowerTitle.includes('backup codes') ||
+    lowerTitle.includes('recovery key') ||
+    lowerTitle.includes('emergency kit') ||
+    lowerTitle.includes('2fa backup') ||
+    lowerTitle.includes('recovery')
+  ) {
+    return true;
+  }
+  const notes = item.notes || '';
+  if (notes) {
+    const lines = notes.split(/\r?\n/)
+      .map((l: string) => l.trim())
+      .filter((l: string) => l.length > 0 && !l.startsWith('#') && !l.startsWith('//'));
+    if (lines.length >= 2 && lines.length <= 40) {
+      const codeRegex = /^[a-zA-Z0-9]{4,}(-[a-zA-Z0-9]{3,})*$/;
+      const matches = lines.filter((l: string) => codeRegex.test(l.replace(/\s+/g, ''))).length;
+      if (matches >= Math.max(1, Math.floor(lines.length / 2))) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getRecoveryCodesList(noteItem: any): string[] {
+  if (!noteItem || !noteItem.notes) return [];
+  return (noteItem.notes as string)
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && !l.startsWith('#') && !l.startsWith('//') && !l.toLowerCase().startsWith('note:'));
+}
+
+function findAssociatedRecoveryNote(item: any, allItems: any[]): any | null {
+  if (!item || !allItems || allItems.length === 0) return null;
+  const brandTerms: string[] = [];
+  if (item.title) {
+    const cleanTitle = item.title.replace(/\([^)]*\)/g, '').trim();
+    const parts = cleanTitle.split(/[\s\-–—:|/]+/).filter((p: string) => p.length >= 3);
+    for (const p of parts) {
+      brandTerms.push(p.toLowerCase());
+    }
+  }
+  if (item.urls && item.urls.length > 0) {
+    try {
+      const urlStr = item.urls[0].startsWith('http') ? item.urls[0] : `https://${item.urls[0]}`;
+      const host = new URL(urlStr).hostname.replace(/^www\./, '');
+      const sld = host.split('.')[0];
+      if (sld && sld.length >= 3 && !brandTerms.includes(sld.toLowerCase())) {
+        brandTerms.push(sld.toLowerCase());
+      }
+    } catch {}
+  }
+  try {
+    const host = window.location.hostname.replace(/^www\./, '');
+    const sld = host.split('.')[0];
+    if (sld && sld.length >= 3 && !brandTerms.includes(sld.toLowerCase())) {
+      brandTerms.push(sld.toLowerCase());
+    }
+  } catch {}
+
+  const recoveryNotes = allItems.filter(i => isRecoveryCodeNote(i));
+  if (recoveryNotes.length === 0) return null;
+
+  for (const note of recoveryNotes) {
+    const noteTitle = (note.title || '').toLowerCase();
+    for (const term of brandTerms) {
+      if (noteTitle.includes(term)) {
+        return note;
+      }
+    }
+  }
+  return null;
+}
+
 // ── Japanese Bento Box Popup Builder ──
 function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean = true, animateReveal: boolean = false) {
   currentTargetInput = input;
@@ -1045,11 +1352,27 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
   const isSignup = isRegistrationOrSignupPage();
   const pageContext = analyzePageContext(input);
 
-  const estimatedHeight = !isUnlocked
-    ? 210
-    : (items.length > 0 && !isSignup
-        ? (items[0]?.totpSecret || pageContext.hasOtpField ? 220 : 185)
-        : 160);
+  // Smart Sizing: compact (standard: 185px), medium (+60px with TOTP), tall (+130px more with Recovery)
+  const firstItemHasTotp = items.length > 0 && Boolean(items[0]?.totpSecret);
+  const firstItemRecoveryNote = (firstItemHasTotp && allVaultItems.length > 0)
+    ? findAssociatedRecoveryNote(items[0], allVaultItems)
+    : null;
+  const firstItemHasRecovery = firstItemHasTotp && Boolean(firstItemRecoveryNote);
+
+  let estimatedHeight = 185;
+  if (!isUnlocked) {
+    estimatedHeight = 210;
+  } else if (isSignup) {
+    estimatedHeight = 160;
+  } else if (items.length > 0) {
+    if (firstItemHasRecovery) {
+      estimatedHeight = 185 + 60 + 130; // Tall (+130px more, scrollable: 375px)
+    } else if (firstItemHasTotp) {
+      estimatedHeight = 185 + 60; // Medium (+60px: 245px)
+    } else {
+      estimatedHeight = 185; // Compact (standard height: 185px)
+    }
+  }
 
   const { top, left } = calculatePopupPosition(rect, estimatedHeight);
 
@@ -1132,6 +1455,11 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
       const maskedPassword = '••••••••••••';
       const hasTotp = !!item.totpSecret;
 
+      const matchedRecovery = (hasTotp && allVaultItems.length > 0)
+        ? findAssociatedRecoveryNote(item, allVaultItems)
+        : null;
+      const recoveryCodes = matchedRecovery ? getRecoveryCodesList(matchedRecovery) : [];
+
       let riskGaugeHtml = '';
       if (item.password) {
         const risk = evaluateCredentialRisk(item, items);
@@ -1183,27 +1511,55 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
               <button class="kloak-bento-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">📋</button>
             </div>
           </div>
+        </div>
 
-          <!-- Horizontal Textbox 3: TOTP Code Filler (Context Aware) -->
-          ${hasTotp ? `
-            <div class="kloak-bento-textbox ${pageContext.hasOtpField ? 'highlighted' : ''}" id="box-totp-${itemId}">
-              <span class="kloak-bento-label totp">2FA OTP</span>
-              <span class="kloak-bento-val totp-code" id="totp-val-${itemId}">------</span>
-              <span class="kloak-bento-timer-badge" id="totp-timer-${itemId}">⏳ 30s</span>
-              <div class="kloak-bento-actions">
-                <button class="kloak-bento-btn fill-btn" id="fill-totp-btn-${itemId}" title="Fill 2FA Code">⚡ Fill Code</button>
-                <button class="kloak-bento-btn" id="copy-totp-btn-${itemId}" title="Copy 2FA Code">📋</button>
+        <!-- Bento-Style Containers Below Credentials (When item has totpSecret) -->
+        ${hasTotp ? `
+          <!-- 1. Authenticator container: live TOTP code, auto-copies when clicked -->
+          <div class="kloak-bento-auth-container" id="bento-auth-container-${itemId}" title="Click to copy live 2FA code">
+            <div class="kloak-bento-auth-left">
+              <svg class="kloak-bento-auth-icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+              <div style="display: flex; flex-direction: column;">
+                <span class="kloak-bento-auth-title">Authenticator</span>
+                <span class="kloak-bento-auth-code" id="bento-auth-code-${itemId}">------</span>
               </div>
             </div>
-          ` : (pageContext.hasOtpField ? `
-            <div class="kloak-bento-textbox" id="box-totp-${itemId}">
-              <span class="kloak-bento-label totp">2FA OTP</span>
-              <span class="kloak-bento-val" style="color: #8C8899; font-size: 9px;">No 2FA secret saved in vault</span>
-              <div class="kloak-bento-actions">
-                <button class="kloak-bento-btn" id="copy-user-btn-fallback-${itemId}" title="Fill Username">👤 User</button>
+            <div class="kloak-bento-auth-right">
+              <span class="kloak-bento-auth-countdown" id="bento-auth-timer-${itemId}">⏳ 30s</span>
+              <span class="kloak-bento-auth-copy-pill" id="bento-auth-copy-${itemId}">Copy</span>
+            </div>
+          </div>
+
+          <!-- 2. Recovery Codes container (if item has recovery codes note in allItems) -->
+          ${(matchedRecovery && recoveryCodes.length > 0) ? `
+            <div class="kloak-bento-recovery-container" id="bento-recovery-container-${itemId}">
+              <div class="kloak-bento-recovery-header">
+                <div class="kloak-bento-recovery-title-group">
+                  <svg viewBox="0 0 24 24" style="width: 12px; height: 12px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+                  <span class="kloak-bento-recovery-title">Recovery Codes</span>
+                </div>
+                <span class="kloak-bento-recovery-badge" id="bento-recovery-badge-${itemId}">${recoveryCodes.length} Codes</span>
+              </div>
+              <div class="kloak-bento-recovery-list" id="bento-recovery-list-${itemId}">
+                ${recoveryCodes.map((c, cIdx) => `
+                  <div class="kloak-bento-recovery-item" data-index="${cIdx}" id="rec-item-${itemId}-${cIdx}">
+                    <input type="checkbox" class="kloak-bento-recovery-checkbox" data-index="${cIdx}" id="rec-check-${itemId}-${cIdx}">
+                    <span class="kloak-bento-recovery-code" data-code="${c}" title="Click to copy">${c}</span>
+                    <button class="kloak-bento-recovery-copy" data-code="${c}" title="Copy Code">📋</button>
+                  </div>
+                `).join('')}
               </div>
             </div>
-          ` : '')}
+          ` : ''}
+        ` : (pageContext.hasOtpField ? `
+          <div class="kloak-bento-textbox" id="box-totp-${itemId}">
+            <span class="kloak-bento-label totp">2FA OTP</span>
+            <span class="kloak-bento-val" style="color: #8C8899; font-size: 9px;">No 2FA secret saved in vault</span>
+            <div class="kloak-bento-actions">
+              <button class="kloak-bento-btn" id="copy-user-btn-fallback-${itemId}" title="Fill Username">👤 User</button>
+            </div>
+          </div>
+        ` : '')}
         </div>
       `;
 
@@ -1310,82 +1666,149 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
         }
       });
 
-      // ── Event Handlers: TOTP Live Ticker & Code Filling ──
+      // ── Event Handlers: Bento 2FA (Authenticator & Recovery Codes) ──
       if (hasTotp) {
         let currentTotpToken = '';
 
         const updateTotpDisplay = (token: string, secRemaining: number) => {
           currentTotpToken = token;
-          const valEl = card.querySelector(`#totp-val-${itemId}`) as HTMLElement;
-          const timerEl = card.querySelector(`#totp-timer-${itemId}`) as HTMLElement;
-          if (valEl) {
-            valEl.textContent = token.length === 6 ? `${token.slice(0, 3)} ${token.slice(3)}` : token;
+          const codeEl = card.querySelector(`#bento-auth-code-${itemId}`) as HTMLElement | null;
+          const timerEl = card.querySelector(`#bento-auth-timer-${itemId}`) as HTMLElement | null;
+          if (codeEl) {
+            codeEl.textContent = token.length === 6 ? `${token.slice(0, 3)} ${token.slice(3)}` : token;
           }
           if (timerEl) {
             timerEl.textContent = `⏳ ${secRemaining}s`;
+            timerEl.classList.toggle('warn', secRemaining <= 10 && secRemaining > 5);
+            timerEl.classList.toggle('danger', secRemaining <= 5);
           }
         };
 
-        const fetchTotp = () => {
-          chrome.runtime.sendMessage({ type: 'GET_TOTP', secret: item.totpSecret }, (res) => {
-            if (res && res.success && res.token) {
-              const sec = res.secondsRemaining ?? (30 - Math.floor((Date.now() / 1000) % 30));
-              updateTotpDisplay(res.token, sec);
-            }
-          });
+        const generateAndRefresh = async () => {
+          const sec = 30 - Math.floor((Date.now() / 1000) % 30);
+          try {
+            const token = await generateTOTP(item.totpSecret);
+            updateTotpDisplay(token, sec);
+          } catch {
+            updateTotpDisplay('------', sec);
+          }
         };
 
-        fetchTotp();
+        generateAndRefresh();
         activeTotpInterval = setInterval(() => {
           const sec = 30 - Math.floor((Date.now() / 1000) % 30);
           if (sec === 30 || !currentTotpToken) {
-            fetchTotp();
+            generateAndRefresh();
           } else {
-            const timerEl = card.querySelector(`#totp-timer-${itemId}`) as HTMLElement;
-            if (timerEl) timerEl.textContent = `⏳ ${sec}s`;
+            const timerEl = card.querySelector(`#bento-auth-timer-${itemId}`) as HTMLElement | null;
+            if (timerEl) {
+              timerEl.textContent = `⏳ ${sec}s`;
+              timerEl.classList.toggle('warn', sec <= 10 && sec > 5);
+              timerEl.classList.toggle('danger', sec <= 5);
+            }
           }
         }, 1000);
 
-        const handleTotpFillAction = (e: Event) => {
+        // Click on Authenticator container auto-copies live TOTP code
+        const authContainer = card.querySelector(`#bento-auth-container-${itemId}`) as HTMLElement | null;
+        authContainer?.addEventListener('click', async (e) => {
           e.stopPropagation();
-          const cleanToken = currentTotpToken.replace(/\s+/g, '');
-          if (!cleanToken) return;
-
-          if (pageContext.hasOtpField && pageContext.otpInputs.length > 0) {
-            if (pageContext.otpInputs.length === 1) {
-              setInputValue(pageContext.otpInputs[0], cleanToken);
-            } else {
-              pageContext.otpInputs.forEach((inp, idx) => {
-                if (cleanToken[idx]) setInputValue(inp, cleanToken[idx]);
-              });
-            }
-            showToastNotification(`✨ Filled 2FA code (${cleanToken}) into page!`);
-            setTimeout(() => cleanDismiss(), 200);
-          } else {
-            navigator.clipboard.writeText(cleanToken);
-            showToastNotification(`📋 2FA code (${cleanToken}) copied to clipboard!`);
+          let cleanToken = currentTotpToken.replace(/\s+/g, '');
+          if (!cleanToken || cleanToken === '------') {
+            cleanToken = await generateTOTP(item.totpSecret);
           }
-        };
-
-        card.querySelector(`#fill-totp-btn-${itemId}`)?.addEventListener('click', handleTotpFillAction);
-
-        card.querySelector(`#copy-totp-btn-${itemId}`)?.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const cleanToken = currentTotpToken.replace(/\s+/g, '');
           if (cleanToken) {
-            navigator.clipboard.writeText(cleanToken);
-            const btn = card.querySelector(`#copy-totp-btn-${itemId}`) as HTMLElement;
-            if (btn) {
-              btn.classList.add('copied');
-              btn.textContent = '✓';
+            await navigator.clipboard.writeText(cleanToken);
+            const copyPill = card.querySelector(`#bento-auth-copy-${itemId}`) as HTMLElement | null;
+            if (copyPill) {
+              copyPill.classList.add('copied');
+              copyPill.textContent = 'Copied!';
               setTimeout(() => {
-                btn.classList.remove('copied');
-                btn.textContent = '📋';
-              }, 1500);
+                copyPill.classList.remove('copied');
+                copyPill.textContent = 'Copy';
+              }, 1600);
             }
-            showToastNotification(`📋 2FA code (${cleanToken}) copied!`);
+            showToastNotification(`🛡️ 2FA code (${cleanToken}) copied!`);
+
+            if (pageContext.hasOtpField && pageContext.otpInputs.length > 0) {
+              if (pageContext.otpInputs.length === 1) {
+                setInputValue(pageContext.otpInputs[0], cleanToken);
+              } else {
+                pageContext.otpInputs.forEach((inp, i) => {
+                  if (cleanToken[i]) setInputValue(inp, cleanToken[i]);
+                });
+              }
+              showToastNotification(`✨ Filled 2FA code (${cleanToken}) into page!`);
+              setTimeout(() => cleanDismiss(), 250);
+            }
           }
         });
+
+        // Setup Recovery Codes Container & Usage Tracking in chrome.storage.local
+        if (matchedRecovery && recoveryCodes.length > 0) {
+          const storageKey = `recovery_used_${itemId}`;
+          const recoveryContainer = card.querySelector(`#bento-recovery-container-${itemId}`) as HTMLElement | null;
+          if (recoveryContainer) {
+            chrome.storage.local.get([storageKey], (res) => {
+              const used: number[] = res[storageKey] || [];
+              used.forEach(idx => {
+                const itemRow = recoveryContainer.querySelector(`#rec-item-${itemId}-${idx}`);
+                const checkbox = recoveryContainer.querySelector(`#rec-check-${itemId}-${idx}`) as HTMLInputElement | null;
+                if (checkbox) checkbox.checked = true;
+                if (itemRow) itemRow.classList.add('used');
+              });
+              const badge = recoveryContainer.querySelector(`#bento-recovery-badge-${itemId}`);
+              if (badge) {
+                const remaining = Math.max(0, recoveryCodes.length - used.length);
+                badge.textContent = `${remaining}/${recoveryCodes.length} Left`;
+              }
+            });
+
+            recoveryContainer.querySelectorAll('.kloak-bento-recovery-checkbox').forEach(cb => {
+              cb.addEventListener('click', (e) => {
+                e.stopPropagation();
+              });
+              cb.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const checkbox = e.target as HTMLInputElement;
+                const codeIdx = parseInt(checkbox.dataset.index || '0', 10);
+                chrome.storage.local.get([storageKey], (res) => {
+                  let used: number[] = res[storageKey] || [];
+                  if (checkbox.checked) {
+                    if (!used.includes(codeIdx)) used.push(codeIdx);
+                  } else {
+                    used = used.filter(i => i !== codeIdx);
+                  }
+                  chrome.storage.local.set({ [storageKey]: used });
+
+                  const itemRow = recoveryContainer.querySelector(`#rec-item-${itemId}-${codeIdx}`);
+                  if (checkbox.checked) {
+                    itemRow?.classList.add('used');
+                  } else {
+                    itemRow?.classList.remove('used');
+                  }
+
+                  const badge = recoveryContainer.querySelector(`#bento-recovery-badge-${itemId}`);
+                  if (badge) {
+                    const remaining = Math.max(0, recoveryCodes.length - used.length);
+                    badge.textContent = `${remaining}/${recoveryCodes.length} Left`;
+                  }
+                });
+              });
+            });
+
+            recoveryContainer.querySelectorAll('.kloak-bento-recovery-code, .kloak-bento-recovery-copy').forEach(el => {
+              el.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const codeText = el.getAttribute('data-code') || el.textContent || '';
+                if (codeText) {
+                  await navigator.clipboard.writeText(codeText.trim());
+                  showToastNotification(`📋 Copied recovery code: ${codeText.trim()}`);
+                }
+              });
+            });
+          }
+        }
       }
 
       savedSection.appendChild(card);
@@ -1658,7 +2081,17 @@ function triggerCredentialPopupForInput(input: HTMLInputElement) {
     }
     const isUnlocked = response ? response.isUnlocked !== false : true;
     hasFetchedCredentials = true;
-    buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
+
+    if (allVaultItems.length === 0 && isUnlocked) {
+      chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (vaultRes) => {
+        if (vaultRes && Array.isArray(vaultRes.items)) {
+          allVaultItems = vaultRes.items;
+        }
+        buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
+      });
+    } else {
+      buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
+    }
   });
 }
 

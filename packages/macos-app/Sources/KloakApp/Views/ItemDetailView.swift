@@ -36,6 +36,8 @@ public struct ItemDetailView: View {
         self.onDidFocus2FA = onDidFocus2FA
     }
 
+    @ObservedObject var vaultStore: VaultStore = .shared
+
     private enum DetailFocusField: Hashable {
         case title
         case username
@@ -625,8 +627,31 @@ public struct ItemDetailView: View {
 
     // MARK: - Login View & Edit Sections
 
+    private var is2FAContext: Bool {
+        if case .category(let type) = currentSection, type == .authenticator { return true }
+        if case .twoFASubtype = currentSection { return true }
+        return false
+    }
+
     @ViewBuilder
     private var loginViewSection: some View {
+        if is2FAContext {
+            // In 2FA tabs: Authenticator 2FA container comes FIRST on top, username and password below
+            login2FAContainer
+            loginUsernameContainer
+            loginPasswordContainer
+            loginCustomFieldsAndUrls
+        } else {
+            // In normal tabs: username, password, custom fields, urls, and 2FA below
+            loginUsernameContainer
+            loginPasswordContainer
+            loginCustomFieldsAndUrls
+            login2FAContainer
+        }
+    }
+
+    @ViewBuilder
+    private var loginUsernameContainer: some View {
         if let username = item.username, !username.isEmpty {
             DetailFieldRow(
                 label: "USERNAME / EMAIL",
@@ -635,7 +660,10 @@ public struct ItemDetailView: View {
                 onCopy: { copyToClipboard(username, "username") }
             )
         }
+    }
 
+    @ViewBuilder
+    private var loginPasswordContainer: some View {
         if let password = item.password, !password.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 Text("PASSWORD")
@@ -727,7 +755,80 @@ public struct ItemDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             }
         }
+    }
 
+    @ViewBuilder
+    private var login2FAContainer: some View {
+        if let totp = item.totpSecret, !totp.isEmpty {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("AUTHENTICATOR (2FA)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button(action: {
+                        startEditing()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            focusedField = .totpSecret
+                        }
+                    }) {
+                        HStack(spacing: 3) {
+                            Image(systemName: "pencil")
+                            Text("Edit Key")
+                        }
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                TOTPRingView(secret: totp)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AUTHENTICATOR (2FA)")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    Text("No 2FA attached to this login")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary.opacity(0.6))
+                        .italic()
+
+                    Spacer()
+
+                    Button(action: {
+                        startEditing()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            focusedField = .totpSecret
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Add 2FA")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundColor(LiquidGlassTheme.primaryAccent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(10)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var loginCustomFieldsAndUrls: some View {
         // Custom Fields & Alternate Passwords
         if let fields = item.customFields, !fields.isEmpty {
             ForEach(fields) { field in
@@ -843,21 +944,14 @@ public struct ItemDetailView: View {
                 }
             }
         }
-
-        // Live Authenticator (if attached to login)
-        if let totp = item.totpSecret, !totp.isEmpty {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("AUTHENTICATOR (2FA)")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.secondary)
-
-                TOTPRingView(secret: totp)
-            }
-        }
     }
 
     @ViewBuilder
     private var loginEditSection: some View {
+        if is2FAContext {
+            loginTotpEditField
+        }
+
         VStack(alignment: .leading, spacing: 6) {
             Text("USERNAME / EMAIL")
                 .font(.system(size: 10, weight: .bold))
@@ -983,6 +1077,13 @@ public struct ItemDetailView: View {
         }
 
         // Authenticator
+        if !is2FAContext {
+            loginTotpEditField
+        }
+    }
+
+    @ViewBuilder
+    private var loginTotpEditField: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("AUTHENTICATOR (2FA SECRET KEY)")
                 .font(.system(size: 10, weight: .bold))
@@ -1573,7 +1674,11 @@ public struct ItemDetailView: View {
     }
 
     private func recoveryCodesViewSection(notes: String) -> some View {
-        let codes = item.recoveryCodesList
+        let currentItem = vaultStore.items.first(where: { $0.id == item.id }) ?? item
+        let codes = currentItem.recoveryCodesList
+        let usedCount = currentItem.usedRecoveryCodes.count
+        let totalCount = codes.count
+        let progress = totalCount > 0 ? Double(usedCount) / Double(totalCount) : 0.0
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 HStack(spacing: 5) {
@@ -1596,19 +1701,64 @@ public struct ItemDetailView: View {
                 .buttonStyle(.plain)
             }
 
+            // Progress indicator
+            if totalCount > 0 {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("\(usedCount) / \(totalCount) used")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(usedCount == totalCount ? LiquidGlassTheme.emeraldAccent : .secondary)
+                        Spacer()
+                        if usedCount == totalCount {
+                            Text("All used")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white.opacity(0.08))
+                                .frame(height: 4)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(LiquidGlassTheme.emeraldAccent)
+                                .frame(width: geo.size.width * progress, height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+                }
+                .padding(.bottom, 2)
+            }
+
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 8)], spacing: 8) {
                 ForEach(Array(codes.enumerated()), id: \.offset) { idx, code in
                     let fieldId = "code_\(idx)"
+                    let isUsed = currentItem.usedRecoveryCodes.contains(idx)
                     HStack(spacing: 6) {
-                        Text("\(idx + 1)")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.secondary.opacity(0.6))
-                            .frame(width: 16, alignment: .trailing)
+                        // Checkbox / tick circle
+                        Button(action: {
+                            vaultStore.toggleRecoveryCodeUsed(itemId: item.id, index: idx)
+                            if let updated = vaultStore.items.first(where: { $0.id == item.id }) {
+                                item = updated
+                                onSave(updated)
+                            }
+                        }) {
+                            Image(systemName: isUsed ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 14))
+                                .foregroundColor(isUsed ? LiquidGlassTheme.emeraldAccent : .secondary.opacity(0.5))
+                        }
+                        .buttonStyle(.plain)
+                        .help(isUsed ? "Mark as unused" : "Mark as used")
 
                         Text(code)
                             .font(.system(size: 12, weight: .medium, design: .monospaced))
                             .lineLimit(1)
-                            .foregroundColor(.white)
+                            .foregroundColor(isUsed ? .secondary.opacity(0.5) : .white)
+                            .strikethrough(isUsed, color: .secondary.opacity(0.5))
 
                         Spacer(minLength: 2)
 
@@ -1618,11 +1768,16 @@ public struct ItemDetailView: View {
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 7)
-                    .background(Color.black.opacity(0.35))
+                    .background(isUsed ? Color.black.opacity(0.2) : Color.black.opacity(0.35))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(copiedField == fieldId ? LiquidGlassTheme.emeraldAccent.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 0.8)
+                            .stroke(
+                                copiedField == fieldId
+                                    ? LiquidGlassTheme.emeraldAccent.opacity(0.6)
+                                    : (isUsed ? Color.white.opacity(0.04) : Color.white.opacity(0.08)),
+                                lineWidth: 0.8
+                            )
                     )
                     .contentShape(Rectangle())
                     .onTapGesture {

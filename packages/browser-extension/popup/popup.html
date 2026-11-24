@@ -1173,6 +1173,68 @@
       fill: currentColor;
     }
 
+    /* ── Bento Grid 2FA Layout ── */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 8px;
+      padding: 8px;
+      margin-bottom: 12px;
+    }
+    .bento-cell {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .bento-cell:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+    .bento-cell.span-full { grid-column: 1 / -1; }
+    .bento-cell.bento-totp-cell {
+      background: linear-gradient(135deg, rgba(41, 201, 143, 0.09) 0%, rgba(33, 31, 45, 0.95) 100%);
+      border-color: rgba(41, 201, 143, 0.3);
+    }
+    .bento-cell.bento-recovery-cell {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(33, 31, 45, 0.95) 100%);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .bento-cell-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .bento-cell-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .bento-cred-value {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin: 4px 0 8px 0;
+    }
+    .bento-cell-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
     /* ── METADATA ── */
     .meta-row {
       display: flex; justify-content: space-between; padding: 6px 12px;
@@ -2292,6 +2354,10 @@
         <button class="filter-btn" id="filter-favorites" title="Favorites">
           <svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
           Favorites
+        </button>
+        <button class="filter-btn" id="filter-2fa" title="2FA Authenticator & Recovery">
+          <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          2FA
         </button>
         <button class="filter-btn" id="filter-generator" title="Password Generator">
           <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.9 17.58 11 21 11 21z"/></svg>

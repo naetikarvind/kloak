@@ -51,18 +51,20 @@ public final class AccessibilityAutofillPanelManager {
     private var hostingView: NSHostingView<AccessibilityAutofillPopupView>? = nil
 
     private let panelWidth: CGFloat = 360
-    private let panelHeight: CGFloat = 430
+    private var currentHeight: CGFloat = 320
+    private var currentAnchorRect: NSRect? = nil
 
     private init() {}
 
     public func show(anchoredTo rect: NSRect?, targetAppName: String) {
-        let panelRect = calculateFrame(anchoredTo: rect)
+        self.currentAnchorRect = rect
+        let panelRect = calculateFrame(anchoredTo: rect, height: currentHeight)
 
         if panel == nil {
             let newPanel = AccessibilityAutofillPanel(contentRect: panelRect)
             let view = AccessibilityAutofillPopupView()
             let hosting = NSHostingView(rootView: view)
-            hosting.frame = NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight)
+            hosting.frame = NSRect(x: 0, y: 0, width: panelWidth, height: currentHeight)
             newPanel.contentView = hosting
 
             self.panel = newPanel
@@ -72,19 +74,30 @@ public final class AccessibilityAutofillPanelManager {
         guard let p = panel else { return }
 
         p.setFrame(panelRect, display: true, animate: false)
-        // Do NOT call NSApp.activate() or makeKeyAndOrderFront() here:
-        // • activate() would steal focus from the target app, breaking AX coordinate lookup.
-        // • makeKeyAndOrderFront() triggers canBecomeKey (now false), which would be a no-op
-        //   anyway, but its side effects can reorder windows unexpectedly on macOS 14+.
-        // orderFrontRegardless() is sufficient for a .nonactivatingPanel at .popUpMenu level.
         p.orderFrontRegardless()
+    }
+
+    public func updateHeight(_ newHeight: CGFloat) {
+        let clamped = max(200, min(500, newHeight))
+        guard let p = panel, abs(currentHeight - clamped) > 3 else { return }
+        currentHeight = clamped
+        let newFrame = calculateFrame(anchoredTo: currentAnchorRect, height: clamped)
+        if let h = hostingView {
+            h.frame = NSRect(x: 0, y: 0, width: panelWidth, height: clamped)
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.22
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            p.animator().setFrame(newFrame, display: true)
+        }
     }
 
     public func hide() {
         panel?.orderOut(nil)
     }
 
-    private func calculateFrame(anchoredTo targetRect: NSRect?) -> NSRect {
+    private func calculateFrame(anchoredTo targetRect: NSRect?, height: CGFloat? = nil) -> NSRect {
+        let activeHeight = height ?? currentHeight
         let screens = NSScreen.screens
         let primaryScreen = screens.first ?? NSScreen.main!
 
@@ -95,7 +108,7 @@ public final class AccessibilityAutofillPanelManager {
 
             var x = rect.origin.x
             // Default position: 8pt directly below the focused input field
-            var y = rect.origin.y - panelHeight - 8
+            var y = rect.origin.y - activeHeight - 8
 
             // Flip above if panel would clip bottom of screen
             if y < screenFrame.minY {
@@ -110,7 +123,7 @@ public final class AccessibilityAutofillPanelManager {
                 x = screenFrame.minX + 12
             }
 
-            return NSRect(x: x, y: y, width: panelWidth, height: panelHeight)
+            return NSRect(x: x, y: y, width: panelWidth, height: activeHeight)
         } else {
             // Fallback: place below mouse pointer or centered on screen
             let mouse = NSEvent.mouseLocation
@@ -118,16 +131,16 @@ public final class AccessibilityAutofillPanelManager {
             let screenFrame = screen.visibleFrame
 
             var x = mouse.x - (panelWidth / 2)
-            var y = mouse.y - panelHeight - 12
+            var y = mouse.y - activeHeight - 12
 
             if y < screenFrame.minY {
                 y = mouse.y + 16
             }
 
             x = min(max(x, screenFrame.minX + 12), screenFrame.maxX - panelWidth - 12)
-            y = min(max(y, screenFrame.minY + 12), screenFrame.maxY - panelHeight - 12)
+            y = min(max(y, screenFrame.minY + 12), screenFrame.maxY - activeHeight - 12)
 
-            return NSRect(x: x, y: y, width: panelWidth, height: panelHeight)
+            return NSRect(x: x, y: y, width: panelWidth, height: activeHeight)
         }
     }
 }
@@ -185,6 +198,32 @@ public struct AccessibilityAutofillPopupView: View {
         return autofillService.smartSuggestions
     }
 
+    @State private var revealedPasswords: Set<String> = []
+
+    private var smartCalculatedHeight: CGFloat {
+        if !vaultStore.isUnlocked {
+            return 225
+        }
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return 440
+        }
+        if let top = displayedSuggestions.first {
+            var h: CGFloat = 265
+            if top.totpSecret != nil && !top.totpSecret!.isEmpty {
+                h += 38
+            }
+            if top.isRecoveryCode || top.recoveryCodesCount > 0 {
+                h += 42
+            }
+            if displayedSuggestions.count > 1 {
+                h = min(450, h + CGFloat(displayedSuggestions.count - 1) * 75)
+            }
+            return min(460, max(245, h))
+        }
+        return 280
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
             headerBar
@@ -199,7 +238,13 @@ public struct AccessibilityAutofillPopupView: View {
 
             footerBar
         }
-        .frame(width: 360, height: 430)
+        .frame(width: 360, height: smartCalculatedHeight)
+        .onChange(of: smartCalculatedHeight) { _, newH in
+            AccessibilityAutofillPanelManager.shared.updateHeight(newH)
+        }
+        .onAppear {
+            AccessibilityAutofillPanelManager.shared.updateHeight(smartCalculatedHeight)
+        }
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(Color(red: 0.07, green: 0.09, blue: 0.15).opacity(0.96))
@@ -384,84 +429,106 @@ public struct AccessibilityAutofillPopupView: View {
         }
     }
 
-    // MARK: - Individual Item Card
+    // MARK: - Individual Item Bento Card
 
     @ViewBuilder
     private func autofillItemCard(_ item: VaultItem, isHighlighted: Bool) -> some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                FaviconView(urls: item.urls, title: item.title, itemType: item.type, size: 28)
+        VStack(spacing: 6) {
+            // Bento Header Compartment
+            HStack(spacing: 8) {
+                FaviconView(urls: item.urls, title: item.title, itemType: item.type, size: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 1) {
                     Text(item.title)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(1)
 
-                    if let user = item.username, !user.isEmpty {
-                        Text(user)
-                            .font(.system(size: 11))
-                            .foregroundColor(.white.opacity(0.75))
+                    if let domain = item.urls.first {
+                        let cleanHost = domain.replacingOccurrences(of: "https://", with: "")
+                            .replacingOccurrences(of: "http://", with: "")
+                            .components(separatedBy: "/").first ?? ""
+                        Text("• \(cleanHost)")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 }
 
                 Spacer()
 
-                // Primary Autofill Button
+                // Primary 1-Click Master Fill All
                 Button(action: {
                     autofillService.performAutofill(item: item, mode: .all)
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "bolt.fill")
-                            .font(.system(size: 10))
-                        Text("Autofill")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(.system(size: 9))
+                        Text("Fill All")
+                            .font(.system(size: 10, weight: .bold))
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
                     .background(
                         LinearGradient(
-                            colors: isHighlighted
-                                ? [LiquidGlassTheme.primaryAccent, Color.blue]
-                                : [Color.white.opacity(0.18), Color.white.opacity(0.10)],
+                            colors: [LiquidGlassTheme.primaryAccent, Color.blue],
                             startPoint: .top,
                             endPoint: .bottom
                         )
                     )
                     .foregroundColor(.white)
                     .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(isHighlighted ? 0.35 : 0.15), lineWidth: 0.75)
-                    )
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.bottom, 2)
 
-            // Quick Actions: Username / Password / 2FA
-            HStack(spacing: 6) {
+            // Horizontal Bento Compartments (User, Password, 2FA OTP, Recovery)
+            VStack(spacing: 4) {
+                // USER Compartment
                 if let user = item.username, !user.isEmpty {
-                    quickActionPill(icon: "person.fill", label: "User") {
-                        autofillService.performAutofill(item: item, mode: .usernameOnly)
-                    }
+                    bentoCompartmentRow(
+                        label: "USER",
+                        value: user,
+                        isMono: false,
+                        onFill: { autofillService.performAutofill(item: item, mode: .usernameOnly) },
+                        onCopy: { copyString(user) }
+                    )
                 }
 
+                // PASS Compartment
                 if let pass = item.password, !pass.isEmpty {
-                    quickActionPill(icon: "key.fill", label: "Password") {
-                        autofillService.performAutofill(item: item, mode: .passwordOnly)
-                    }
+                    let isRevealed = revealedPasswords.contains(item.id)
+                    bentoCompartmentRow(
+                        label: "PASS",
+                        value: isRevealed ? pass : "••••••••••••",
+                        isMono: true,
+                        revealAction: {
+                            if isRevealed { revealedPasswords.remove(item.id) }
+                            else { revealedPasswords.insert(item.id) }
+                        },
+                        isRevealed: isRevealed,
+                        onFill: { autofillService.performAutofill(item: item, mode: .passwordOnly) },
+                        onCopy: { copyString(pass) }
+                    )
                 }
 
+                // 2FA OTP Compartment
                 if let secret = item.totpSecret, !secret.isEmpty {
                     if let totp = TOTPEngine.shared.generate(secretBase32: secret) {
-                        quickActionPill(icon: "clock.badge.checkmark.fill", label: "\(totp.token) (\(totp.secondsRemaining)s)") {
-                            autofillService.performAutofill(item: item, mode: .totpOnly)
-                        }
+                        bentoTotpRow(
+                            code: totp.token,
+                            remainingSeconds: totp.secondsRemaining,
+                            onFill: { autofillService.performAutofill(item: item, mode: .totpOnly) },
+                            onCopy: { copyString(totp.token) }
+                        )
                     }
                 }
 
-                Spacer()
+                // RECOVERY CODES Compartment
+                if item.isRecoveryCode || item.recoveryCodesCount > 0 {
+                    bentoRecoveryCodesRow(item: item)
+                }
             }
         }
         .padding(10)
@@ -470,33 +537,179 @@ public struct AccessibilityAutofillPopupView: View {
                 .fill(isHighlighted ? Color.white.opacity(0.06) : Color.white.opacity(0.03))
                 .overlay(
                     RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(
-                            isHighlighted ? LiquidGlassTheme.primaryAccent.opacity(0.4) : Color.white.opacity(0.07),
-                            lineWidth: 1
-                        )
+                        .stroke(isHighlighted ? LiquidGlassTheme.primaryAccent.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
                 )
         )
     }
 
-    private func quickActionPill(icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 9))
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
+    @ViewBuilder
+    private func bentoCompartmentRow(
+        label: String,
+        value: String,
+        isMono: Bool,
+        revealAction: (() -> Void)? = nil,
+        isRevealed: Bool = false,
+        onFill: @escaping () -> Void,
+        onCopy: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 8.5, weight: .bold))
+                .foregroundColor(.secondary.opacity(0.8))
+                .frame(width: 32, alignment: .leading)
+
+            Text(value)
+                .font(isMono ? .system(size: 11.5, weight: .medium, design: .monospaced) : .system(size: 11.5))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer()
+
+            if let rev = revealAction {
+                Button(action: rev) {
+                    Image(systemName: isRevealed ? "eye.slash" : "eye")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(Color.black.opacity(0.35))
-            .foregroundColor(.white.opacity(0.85))
-            .clipShape(RoundedRectangle(cornerRadius: 5))
-            .overlay(
-                RoundedRectangle(cornerRadius: 5)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
-            )
+
+            Button(action: onFill) {
+                Text("⚡ Fill")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onCopy) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(6)
+        .background(Color.black.opacity(0.25))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func bentoTotpRow(
+        code: String,
+        remainingSeconds: Int,
+        onFill: @escaping () -> Void,
+        onCopy: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 6) {
+            Text("2FA OTP")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(LiquidGlassTheme.amberAccent)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(LiquidGlassTheme.amberAccent.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+
+            Text(code)
+                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .foregroundColor(LiquidGlassTheme.amberAccent)
+
+            Text("⏳ \(remainingSeconds)s")
+                .font(.system(size: 9.5))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Button(action: onFill) {
+                Text("⚡ Fill")
+                    .font(.system(size: 9.5, weight: .semibold))
+                    .foregroundColor(LiquidGlassTheme.amberAccent)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(LiquidGlassTheme.amberAccent.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onCopy) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(6)
+        .background(Color.black.opacity(0.25))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    @ViewBuilder
+    private func bentoRecoveryCodesRow(item: VaultItem) -> some View {
+        let codes = item.recoveryCodesList
+        let nextIndex = codes.indices.first(where: { !item.usedRecoveryCodes.contains($0) }) ?? 0
+        let nextCode = codes.indices.contains(nextIndex) ? codes[nextIndex] : ""
+        let isAllUsed = !codes.isEmpty && item.usedRecoveryCodes.count >= codes.count
+
+        HStack(spacing: 6) {
+            Text("2FA REC")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 2)
+                .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+
+            if !nextCode.isEmpty && !isAllUsed {
+                Text("#\(nextIndex + 1): \(nextCode)")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            } else {
+                Text(isAllUsed ? "All codes used" : "Recovery codes")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if !nextCode.isEmpty && !isAllUsed {
+                Button(action: {
+                    VaultStore.shared.toggleRecoveryCodeUsed(itemId: item.id, index: nextIndex)
+                }) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 11))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                }
+                .buttonStyle(.plain)
+                .help("Mark code as used")
+
+                Button(action: {
+                    copyString(nextCode)
+                    VaultStore.shared.toggleRecoveryCodeUsed(itemId: item.id, index: nextIndex)
+                }) {
+                    Text("⚡ Fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(Color.black.opacity(0.25))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func copyString(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     // MARK: - Empty State

@@ -16,7 +16,6 @@ public struct ItemListView: View {
     var onEmptyTrash: (() -> Void)? = nil
 
     @State private var isShowingEmptyTrashConfirm: Bool = false
-    @State private var active2FASubtype: TwoFASubtype = .all
 
     private var is2FASection: Bool {
         if case .category(let t) = currentSection, t == .authenticator { return true }
@@ -25,10 +24,8 @@ public struct ItemListView: View {
     }
 
     private var current2FASubtype: TwoFASubtype {
-        if case .twoFASubtype(let s) = currentSection {
-            return s
-        }
-        return active2FASubtype
+        if case .twoFASubtype(let s) = currentSection { return s }
+        return .all
     }
 
     private var authenticatorItems: [VaultItem] {
@@ -192,26 +189,6 @@ public struct ItemListView: View {
 
             Divider().opacity(0.12)
 
-            // Sub-headings filter pills for 2FA
-            if is2FASection {
-                HStack(spacing: 6) {
-                    twoFAPillButton("All 2FA", count: items.filter { $0.is2FA }.count, isSelected: current2FASubtype == .all) {
-                        active2FASubtype = .all
-                    }
-                    twoFAPillButton("Authenticator", count: authenticatorItems.count, isSelected: current2FASubtype == .authenticator) {
-                        active2FASubtype = .authenticator
-                    }
-                    twoFAPillButton("Recovery Codes", count: recoveryItems.count, isSelected: current2FASubtype == .recoveryCodes) {
-                        active2FASubtype = .recoveryCodes
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-
-                Divider().opacity(0.08)
-            }
-
             // Items List
             if items.isEmpty {
                 VStack(spacing: 12) {
@@ -240,53 +217,65 @@ public struct ItemListView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .transition(.opacity)
             } else {
-                List(selection: $selectedItemId) {
-                    if is2FASection && current2FASubtype == .all && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
-                        if !authenticatorItems.isEmpty {
-                            Section {
-                                ForEach(authenticatorItems) { item in
-                                    itemRow(item)
+                ScrollViewReader { proxy in
+                    List(selection: $selectedItemId) {
+                        if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
+                            if !authenticatorItems.isEmpty {
+                                Section {
+                                    ForEach(authenticatorItems) { item in
+                                        itemRow(item)
+                                    }
+                                } header: {
+                                    twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
+                                        .id("section_authenticator")
                                 }
-                            } header: {
-                                twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
                             }
-                        }
 
-                        if !recoveryItems.isEmpty {
-                            Section {
-                                ForEach(recoveryItems) { item in
-                                    itemRow(item)
+                            if !recoveryItems.isEmpty {
+                                Section {
+                                    ForEach(recoveryItems) { item in
+                                        itemRow(item)
+                                    }
+                                } header: {
+                                    twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
+                                        .id("section_recovery")
                                 }
-                            } header: {
-                                twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
                             }
-                        }
-                    } else if is2FASection && current2FASubtype == .authenticator {
-                        Section {
-                            ForEach(authenticatorItems) { item in
+                        } else {
+                            ForEach(items) { item in
                                 itemRow(item)
                             }
-                        } header: {
-                            twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
                         }
-                    } else if is2FASection && current2FASubtype == .recoveryCodes {
-                        Section {
-                            ForEach(recoveryItems) { item in
-                                itemRow(item)
+                    }
+                    .listStyle(.inset)
+                    .tint(LiquidGlassTheme.primaryAccent)
+                    .accentColor(LiquidGlassTheme.primaryAccent)
+                    .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items)
+                    .onChange(of: currentSection) { _, newSection in
+                        if case .twoFASubtype(let sub) = newSection {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if sub == .recoveryCodes {
+                                    proxy.scrollTo("section_recovery", anchor: .top)
+                                } else if sub == .authenticator {
+                                    proxy.scrollTo("section_authenticator", anchor: .top)
+                                }
                             }
-                        } header: {
-                            twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
                         }
-                    } else {
-                        ForEach(items) { item in
-                            itemRow(item)
+                    }
+                    .onAppear {
+                        if case .twoFASubtype(let sub) = currentSection {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if sub == .recoveryCodes {
+                                        proxy.scrollTo("section_recovery", anchor: .top)
+                                    } else if sub == .authenticator {
+                                        proxy.scrollTo("section_authenticator", anchor: .top)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
-                .listStyle(.inset)
-                .tint(LiquidGlassTheme.primaryAccent)
-                .accentColor(LiquidGlassTheme.primaryAccent)
-                .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items)
             }
         }
         .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items.isEmpty)

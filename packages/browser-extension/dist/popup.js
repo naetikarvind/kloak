@@ -2447,6 +2447,7 @@
     document.getElementById("filter-all")?.classList.remove("active");
     document.getElementById("filter-logins")?.classList.remove("active");
     document.getElementById("filter-favorites")?.classList.remove("active");
+    document.getElementById("filter-2fa")?.classList.remove("active");
     document.getElementById("filter-generator")?.classList.remove("active");
     activeBtn?.classList.add("active");
   }
@@ -2454,6 +2455,7 @@
     const filterAllBtn = document.getElementById("filter-all");
     const filterLoginsBtn = document.getElementById("filter-logins");
     const filterFavsBtn = document.getElementById("filter-favorites");
+    const filter2faBtn = document.getElementById("filter-2fa");
     const filterGenBtn = document.getElementById("filter-generator");
     const headerGenBtn = document.getElementById("btn-header-gen");
     filterAllBtn?.addEventListener("click", () => {
@@ -2483,6 +2485,16 @@
       const favItems = allItems.filter((i) => Boolean(i.favorite));
       if (favItems.length > 0 && (!activeItem || !favItems.some((i) => i.id === activeItem.id))) {
         selectItem(favItems[0]);
+      }
+    });
+    filter2faBtn?.addEventListener("click", () => {
+      isGeneratorOpen = false;
+      currentFilterMode = "2fa";
+      updateActiveFilterTab(filter2faBtn);
+      applyFilterAndSort(true);
+      const twoFaItems = allItems.filter((i) => i.type === "authenticator" || Boolean(i.totpSecret));
+      if (twoFaItems.length > 0 && (!activeItem || !twoFaItems.some((i) => i.id === activeItem.id))) {
+        selectItem(twoFaItems[0]);
       }
     });
     filterGenBtn?.addEventListener("click", () => {
@@ -2565,6 +2577,8 @@
       filtered = filtered.filter((item) => Boolean(item.favorite));
     } else if (currentFilterMode === "logins") {
       filtered = filtered.filter((item) => item.type === "login" || !item.type);
+    } else if (currentFilterMode === "2fa") {
+      filtered = filtered.filter((item) => item.type === "authenticator" || Boolean(item.totpSecret));
     }
     if (rawQuery) {
       const terms = rawQuery.split(/\s+/).filter(Boolean);
@@ -4473,7 +4487,7 @@ ${notes}`;
     container.innerHTML = "";
     const groupHeader = document.createElement("div");
     groupHeader.className = "list-group-header";
-    groupHeader.textContent = currentFilterMode === "favorites" ? "Favorites" : currentFilterMode === "logins" ? "Logins" : "All items";
+    groupHeader.textContent = currentFilterMode === "favorites" ? "Favorites" : currentFilterMode === "logins" ? "Logins" : currentFilterMode === "2fa" ? "2FA / Authenticator" : "All items";
     container.appendChild(groupHeader);
     const newRows = [];
     items.forEach((item) => {
@@ -4557,6 +4571,68 @@ ${notes}`;
     });
     renderDetailPane(item);
   }
+  function isRecoveryCodeNote(item) {
+    if (!item) return false;
+    if (item.type !== "secure_note" && item.type !== "note") {
+      if (item.type && item.type !== "login") return false;
+      if (!item.notes || item.password) return false;
+    }
+    const tags = item.tags || [];
+    if (tags.some((t) => /recovery/i.test(t))) return true;
+    const lowerTitle = (item.title || "").toLowerCase();
+    if (lowerTitle.includes("recovery code") || lowerTitle.includes("recovery codes") || lowerTitle.includes("backup code") || lowerTitle.includes("backup codes") || lowerTitle.includes("recovery key") || lowerTitle.includes("emergency kit") || lowerTitle.includes("2fa backup") || lowerTitle.includes("recovery")) {
+      return true;
+    }
+    const notes = item.notes || "";
+    if (notes) {
+      const lines = notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//"));
+      if (lines.length >= 2 && lines.length <= 40) {
+        const codeRegex = /^[a-zA-Z0-9]{4,}(-[a-zA-Z0-9]{3,})*$/;
+        const matches = lines.filter((l) => codeRegex.test(l.replace(/\s+/g, ""))).length;
+        if (matches >= Math.max(1, Math.floor(lines.length / 2))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  function getRecoveryCodesList(noteItem) {
+    if (!noteItem || !noteItem.notes) return [];
+    return noteItem.notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//") && !l.toLowerCase().startsWith("note:"));
+  }
+  function findAssociatedRecoveryNote(item, items) {
+    if (!item || !items || items.length === 0) return null;
+    const brandTerms = [];
+    if (item.title) {
+      const cleanTitle = item.title.replace(/\([^)]*\)/g, "").trim();
+      const parts = cleanTitle.split(/[\s\-–—:|/]+/).filter((p) => p.length >= 3);
+      for (const p of parts) {
+        brandTerms.push(p.toLowerCase());
+      }
+    }
+    if (item.urls && item.urls.length > 0) {
+      try {
+        const urlStr = item.urls[0].startsWith("http") ? item.urls[0] : `https://${item.urls[0]}`;
+        const host = new URL(urlStr).hostname.replace(/^www\./, "");
+        const sld = host.split(".")[0];
+        if (sld && sld.length >= 3 && !brandTerms.includes(sld.toLowerCase())) {
+          brandTerms.push(sld.toLowerCase());
+        }
+      } catch {
+      }
+    }
+    const recoveryNotes = items.filter((i) => isRecoveryCodeNote(i));
+    if (recoveryNotes.length === 0) return null;
+    for (const note of recoveryNotes) {
+      const noteTitle = (note.title || "").toLowerCase();
+      for (const term of brandTerms) {
+        if (noteTitle.includes(term)) {
+          return note;
+        }
+      }
+    }
+    return null;
+  }
   function renderDetailPane(item) {
     const container = document.getElementById("detail-pane");
     if (!container) return;
@@ -4610,70 +4686,220 @@ ${notes}`;
     header.appendChild(titleGroup);
     header.appendChild(actionsDiv);
     container.appendChild(header);
-    const card1 = document.createElement("div");
-    card1.className = "card";
-    if (username) {
-      card1.innerHTML += `
-      <div class="card-row">
-        <div class="card-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+    if (hasTotp) {
+      const bentoGrid = document.createElement("div");
+      bentoGrid.className = "bento-grid";
+      const totpCell = document.createElement("div");
+      totpCell.className = "bento-cell bento-totp-cell";
+      totpCell.innerHTML = `
+      <div class="totp-header" style="margin-bottom: 6px;">
+        <div class="totp-label-group">
+          <div class="totp-shield-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+          </div>
+          <span class="totp-title">Authenticator</span>
         </div>
-        <div class="card-content">
-          <div class="card-label">Username</div>
-          <div class="card-value" id="user-val"></div>
+        <div class="totp-countdown-pill" id="totp-countdown-pill">
+          <svg class="totp-countdown-svg" viewBox="0 0 24 24">
+            <circle class="totp-svg-bg" cx="12" cy="12" r="9"></circle>
+            <circle class="totp-svg-progress" id="totp-svg-progress" cx="12" cy="12" r="9"></circle>
+          </svg>
+          <span id="totp-timer-text">30s</span>
         </div>
-        <div class="card-actions">
-          <div class="action-icon" id="copy-user" title="Copy">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      </div>
+      <div class="totp-body-row" id="copy-totp-row" title="Click to copy code">
+        <div class="totp-code-display" id="totp-code" style="font-size: 17px; letter-spacing: 2px;">------</div>
+        <button class="totp-copy-btn" id="copy-totp-btn">
+          <svg class="copy-icon-svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <span id="totp-copy-text">Copy</span>
+        </button>
+      </div>
+    `;
+      bentoGrid.appendChild(totpCell);
+      const matchedRecoveryNote = findAssociatedRecoveryNote(item, allItems);
+      const recoveryCell = document.createElement("div");
+      recoveryCell.className = "bento-cell bento-recovery-cell";
+      if (matchedRecoveryNote) {
+        const codes = getRecoveryCodesList(matchedRecoveryNote);
+        recoveryCell.style.cursor = "pointer";
+        recoveryCell.title = `View associated note: ${matchedRecoveryNote.title || "Recovery Codes"}`;
+        recoveryCell.innerHTML = `
+        <div class="bento-cell-header">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            <span class="bento-cell-title" style="color: #10B981;">Recovery</span>
+          </div>
+          <span style="background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 700;">
+            ${codes.length} Codes
+          </span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          ${escHtml(matchedRecoveryNote.title || "Backup Codes")}
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+          <span style="font-size: 9.5px; color: #10B981; font-weight: 600;">\u2713 Linked Kit</span>
+          <button class="btn-pill" id="btn-jump-recovery" style="height: 22px; padding: 0 8px; font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">View</button>
+        </div>
+      `;
+        recoveryCell.addEventListener("click", () => {
+          selectItem(matchedRecoveryNote);
+        });
+      } else {
+        recoveryCell.innerHTML = `
+        <div class="bento-cell-header">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: var(--text-muted);"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+            <span class="bento-cell-title">Recovery</span>
+          </div>
+          <span style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 1px 6px; border-radius: 8px; font-size: 9.5px;">
+            0 Linked
+          </span>
+        </div>
+        <div style="font-size: 10px; color: var(--text-muted); line-height: 1.3; margin-top: 4px;">
+          No backup codes note detected in vault.
+        </div>
+      `;
+      }
+      bentoGrid.appendChild(recoveryCell);
+      const userCell = document.createElement("div");
+      userCell.className = "bento-cell bento-user-cell";
+      userCell.innerHTML = `
+      <div class="bento-cell-header">
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: currentColor; color: var(--text-muted);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          <span class="bento-cell-title">Username</span>
+        </div>
+        <div class="action-icon" id="copy-user" title="Copy" style="cursor: pointer;">
+          <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+        </div>
+      </div>
+      <div class="bento-cred-value" id="user-val" title="${escHtml(username || "")}">${escHtml(username || "No username")}</div>
+    `;
+      bentoGrid.appendChild(userCell);
+      const pwdCell = document.createElement("div");
+      pwdCell.className = "bento-cell bento-pwd-cell";
+      pwdCell.innerHTML = `
+      <div class="bento-cell-header">
+        <div style="display: flex; align-items: center; gap: 5px;">
+          <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: var(--color-login);"><path d="${PROTON_ICONS.login}"/></svg>
+          <span class="bento-cell-title">Password</span>
+        </div>
+        <div class="bento-cell-actions">
+          <div class="action-icon" id="toggle-pwd" title="Reveal" style="cursor: pointer;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+          </div>
+          <div class="action-icon" id="copy-pwd" title="Copy" style="cursor: pointer;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           </div>
         </div>
       </div>
+      <div class="bento-cred-value" id="pwd-val" style="letter-spacing: 2px;">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</div>
     `;
-    }
-    if (email && email !== username) {
-      card1.innerHTML += `
-      <div class="card-row">
-        <div class="card-icon" style="color: var(--color-alias);">
-          <svg viewBox="0 0 24 24"><path d="${PROTON_ICONS.alias}"/></svg>
-        </div>
-        <div class="card-content">
-          <div class="card-label">Email</div>
-          <div class="card-value" id="email-val"></div>
-        </div>
-        <div class="card-actions">
-          <div class="action-icon" id="copy-email" title="Copy">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+      bentoGrid.appendChild(pwdCell);
+      if (email && email !== username) {
+        const emailCell = document.createElement("div");
+        emailCell.className = "bento-cell span-full";
+        emailCell.innerHTML = `
+        <div class="bento-cell-header">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: var(--color-alias);"><path d="${PROTON_ICONS.alias}"/></svg>
+            <span class="bento-cell-title">Email</span>
+          </div>
+          <div class="action-icon" id="copy-email" title="Copy" style="cursor: pointer;">
+            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
           </div>
         </div>
-      </div>
-    `;
-    }
-    if (item.password) {
-      card1.innerHTML += `
-      <div class="card-row">
-        <div class="card-icon" style="color: var(--color-login);">
-          <svg viewBox="0 0 24 24"><path d="${PROTON_ICONS.login}"/></svg>
-        </div>
-        <div class="card-content">
-          <div class="card-label">Password</div>
-          <div class="card-value" id="pwd-val" style="letter-spacing: 2px;">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</div>
-        </div>
-        <div class="card-actions">
-          <div class="action-icon" id="toggle-pwd" title="Reveal">
-            <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        <div class="bento-cred-value" id="email-val">${escHtml(email)}</div>
+      `;
+        bentoGrid.appendChild(emailCell);
+      }
+      container.appendChild(bentoGrid);
+      const handleCopy = async (e) => {
+        e.stopPropagation();
+        const codeEl = document.getElementById("totp-code");
+        const rawCode = (codeEl?.textContent || "").replace(/\s+/g, "");
+        if (!rawCode || rawCode === "------") return;
+        await copyToClipboardText(rawCode);
+        const copyBtn = document.getElementById("copy-totp-btn");
+        const copyText = document.getElementById("totp-copy-text");
+        if (copyBtn && copyText) {
+          copyBtn.classList.add("copied");
+          copyText.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.classList.remove("copied");
+            copyText.textContent = "Copy";
+          }, 1800);
+        }
+      };
+      totpCell.querySelector("#copy-totp-row")?.addEventListener("click", handleCopy);
+      totpCell.querySelector("#copy-totp-btn")?.addEventListener("click", handleCopy);
+      startTotpCounter(item.totpSecret);
+    } else {
+      const card1 = document.createElement("div");
+      card1.className = "card";
+      if (username) {
+        card1.innerHTML += `
+        <div class="card-row">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
           </div>
-          <div class="action-icon" id="copy-pwd" title="Copy">
-            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <div class="card-content">
+            <div class="card-label">Username</div>
+            <div class="card-value" id="user-val"></div>
+          </div>
+          <div class="card-actions">
+            <div class="action-icon" id="copy-user" title="Copy">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </div>
           </div>
         </div>
-      </div>
-    `;
+      `;
+      }
+      if (email && email !== username) {
+        card1.innerHTML += `
+        <div class="card-row">
+          <div class="card-icon" style="color: var(--color-alias);">
+            <svg viewBox="0 0 24 24"><path d="${PROTON_ICONS.alias}"/></svg>
+          </div>
+          <div class="card-content">
+            <div class="card-label">Email</div>
+            <div class="card-value" id="email-val"></div>
+          </div>
+          <div class="card-actions">
+            <div class="action-icon" id="copy-email" title="Copy">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </div>
+          </div>
+        </div>
+      `;
+      }
+      if (item.password) {
+        card1.innerHTML += `
+        <div class="card-row">
+          <div class="card-icon" style="color: var(--color-login);">
+            <svg viewBox="0 0 24 24"><path d="${PROTON_ICONS.login}"/></svg>
+          </div>
+          <div class="card-content">
+            <div class="card-label">Password</div>
+            <div class="card-value" id="pwd-val" style="letter-spacing: 2px;">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</div>
+          </div>
+          <div class="card-actions">
+            <div class="action-icon" id="toggle-pwd" title="Reveal">
+              <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+            </div>
+            <div class="action-icon" id="copy-pwd" title="Copy">
+              <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </div>
+          </div>
+        </div>
+      `;
+      }
+      container.appendChild(card1);
+      const userVal = document.getElementById("user-val");
+      if (userVal) userVal.textContent = username;
+      const emailVal = document.getElementById("email-val");
+      if (emailVal) emailVal.textContent = email;
     }
-    container.appendChild(card1);
-    const userVal = document.getElementById("user-val");
-    if (userVal) userVal.textContent = username;
-    const emailVal = document.getElementById("email-val");
-    if (emailVal) emailVal.textContent = email;
     if (item.type === "login" && item.password) {
       const risk = evaluateCredentialRisk(item, allItems);
       const riskCard = document.createElement("div");
@@ -4706,55 +4932,6 @@ ${notes}`;
       </div>
     `;
       container.appendChild(riskCard);
-    }
-    if (item.totpSecret) {
-      const totpCard = document.createElement("div");
-      totpCard.className = "totp-container";
-      totpCard.innerHTML = `
-      <div class="totp-header">
-        <div class="totp-label-group">
-          <div class="totp-shield-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-          </div>
-          <span class="totp-title">Authenticator</span>
-        </div>
-        <div class="totp-countdown-pill" id="totp-countdown-pill">
-          <svg class="totp-countdown-svg" viewBox="0 0 24 24">
-            <circle class="totp-svg-bg" cx="12" cy="12" r="9"></circle>
-            <circle class="totp-svg-progress" id="totp-svg-progress" cx="12" cy="12" r="9"></circle>
-          </svg>
-          <span id="totp-timer-text">30s</span>
-        </div>
-      </div>
-      <div class="totp-body-row" id="copy-totp-row" title="Click to copy code">
-        <div class="totp-code-display" id="totp-code">------</div>
-        <button class="totp-copy-btn" id="copy-totp-btn">
-          <svg class="copy-icon-svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          <span id="totp-copy-text">Copy</span>
-        </button>
-      </div>
-    `;
-      container.appendChild(totpCard);
-      const handleCopy = async (e) => {
-        e.stopPropagation();
-        const codeEl = document.getElementById("totp-code");
-        const rawCode = (codeEl?.textContent || "").replace(/\s+/g, "");
-        if (!rawCode || rawCode === "------") return;
-        await copyToClipboardText(rawCode);
-        const copyBtn = document.getElementById("copy-totp-btn");
-        const copyText = document.getElementById("totp-copy-text");
-        if (copyBtn && copyText) {
-          copyBtn.classList.add("copied");
-          copyText.textContent = "Copied!";
-          setTimeout(() => {
-            copyBtn.classList.remove("copied");
-            copyText.textContent = "Copy";
-          }, 1800);
-        }
-      };
-      totpCard.querySelector("#copy-totp-row")?.addEventListener("click", handleCopy);
-      totpCard.querySelector("#copy-totp-btn")?.addEventListener("click", handleCopy);
-      startTotpCounter(item.totpSecret);
     }
     if (urls.length > 0) {
       const urlCard = document.createElement("div");

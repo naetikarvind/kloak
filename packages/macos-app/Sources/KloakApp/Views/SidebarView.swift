@@ -76,32 +76,46 @@ public struct SidebarView: View {
             }
             .tag(NavigationSection.category(.authenticator))
 
-            NavigationLink(value: NavigationSection.twoFASubtype(.authenticator)) {
-                Label {
+            Button(action: { selection = .twoFASubtype(.authenticator) }) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(LiquidGlassTheme.primaryAccent)
+                        .frame(width: 5, height: 5)
                     Text("Authenticator")
-                        .font(.system(size: 12))
-                } icon: {
-                    Image(systemName: "timer")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(selection == .twoFASubtype(.authenticator) ? .primary : .secondary)
+                    Spacer()
+                    if authCount > 0 {
+                        Text("\(authCount)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
                 }
                 .padding(.leading, 12)
-                .badge(authCount)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .tag(NavigationSection.twoFASubtype(.authenticator))
 
-            NavigationLink(value: NavigationSection.twoFASubtype(.recoveryCodes)) {
-                Label {
+            Button(action: { selection = .twoFASubtype(.recoveryCodes) }) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(LiquidGlassTheme.emeraldAccent)
+                        .frame(width: 5, height: 5)
                     Text("Recovery Codes")
-                        .font(.system(size: 12))
-                } icon: {
-                    Image(systemName: "key.horizontal.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(selection == .twoFASubtype(.recoveryCodes) ? .primary : .secondary)
+                    Spacer()
+                    if recoveryCount > 0 {
+                        Text("\(recoveryCount)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
                 }
                 .padding(.leading, 12)
-                .badge(recoveryCount)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .tag(NavigationSection.twoFASubtype(.recoveryCodes))
         }
     }
