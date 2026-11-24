@@ -241,15 +241,8 @@ public struct SidebarView: View {
                     }
                     .tag(NavigationSection.generator)
 
-                    let combinableCount = CredentialCombinerService.shared.findCombinableGroups(in: items).count
                     NavigationLink(value: NavigationSection.combineCredentials) {
-                        Label {
-                            Text("Combine Credentials")
-                        } icon: {
-                            Image(systemName: "arrow.triangle.merge")
-                                .foregroundColor(combinableCount > 0 ? LiquidGlassTheme.primaryAccent : .secondary)
-                        }
-                        .badge(combinableCount)
+                        Label("Combine Credentials", systemImage: "arrow.triangle.merge")
                     }
                     .tag(NavigationSection.combineCredentials)
 

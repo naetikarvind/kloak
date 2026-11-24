@@ -165,6 +165,117 @@ public struct CredentialCombinerService: Sendable {
         return results.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
     }
 
+    // MARK: - User-Driven Multi-Item Combination & Preview
+
+    /// Generates a live merged preview of the resulting unified item from any user-selected items.
+    public func generatePreview(primaryId: String?, items: [VaultItem], customTitle: String? = nil) -> VaultItem? {
+        guard !items.isEmpty else { return nil }
+
+        let primary = items.first(where: { $0.id == primaryId })
+            ?? items.first(where: { $0.type == .login })
+            ?? items.first!
+
+        var preview = primary
+
+        if let ct = customTitle?.trimmingCharacters(in: .whitespacesAndNewlines), !ct.isEmpty {
+            preview.title = ct
+        } else {
+            preview.title = BrandTitleService.cleanTitle(primary.title, url: primary.urls.first)
+        }
+
+        for item in items where item.id != primary.id {
+            // Username & Password
+            if (preview.username == nil || preview.username?.isEmpty == true) && (item.username != nil && !item.username!.isEmpty) {
+                preview.username = item.username
+            }
+            if (preview.password == nil || preview.password?.isEmpty == true) && (item.password != nil && !item.password!.isEmpty) {
+                preview.password = item.password
+            }
+
+            // TOTP / 2FA
+            if (preview.totpSecret == nil || preview.totpSecret?.isEmpty == true) && (item.totpSecret != nil && !item.totpSecret!.isEmpty) {
+                preview.totpSecret = item.totpSecret
+                preview.authenticatorDetails = item.authenticatorDetails
+                if !preview.tags.contains("2FA") { preview.tags.append("2FA") }
+            }
+
+            // Recovery Codes / Notes
+            if item.isRecoveryCode {
+                if let recNote = item.notes, !recNote.isEmpty {
+                    if preview.notes == nil || preview.notes?.isEmpty == true {
+                        preview.notes = recNote
+                    } else if let pNotes = preview.notes, !pNotes.contains(item.recoveryCodesList.first ?? "---") {
+                        preview.notes = "\(pNotes)\n\n\(recNote)"
+                    }
+                }
+                let combinedUsed = Set(preview.usedRecoveryCodes).union(item.usedRecoveryCodes)
+                preview.usedRecoveryCodes = Array(combinedUsed).sorted()
+                if !preview.tags.contains("Recovery Codes") { preview.tags.append("Recovery Codes") }
+                if !preview.tags.contains("2FA") { preview.tags.append("2FA") }
+            } else if let otherNotes = item.notes, !otherNotes.isEmpty {
+                if preview.notes == nil || preview.notes?.isEmpty == true {
+                    preview.notes = otherNotes
+                } else if let pNotes = preview.notes, !pNotes.contains(otherNotes) {
+                    preview.notes = "\(pNotes)\n\n\(otherNotes)"
+                }
+            }
+
+            // URLs
+            for u in item.urls where !preview.urls.contains(u) {
+                preview.urls.append(u)
+            }
+
+            // Tags
+            for t in item.tags where !preview.tags.contains(t) {
+                preview.tags.append(t)
+            }
+
+            // Custom fields
+            if let fields = item.customFields {
+                var existing = preview.customFields ?? []
+                for f in fields where !existing.contains(where: { $0.name.lowercased() == f.name.lowercased() }) {
+                    existing.append(f)
+                }
+                preview.customFields = existing
+            }
+        }
+
+        return preview
+    }
+
+    /// Combines any user-selected items from the vault into a single unified record.
+    public func combineSelectedItems(
+        primaryId: String,
+        items: [VaultItem],
+        customTitle: String? = nil,
+        archiveOthersToTrash: Bool = true,
+        in allItems: inout [VaultItem]
+    ) -> VaultItem {
+        guard let primaryIndex = allItems.firstIndex(where: { $0.id == primaryId }) else {
+            return items.first!
+        }
+
+        guard let unifiedPreview = generatePreview(primaryId: primaryId, items: items, customTitle: customTitle) else {
+            return allItems[primaryIndex]
+        }
+
+        var unified = unifiedPreview
+        unified.updatedAt = ISO8601DateFormatter().string(from: Date())
+
+        if archiveOthersToTrash {
+            let now = ISO8601DateFormatter().string(from: Date())
+            for item in items where item.id != primaryId {
+                if let secIdx = allItems.firstIndex(where: { $0.id == item.id }) {
+                    allItems[secIdx].trashed = true
+                    allItems[secIdx].updatedAt = now
+                }
+            }
+        }
+
+        allItems[primaryIndex] = unified
+        return unified
+    }
+
     // MARK: - Combine Execution
 
     public func combine(group: CombinableCredentialGroup, in allItems: inout [VaultItem]) -> VaultItem {

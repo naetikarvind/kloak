@@ -9,6 +9,7 @@ public struct ItemDetailView: View {
     var onRestore: ((String) -> Void)? = nil
     var onDeletePermanently: ((String) -> Void)? = nil
     var onClose: (() -> Void)? = nil
+    var onCombineWith: ((String) -> Void)? = nil
     var startIn2FAEdit: Bool = false
     var onDidFocus2FA: (() -> Void)? = nil
 
@@ -21,6 +22,7 @@ public struct ItemDetailView: View {
         onRestore: ((String) -> Void)? = nil,
         onDeletePermanently: ((String) -> Void)? = nil,
         onClose: (() -> Void)? = nil,
+        onCombineWith: ((String) -> Void)? = nil,
         startIn2FAEdit: Bool = false,
         onDidFocus2FA: (() -> Void)? = nil
     ) {
@@ -32,6 +34,7 @@ public struct ItemDetailView: View {
         self.onRestore = onRestore
         self.onDeletePermanently = onDeletePermanently
         self.onClose = onClose
+        self.onCombineWith = onCombineWith
         self.startIn2FAEdit = startIn2FAEdit
         self.onDidFocus2FA = onDidFocus2FA
     }
@@ -329,6 +332,23 @@ public struct ItemDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .help(item.favorite ? "Remove from Favorites" : "Add to Favorites")
+
+                            if let onCombine = onCombineWith {
+                                Button(action: { onCombine(item.id) }) {
+                                    Image(systemName: "arrow.triangle.merge")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.secondary)
+                                        .frame(width: 32, height: 32)
+                                        .background(Color.white.opacity(0.06))
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                                .help("Combine with another credential")
+                            }
 
                             if let onClose = onClose {
                                 Button(action: onClose) {

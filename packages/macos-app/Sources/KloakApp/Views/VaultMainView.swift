@@ -16,6 +16,7 @@ public struct VaultMainView: View {
     @State private var selection: NavigationSection = .allItems
     @State private var selectedItemId: String? = nil
     @State private var focus2FAOnItemId: String? = nil
+    @State private var preselectedCombineItemIds: Set<String> = []
     @State private var searchText: String = ""
     @State private var isShowingNewItemSheet: Bool = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
@@ -189,6 +190,12 @@ public struct VaultMainView: View {
                                 focus2FAOnItemId = nil
                             }
                         },
+                        onCombineWith: { id in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                preselectedCombineItemIds = [id]
+                                selection = .combineCredentials
+                            }
+                        },
                         startIn2FAEdit: focus2FAOnItemId == selId,
                         onDidFocus2FA: {
                             focus2FAOnItemId = nil
@@ -205,11 +212,13 @@ public struct VaultMainView: View {
         case .combineCredentials:
             CombineCredentialsView(
                 items: $items,
-                onCombineGroup: { group in
-                    VaultStore.shared.combineCredentialGroup(group)
-                },
-                onCombineAll: {
-                    VaultStore.shared.combineAllCredentialGroups()
+                preselectedItemIds: $preselectedCombineItemIds,
+                onSaveItem: onSaveItem,
+                onSelectCombinedItem: { newId in
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedItemId = newId
+                        selection = .allItems
+                    }
                 }
             )
         case .importExport:
@@ -375,6 +384,12 @@ public struct VaultMainView: View {
                                     },
                                     onDeletePermanently: { id in
                                         handleDeletePermanently(id)
+                                    },
+                                    onCombineWith: { id in
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            preselectedCombineItemIds = [id]
+                                            selection = .combineCredentials
+                                        }
                                     },
                                     startIn2FAEdit: focus2FAOnItemId == selId,
                                     onDidFocus2FA: {

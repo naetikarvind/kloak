@@ -778,6 +778,20 @@ public final class VaultStore: ObservableObject {
     }
 
     @discardableResult
+    public func combineSelectedCredentials(primaryId: String, items: [VaultItem], customTitle: String? = nil, archiveOthersToTrash: Bool = true) -> VaultItem {
+        let result = CredentialCombinerService.shared.combineSelectedItems(
+            primaryId: primaryId,
+            items: items,
+            customTitle: customTitle,
+            archiveOthersToTrash: archiveOthersToTrash,
+            in: &self.items
+        )
+        recordUserActivity()
+        saveVault()
+        return result
+    }
+
+    @discardableResult
     public func combineAllCredentialGroups() -> Int {
         let groups = CredentialCombinerService.shared.findCombinableGroups(in: items)
         guard !groups.isEmpty else { return 0 }
