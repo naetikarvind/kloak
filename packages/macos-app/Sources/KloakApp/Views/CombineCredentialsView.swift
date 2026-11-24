@@ -14,6 +14,7 @@ public struct CombineCredentialsView: View {
     @State private var archiveOthersToTrash: Bool = true
     @State private var revealPasswordPreview: Bool = false
     @State private var statusMessage: String? = nil
+    @State private var lastCombinedItemId: String? = nil
     @State private var showSuggestionsSheet: Bool = false
 
     private enum FilterType: String, CaseIterable, Identifiable {
@@ -366,7 +367,28 @@ public struct CombineCredentialsView: View {
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.primary)
                         Spacer()
-                        Button(action: { statusMessage = nil }) {
+                        if let lastId = lastCombinedItemId {
+                            Button(action: {
+                                onSelectCombinedItem?(lastId)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Text("View in Vault")
+                                        .font(.system(size: 11, weight: .semibold))
+                                    Image(systemName: "arrow.right")
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(LiquidGlassTheme.emeraldAccent.opacity(0.2))
+                                .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Button(action: {
+                            statusMessage = nil
+                            lastCombinedItemId = nil
+                        }) {
                             Image(systemName: "xmark")
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(.secondary)
@@ -782,10 +804,10 @@ public struct CombineCredentialsView: View {
 
             onSaveItem?(unified)
             statusMessage = "✓ Successfully combined \(selectedItemsList.count) credentials into '\(unified.title)'!"
+            lastCombinedItemId = unified.id
             selectedItemIds.removeAll()
             primaryTargetId = nil
             customTitleText = ""
-            onSelectCombinedItem?(unified.id)
         }
     }
 }
