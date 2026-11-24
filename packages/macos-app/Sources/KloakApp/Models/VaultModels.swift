@@ -696,6 +696,9 @@ public struct FileImportComparisonResult: Identifiable, Sendable {
 extension VaultItem {
     /// Determines whether this item represents a set of 2FA recovery / backup codes.
     public var isRecoveryCode: Bool {
+        if !usedRecoveryCodes.isEmpty {
+            return true
+        }
         if tags.contains(where: { $0.caseInsensitiveCompare("Recovery Codes") == .orderedSame || $0.caseInsensitiveCompare("Recovery") == .orderedSame }) {
             return true
         }
@@ -707,6 +710,9 @@ extension VaultItem {
             return true
         }
         if let notes = notes, !notes.isEmpty {
+            if notes.localizedCaseInsensitiveContains("recovery code") || notes.localizedCaseInsensitiveContains("backup code") {
+                return true
+            }
             let lines = notes.components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
                 .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("//") }

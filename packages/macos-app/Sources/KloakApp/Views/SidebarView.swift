@@ -77,48 +77,32 @@ public struct SidebarView: View {
             }
             .tag(NavigationSection.category(.authenticator))
 
-            Button(action: { selection = .twoFASubtype(.authenticator) }) {
+            NavigationLink(value: NavigationSection.twoFASubtype(.authenticator)) {
                 HStack(spacing: 7) {
                     Image(systemName: "timer")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(LiquidGlassTheme.primaryAccent)
                         .frame(width: 14)
                     Text("Authenticator")
-                        .font(.system(size: 11, weight: selection == .twoFASubtype(.authenticator) ? .semibold : .regular))
-                        .foregroundColor(selection == .twoFASubtype(.authenticator) ? .primary : .secondary)
-                    Spacer()
-                    if authCount > 0 {
-                        Text("\(authCount)")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
+                        .font(.system(size: 11))
                 }
-                .padding(.leading, 12)
-                .contentShape(Rectangle())
+                .padding(.leading, 10)
             }
-            .buttonStyle(.plain)
+            .badge(authCount)
             .tag(NavigationSection.twoFASubtype(.authenticator))
 
-            Button(action: { selection = .twoFASubtype(.recoveryCodes) }) {
+            NavigationLink(value: NavigationSection.twoFASubtype(.recoveryCodes)) {
                 HStack(spacing: 7) {
                     Image(systemName: "key.horizontal.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         .frame(width: 14)
                     Text("Recovery Codes")
-                        .font(.system(size: 11, weight: selection == .twoFASubtype(.recoveryCodes) ? .semibold : .regular))
-                        .foregroundColor(selection == .twoFASubtype(.recoveryCodes) ? .primary : .secondary)
-                    Spacer()
-                    if recoveryCount > 0 {
-                        Text("\(recoveryCount)")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(.secondary.opacity(0.7))
-                    }
+                        .font(.system(size: 11))
                 }
-                .padding(.leading, 12)
-                .contentShape(Rectangle())
+                .padding(.leading, 10)
             }
-            .buttonStyle(.plain)
+            .badge(recoveryCount)
             .tag(NavigationSection.twoFASubtype(.recoveryCodes))
         }
     }

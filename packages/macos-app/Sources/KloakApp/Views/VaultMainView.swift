@@ -74,10 +74,15 @@ public struct VaultMainView: View {
             } else {
                 base = items.filter { $0.type == type && !$0.trashed }
             }
-        case .twoFASubtype:
-            // Subtypes in sidebar are markers that scroll the list to the selected sub-heading;
-            // all 2FA items remain in the list so preceding items are still visible when scrolled up
-            base = items.filter { !$0.trashed && $0.is2FA }
+        case .twoFASubtype(let sub):
+            switch sub {
+            case .all:
+                base = items.filter { !$0.trashed && $0.is2FA }
+            case .authenticator:
+                base = items.filter { !$0.trashed && $0.isAuthenticator }
+            case .recoveryCodes:
+                base = items.filter { !$0.trashed && $0.isRecoveryCode }
+            }
         case .folder(let folderId):
             if let targetFolder = folders.first(where: { $0.id == folderId }) {
                 base = items.filter { $0.belongsTo(folder: targetFolder, allFolders: folders) }
@@ -431,7 +436,7 @@ public struct VaultMainView: View {
         .animation(.easeInOut(duration: 0.22), value: selection)
         .animation(.easeInOut(duration: 0.18), value: selectedItemId)
         .onAppear {
-            triggerWindowResize(for: selection, animated: false)
+            triggerWindowResize(for: selection, selectedId: selectedItemId, animated: false)
             LogoService.shared.prefetchLogos(for: items)
             VaultStore.shared.sanitizeAllItemTitles()
             updater.checkForUpdates(userInitiated: false)
@@ -441,10 +446,13 @@ public struct VaultMainView: View {
             selectedItemId = nil
             focus2FAOnItemId = nil
             searchText = ""
-            triggerWindowResize(for: newSel, animated: true)
+            triggerWindowResize(for: newSel, selectedId: nil, animated: true)
         }
-        .onChange(of: selectedItemId) { _, _ in
+        .onChange(of: selectedItemId) { oldId, newId in
             VaultStore.shared.recordUserActivity()
+            if selection == .passwordHealth && (oldId == nil) != (newId == nil) {
+                triggerWindowResize(for: selection, selectedId: newId, animated: true)
+            }
         }
         .onChange(of: searchText) { _, _ in
             VaultStore.shared.recordUserActivity()
@@ -477,9 +485,19 @@ public struct VaultMainView: View {
         }
     }
 
-    private func triggerWindowResize(for sec: NavigationSection, animated: Bool = true) {
+    private func triggerWindowResize(for sec: NavigationSection, selectedId: String? = nil, animated: Bool = true) {
         switch sec {
-        case .settings, .duplicates, .combineCredentials:
+        case .passwordHealth:
+            if selectedId != nil {
+                WindowSizeManager.shared.resize(to: .vaultThreePaneExpanded, animated: animated)
+            } else {
+                WindowSizeManager.shared.resize(to: .vaultItems, animated: animated)
+            }
+        case .combineCredentials:
+            WindowSizeManager.shared.resize(to: .vaultCombine, animated: animated)
+        case .duplicates:
+            WindowSizeManager.shared.resize(to: .vaultDuplicates, animated: animated)
+        case .settings:
             WindowSizeManager.shared.resize(to: .vaultSettings, animated: animated)
         case .generator:
             WindowSizeManager.shared.resize(to: .vaultGenerator, animated: animated)

@@ -33,7 +33,7 @@ public struct ItemListView: View {
     }
 
     private var recoveryItems: [VaultItem] {
-        items.filter { $0.isRecoveryCode && !$0.isAuthenticator }
+        items.filter { $0.isRecoveryCode }
     }
 
     private func twoFASectionHeader(title: String, count: Int, icon: String, color: Color) -> some View {
@@ -219,7 +219,23 @@ public struct ItemListView: View {
             } else {
                 ScrollViewReader { proxy in
                     List(selection: $selectedItemId) {
-                        if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
+                        if currentSection == .twoFASubtype(.authenticator) {
+                            Section {
+                                ForEach(items) { item in
+                                    itemRow(item)
+                                }
+                            } header: {
+                                twoFASectionHeader(title: "AUTHENTICATOR", count: items.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
+                            }
+                        } else if currentSection == .twoFASubtype(.recoveryCodes) {
+                            Section {
+                                ForEach(items) { item in
+                                    itemRow(item)
+                                }
+                            } header: {
+                                twoFASectionHeader(title: "RECOVERY CODES", count: items.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
+                            }
+                        } else if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
                             if !authenticatorItems.isEmpty {
                                 Section {
                                     ForEach(authenticatorItems) { item in
@@ -308,6 +324,15 @@ public struct ItemRowView: View {
     }
 
     private var subtitleText: String {
+        if currentSection == .twoFASubtype(.recoveryCodes) {
+            let count = item.recoveryCodesCount
+            let countStr = count > 0 ? "\(count) Recovery Codes" : "Recovery Codes"
+            if let u = item.username, !u.isEmpty {
+                return "\(u) • \(countStr)"
+            }
+            return countStr
+        }
+
         switch item.type {
         case .identity:
             return item.identity?.fullName ?? item.identity?.email ?? item.username ?? "Identity Profile"
@@ -388,7 +413,19 @@ public struct ItemRowView: View {
             .layoutPriority(1)
 
             HStack(spacing: 6) {
-                if let totp = item.totpSecret, !totp.isEmpty {
+                if currentSection == .twoFASubtype(.recoveryCodes) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "key.horizontal.fill")
+                            .font(.system(size: 8))
+                        Text("\(item.recoveryCodesCount)")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
+                    .clipShape(Capsule())
+                } else if let totp = item.totpSecret, !totp.isEmpty {
                     MiniTOTPRowView(secret: totp)
                 } else if item.isRecoveryCode {
                     HStack(spacing: 3) {
