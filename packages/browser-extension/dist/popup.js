@@ -4425,6 +4425,19 @@ ${notes}`;
       oauthProvider: item.oauthProvider || item.oauth?.provider,
       domain: item.domain
     });
+    if (isRecoveryCodeNote(item)) {
+      avatarEl.classList.add("kloak-category-avatar");
+      avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>`;
+      avatarEl.style.color = "#10B981";
+      avatarEl.style.width = `${size}px`;
+      avatarEl.style.height = `${size}px`;
+      avatarEl.style.borderRadius = `${Math.max(4, Math.round(size * 0.2237))}px`;
+      avatarEl.style.display = "inline-flex";
+      avatarEl.style.alignItems = "center";
+      avatarEl.style.justifyContent = "center";
+      avatarEl.style.background = "rgba(16, 185, 129, 0.12)";
+      return;
+    }
     if (domains.length === 0 && item.type && item.type !== "login" && PROTON_ICONS[item.type]) {
       avatarEl.classList.add("kloak-category-avatar");
       avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: currentColor;"><path d="${PROTON_ICONS[item.type]}"/></svg>`;
@@ -4504,7 +4517,15 @@ ${notes}`;
       titleEl.textContent = item.title || "Untitled";
       const subEl = document.createElement("div");
       subEl.className = "item-subtitle";
-      const subText = item.username || item.identity?.fullName || item.card?.cardholderName || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || (item.type === "secure_note" ? "Encrypted Note" : "no username");
+      let subText;
+      if (isRecoveryCodeNote(item)) {
+        const codes = getRecoveryCodesList(item);
+        const usedCount = Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes.length : 0;
+        const remaining = Math.max(0, codes.length - usedCount);
+        subText = codes.length > 0 ? `${remaining}/${codes.length} Recovery Codes` : "Recovery Codes";
+      } else {
+        subText = item.username || item.identity?.fullName || item.card?.cardholderName || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || (item.type === "secure_note" ? "Encrypted Note" : "no username");
+      }
       subEl.textContent = subText;
       info.appendChild(titleEl);
       info.appendChild(subEl);
@@ -4651,6 +4672,9 @@ ${notes}`;
     const hasTotp = !!item.totpSecret;
     const notes = item.notes || "";
     const urls = item.urls || [];
+    const isRecoveryItem = isRecoveryCodeNote(item);
+    const embeddedCodes = getRecoveryCodesList(item);
+    const matchedRecoveryNote = findAssociatedRecoveryNote(item, allItems);
     container.innerHTML = "";
     const header = document.createElement("div");
     header.className = "detail-header";
@@ -4720,14 +4744,13 @@ ${notes}`;
       </div>
     `;
       bentoGrid.appendChild(totpCell);
-      const matchedRecoveryNote2 = findAssociatedRecoveryNote(item, allItems);
       const recoveryCell = document.createElement("div");
       recoveryCell.className = "bento-cell bento-recovery-cell";
-      if (matchedRecoveryNote2) {
-        const codes = getRecoveryCodesList(matchedRecoveryNote2);
-        const isEmbedded = matchedRecoveryNote2.id === item.id;
+      if (matchedRecoveryNote) {
+        const codes = getRecoveryCodesList(matchedRecoveryNote);
+        const isEmbedded = matchedRecoveryNote.id === item.id;
         recoveryCell.style.cursor = "pointer";
-        recoveryCell.title = isEmbedded ? `Contains ${codes.length} embedded recovery codes` : `View associated note: ${matchedRecoveryNote2.title || "Recovery Codes"}`;
+        recoveryCell.title = isEmbedded ? `Contains ${codes.length} embedded recovery codes` : `View associated note: ${matchedRecoveryNote.title || "Recovery Codes"}`;
         recoveryCell.innerHTML = `
         <div class="bento-cell-header">
           <div style="display: flex; align-items: center; gap: 5px;">
@@ -4739,7 +4762,7 @@ ${notes}`;
           </span>
         </div>
         <div style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          ${escHtml(isEmbedded ? "Embedded in Credential" : matchedRecoveryNote2.title || "Backup Codes")}
+          ${escHtml(isEmbedded ? "Embedded in Credential" : matchedRecoveryNote.title || "Backup Codes")}
         </div>
         <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
           <span style="font-size: 9.5px; color: #10B981; font-weight: 600;">\u2713 ${isEmbedded ? "Combined" : "Linked Kit"}</span>
@@ -4748,7 +4771,7 @@ ${notes}`;
       `;
         recoveryCell.addEventListener("click", () => {
           if (!isEmbedded) {
-            selectItem(matchedRecoveryNote2);
+            selectItem(matchedRecoveryNote);
           } else {
             const trackerCard = container.querySelector(".recovery-tracker-card");
             if (trackerCard) {
@@ -4846,6 +4869,43 @@ ${notes}`;
       totpCell.querySelector("#copy-totp-row")?.addEventListener("click", handleCopy);
       totpCell.querySelector("#copy-totp-btn")?.addEventListener("click", handleCopy);
       startTotpCounter(item.totpSecret);
+    } else if (isRecoveryItem && embeddedCodes.length > 0) {
+      const recoveryBento = document.createElement("div");
+      recoveryBento.className = "bento-grid";
+      const recSummaryCell = document.createElement("div");
+      recSummaryCell.className = "bento-cell bento-totp-cell";
+      const usedCount = Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes.length : 0;
+      const remaining = Math.max(0, embeddedCodes.length - usedCount);
+      recSummaryCell.innerHTML = `
+      <div class="totp-header" style="margin-bottom: 6px;">
+        <div class="totp-label-group">
+          <div class="totp-shield-icon" style="background: rgba(16, 185, 129, 0.15);">
+            <svg viewBox="0 0 24 24" style="fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+          </div>
+          <span class="totp-title" style="color: #10B981;">Recovery Codes</span>
+        </div>
+        <span style="background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.4); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${remaining}/${embeddedCodes.length} Left</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+        ${usedCount > 0 ? `${usedCount} code${usedCount > 1 ? "s" : ""} used \u2014 ${remaining} remaining` : "No codes used yet \u2014 scroll down to manage"}
+      </div>
+    `;
+      recoveryBento.appendChild(recSummaryCell);
+      if (username || urls && urls.length > 0) {
+        const serviceCell = document.createElement("div");
+        serviceCell.className = "bento-cell bento-recovery-cell";
+        serviceCell.innerHTML = `
+        <div class="bento-cell-header">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: currentColor; color: var(--text-muted);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            <span class="bento-cell-title">Account</span>
+          </div>
+        </div>
+        <div class="bento-cred-value" style="font-size: 12px; margin-top: 4px;">${escHtml(username || (urls[0] || "No account linked"))}</div>
+      `;
+        recoveryBento.appendChild(serviceCell);
+      }
+      container.appendChild(recoveryBento);
     } else {
       const card1 = document.createElement("div");
       card1.className = "card";
@@ -4956,7 +5016,7 @@ ${notes}`;
       urlCard.innerHTML = urlHtml;
       container.appendChild(urlCard);
     }
-    if (notes) {
+    if (notes && !isRecoveryItem) {
       const noteCard = document.createElement("div");
       noteCard.className = "card";
       noteCard.innerHTML = `

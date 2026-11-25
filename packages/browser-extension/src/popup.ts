@@ -2357,6 +2357,21 @@ function renderItemAvatar(avatarEl: HTMLElement, item: any, size: number = 32) {
   });
 
   // Non-login items without domains render Proton Category Icon
+  // Special case: recovery code notes get a key icon in green
+  if (isRecoveryCodeNote(item)) {
+    avatarEl.classList.add('kloak-category-avatar');
+    avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>`;
+    avatarEl.style.color = '#10B981';
+    avatarEl.style.width = `${size}px`;
+    avatarEl.style.height = `${size}px`;
+    avatarEl.style.borderRadius = `${Math.max(4, Math.round(size * 0.2237))}px`;
+    avatarEl.style.display = 'inline-flex';
+    avatarEl.style.alignItems = 'center';
+    avatarEl.style.justifyContent = 'center';
+    avatarEl.style.background = 'rgba(16, 185, 129, 0.12)';
+    return;
+  }
+
   if (domains.length === 0 && item.type && item.type !== 'login' && (PROTON_ICONS as any)[item.type]) {
     avatarEl.classList.add('kloak-category-avatar');
     avatarEl.innerHTML = `<svg viewBox="0 0 24 24" style="width: ${Math.round(size * 0.5)}px; height: ${Math.round(size * 0.5)}px; fill: currentColor;"><path d="${(PROTON_ICONS as any)[item.type]}"/></svg>`;
@@ -2459,7 +2474,15 @@ function executeRenderSidebarList(items: any[], animate: boolean = true) {
 
     const subEl = document.createElement('div');
     subEl.className = 'item-subtitle';
-    const subText = item.username || item.identity?.fullName || item.card?.cardholderName || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || (item.type === 'secure_note' ? 'Encrypted Note' : 'no username');
+    let subText: string;
+    if (isRecoveryCodeNote(item)) {
+      const codes = getRecoveryCodesList(item);
+      const usedCount = Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes.length : 0;
+      const remaining = Math.max(0, codes.length - usedCount);
+      subText = codes.length > 0 ? `${remaining}/${codes.length} Recovery Codes` : 'Recovery Codes';
+    } else {
+      subText = item.username || item.identity?.fullName || item.card?.cardholderName || item.alias?.aliasEmail || item.authenticatorDetails?.issuer || (item.type === 'secure_note' ? 'Encrypted Note' : 'no username');
+    }
     subEl.textContent = subText;
 
     info.appendChild(titleEl);
@@ -2637,6 +2660,12 @@ function renderDetailPane(item: any) {
   const notes = item.notes || '';
   const urls = item.urls || [];
 
+  // Detect recovery-code items (standalone notes OR combined credentials)
+  const isRecoveryItem = isRecoveryCodeNote(item);
+  const embeddedCodes = getRecoveryCodesList(item);
+  // Find associated recovery note (for items WITH totp but a separate note; also returns `item` itself when embedded)
+  const matchedRecoveryNote = findAssociatedRecoveryNote(item, allItems);
+
   container.innerHTML = '';
 
   // Header
@@ -2721,7 +2750,6 @@ function renderDetailPane(item: any) {
     bentoGrid.appendChild(totpCell);
 
     // Top-right cell: Recovery code count badge
-    const matchedRecoveryNote = findAssociatedRecoveryNote(item, allItems);
     const recoveryCell = document.createElement('div');
     recoveryCell.className = 'bento-cell bento-recovery-cell';
     if (matchedRecoveryNote) {
@@ -2860,6 +2888,50 @@ function renderDetailPane(item: any) {
     totpCell.querySelector('#copy-totp-btn')?.addEventListener('click', handleCopy);
 
     startTotpCounter(item.totpSecret);
+  } else if (isRecoveryItem && embeddedCodes.length > 0) {
+    // ── Bento Layout for Standalone / Combined Recovery Code Items ──
+    const recoveryBento = document.createElement('div');
+    recoveryBento.className = 'bento-grid';
+
+    // Top cell: recovery summary
+    const recSummaryCell = document.createElement('div');
+    recSummaryCell.className = 'bento-cell bento-totp-cell';
+    const usedCount = Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes.length : 0;
+    const remaining = Math.max(0, embeddedCodes.length - usedCount);
+    recSummaryCell.innerHTML = `
+      <div class="totp-header" style="margin-bottom: 6px;">
+        <div class="totp-label-group">
+          <div class="totp-shield-icon" style="background: rgba(16, 185, 129, 0.15);">
+            <svg viewBox="0 0 24 24" style="fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
+          </div>
+          <span class="totp-title" style="color: #10B981;">Recovery Codes</span>
+        </div>
+        <span style="background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.4); padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700;">${remaining}/${embeddedCodes.length} Left</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+        ${usedCount > 0 ? `${usedCount} code${usedCount > 1 ? 's' : ''} used — ${remaining} remaining` : 'No codes used yet — scroll down to manage'}
+      </div>
+    `;
+    recoveryBento.appendChild(recSummaryCell);
+
+    // Right cell: service info (username or domain)
+    if (username || (urls && urls.length > 0)) {
+      const serviceCell = document.createElement('div');
+      serviceCell.className = 'bento-cell bento-recovery-cell';
+      serviceCell.innerHTML = `
+        <div class="bento-cell-header">
+          <div style="display: flex; align-items: center; gap: 5px;">
+            <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: currentColor; color: var(--text-muted);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            <span class="bento-cell-title">Account</span>
+          </div>
+        </div>
+        <div class="bento-cred-value" style="font-size: 12px; margin-top: 4px;">${escHtml(username || (urls[0] || 'No account linked'))}</div>
+      `;
+      recoveryBento.appendChild(serviceCell);
+    }
+
+    container.appendChild(recoveryBento);
+    // Note: recovery tracker card is rendered below (after Security card section)
   } else {
     // ── Standard Card Layout for Non-2FA Items ──
     const card1 = document.createElement('div');
@@ -2987,8 +3059,8 @@ function renderDetailPane(item: any) {
     container.appendChild(urlCard);
   }
 
-  // Card 4: Notes
-  if (notes) {
+  // Card 4: Notes (suppress for recovery items — codes shown in tracker below)
+  if (notes && !isRecoveryItem) {
     const noteCard = document.createElement('div');
     noteCard.className = 'card';
     noteCard.innerHTML = `
