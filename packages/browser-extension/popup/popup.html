@@ -639,15 +639,12 @@
 
     .sidebar-filters {
       display: flex;
+      flex-wrap: wrap;
       padding: 6px 8px;
       gap: 3px;
+      row-gap: 4px;
       align-items: center;
       flex-shrink: 0;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .sidebar-filters::-webkit-scrollbar {
-      display: none;
     }
 
     .filter-btn {

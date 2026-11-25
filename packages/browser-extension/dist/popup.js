@@ -4747,201 +4747,9 @@ ${notes}`;
     header.appendChild(titleGroup);
     header.appendChild(actionsDiv);
     container.appendChild(header);
-    if (hasTotp) {
-      const bentoGrid = document.createElement("div");
-      bentoGrid.className = "bento-grid";
-      const totpCell = document.createElement("div");
-      totpCell.className = "bento-cell bento-totp-cell";
-      totpCell.innerHTML = `
-      <div class="totp-header" style="margin-bottom: 6px;">
-        <div class="totp-label-group">
-          <div class="totp-shield-icon">
-            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
-          </div>
-          <span class="totp-title">Authenticator</span>
-        </div>
-        <div class="totp-countdown-pill" id="totp-countdown-pill">
-          <svg class="totp-countdown-svg" viewBox="0 0 24 24">
-            <circle class="totp-svg-bg" cx="12" cy="12" r="9"></circle>
-            <circle class="totp-svg-progress" id="totp-svg-progress" cx="12" cy="12" r="9"></circle>
-          </svg>
-          <span id="totp-timer-text">30s</span>
-        </div>
-      </div>
-      <div class="totp-body-row" id="copy-totp-row" title="Click to copy code">
-        <div class="totp-code-display" id="totp-code" style="font-size: 17px; letter-spacing: 2px;">------</div>
-        <button class="totp-copy-btn" id="copy-totp-btn">
-          <svg class="copy-icon-svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          <span id="totp-copy-text">Copy</span>
-        </button>
-      </div>
-    `;
-      bentoGrid.appendChild(totpCell);
-      const recoveryCell = document.createElement("div");
-      recoveryCell.className = "bento-cell bento-recovery-cell";
-      if (matchedRecoveryNote) {
-        const codes = getRecoveryCodesList(matchedRecoveryNote);
-        const isEmbedded = matchedRecoveryNote.id === item.id;
-        recoveryCell.style.cursor = "pointer";
-        recoveryCell.title = isEmbedded ? `Contains ${codes.length} embedded recovery codes` : `View associated note: ${matchedRecoveryNote.title || "Recovery Codes"}`;
-        recoveryCell.innerHTML = `
-        <div class="bento-cell-header">
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-            <span class="bento-cell-title" style="color: #10B981;">Recovery</span>
-          </div>
-          <span id="summary-recovery-badge-${item.id}" style="background: rgba(16, 185, 129, 0.2); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 700;">
-            ${codes.length} Codes
-          </span>
-        </div>
-        <div style="font-size: 11px; color: var(--text-muted); margin: 2px 0 6px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          ${escHtml(isEmbedded ? "Embedded in Credential" : matchedRecoveryNote.title || "Backup Codes")}
-        </div>
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
-          <span style="font-size: 9.5px; color: #10B981; font-weight: 600;">\u2713 ${isEmbedded ? "Combined" : "Linked Kit"}</span>
-          <button class="btn-pill" id="btn-jump-recovery" style="height: 22px; padding: 0 8px; font-size: 10px; background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3);">${isEmbedded ? "Codes" : "View"}</button>
-        </div>
-      `;
-        recoveryCell.addEventListener("click", () => {
-          if (!isEmbedded) {
-            selectItem(matchedRecoveryNote);
-          } else {
-            const trackerCard = container.querySelector(".recovery-tracker-card");
-            if (trackerCard) {
-              trackerCard.scrollIntoView({ behavior: "smooth" });
-            }
-          }
-        });
-      } else {
-        recoveryCell.innerHTML = `
-        <div class="bento-cell-header">
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: var(--text-muted);"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-            <span class="bento-cell-title">Recovery</span>
-          </div>
-          <span style="background: rgba(255, 255, 255, 0.08); color: var(--text-muted); padding: 1px 6px; border-radius: 8px; font-size: 9.5px;">
-            0 Linked
-          </span>
-        </div>
-        <div style="font-size: 10px; color: var(--text-muted); line-height: 1.3; margin-top: 4px;">
-          No backup codes note detected in vault.
-        </div>
-      `;
-      }
-      bentoGrid.appendChild(recoveryCell);
-      const userCell = document.createElement("div");
-      userCell.className = "bento-cell bento-user-cell";
-      userCell.innerHTML = `
-      <div class="bento-cell-header">
-        <div style="display: flex; align-items: center; gap: 5px;">
-          <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: currentColor; color: var(--text-muted);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-          <span class="bento-cell-title">Username</span>
-        </div>
-        <div class="action-icon" id="copy-user" title="Copy" style="cursor: pointer;">
-          <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-        </div>
-      </div>
-      <div class="bento-cred-value" id="user-val" title="${escHtml(username || "")}">${escHtml(username || "No username")}</div>
-    `;
-      bentoGrid.appendChild(userCell);
-      const pwdCell = document.createElement("div");
-      pwdCell.className = "bento-cell bento-pwd-cell";
-      pwdCell.innerHTML = `
-      <div class="bento-cell-header">
-        <div style="display: flex; align-items: center; gap: 5px;">
-          <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: var(--color-login);"><path d="${PROTON_ICONS.login}"/></svg>
-          <span class="bento-cell-title">Password</span>
-        </div>
-        <div class="bento-cell-actions">
-          <div class="action-icon" id="toggle-pwd" title="Reveal" style="cursor: pointer;">
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-          </div>
-          <div class="action-icon" id="copy-pwd" title="Copy" style="cursor: pointer;">
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          </div>
-        </div>
-      </div>
-      <div class="bento-cred-value" id="pwd-val" style="letter-spacing: 2px;">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</div>
-    `;
-      bentoGrid.appendChild(pwdCell);
-      if (email && email !== username) {
-        const emailCell = document.createElement("div");
-        emailCell.className = "bento-cell span-full";
-        emailCell.innerHTML = `
-        <div class="bento-cell-header">
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: var(--color-alias);"><path d="${PROTON_ICONS.alias}"/></svg>
-            <span class="bento-cell-title">Email</span>
-          </div>
-          <div class="action-icon" id="copy-email" title="Copy" style="cursor: pointer;">
-            <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
-          </div>
-        </div>
-        <div class="bento-cred-value" id="email-val">${escHtml(email)}</div>
-      `;
-        bentoGrid.appendChild(emailCell);
-      }
-      container.appendChild(bentoGrid);
-      const handleCopy = async (e) => {
-        e.stopPropagation();
-        const codeEl = document.getElementById("totp-code");
-        const rawCode = (codeEl?.textContent || "").replace(/\s+/g, "");
-        if (!rawCode || rawCode === "------") return;
-        await copyToClipboardText(rawCode);
-        const copyBtn = document.getElementById("copy-totp-btn");
-        const copyText = document.getElementById("totp-copy-text");
-        if (copyBtn && copyText) {
-          copyBtn.classList.add("copied");
-          copyText.textContent = "Copied!";
-          setTimeout(() => {
-            copyBtn.classList.remove("copied");
-            copyText.textContent = "Copy";
-          }, 1800);
-        }
-      };
-      totpCell.querySelector("#copy-totp-row")?.addEventListener("click", handleCopy);
-      totpCell.querySelector("#copy-totp-btn")?.addEventListener("click", handleCopy);
-      startTotpCounter(item.totpSecret);
-    } else if (isRecoveryItem && embeddedCodes.length > 0 && !item.password && item.type !== "login") {
-      const recoveryBento = document.createElement("div");
-      recoveryBento.className = "bento-grid";
-      recoveryBento.style.marginBottom = "8px";
-      const recSummaryCell = document.createElement("div");
-      recSummaryCell.className = `bento-cell bento-totp-cell ${username || urls && urls.length > 0 ? "" : "span-full"}`;
-      const usedCount = Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes.length : 0;
-      const remaining = Math.max(0, embeddedCodes.length - usedCount);
-      recSummaryCell.innerHTML = `
-      <div class="totp-header" style="margin-bottom: 4px;">
-        <div class="totp-label-group">
-          <div class="totp-shield-icon" style="background: rgba(16, 185, 129, 0.15); border-radius: 6px; padding: 3px;">
-            <svg viewBox="0 0 24 24" style="fill: #10B981;"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>
-          </div>
-          <span class="totp-title" style="color: #10B981;">Recovery Key Set</span>
-        </div>
-        <span id="summary-recovery-badge-${item.id}" style="background: rgba(16,185,129,0.15); color: #10B981; border: 1px solid rgba(16,185,129,0.4); padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 700;">${remaining}/${embeddedCodes.length} Left</span>
-      </div>
-      <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-        ${usedCount > 0 ? `${usedCount} code${usedCount > 1 ? "s" : ""} used \u2022 ${remaining} unused remaining` : `${embeddedCodes.length} one-time backup codes stored`}
-      </div>
-    `;
-      recoveryBento.appendChild(recSummaryCell);
-      if (username || urls && urls.length > 0) {
-        const serviceCell = document.createElement("div");
-        serviceCell.className = "bento-cell bento-recovery-cell";
-        serviceCell.innerHTML = `
-        <div class="bento-cell-header">
-          <div style="display: flex; align-items: center; gap: 5px;">
-            <svg viewBox="0 0 24 24" style="width: 13px; height: 13px; fill: currentColor; color: var(--text-muted);"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-            <span class="bento-cell-title">Account</span>
-          </div>
-          ${username ? `<div class="action-icon" id="copy-user" title="Copy" style="cursor: pointer;"><svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></div>` : ""}
-        </div>
-        <div class="bento-cred-value" id="user-val" style="font-size: 12px; margin-top: 4px;">${escHtml(username || urls[0] || "Standalone Kit")}</div>
-      `;
-        recoveryBento.appendChild(serviceCell);
-      }
-      container.appendChild(recoveryBento);
-    } else {
+    const hasCredentialFields = Boolean(username || email && email !== username || item.password);
+    const appendCredentialCard = () => {
+      if (!hasCredentialFields) return;
       const card1 = document.createElement("div");
       card1.className = "card";
       if (username) {
@@ -5006,39 +4814,100 @@ ${notes}`;
       if (userVal) userVal.textContent = username;
       const emailVal = document.getElementById("email-val");
       if (emailVal) emailVal.textContent = email;
-    }
-    if (item.type === "login" && item.password) {
-      const risk = evaluateCredentialRisk(item, allItems);
-      const riskCard = document.createElement("div");
-      riskCard.className = "card risk-detail-card";
-      riskCard.innerHTML = `
-      <div class="risk-card-inner">
-        <div class="risk-info-column" style="width: 100%;">
-          <div class="risk-header-row">
-            <span class="risk-title">Security & Risk Health</span>
-            <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
-              ${risk.label}
-            </span>
+    };
+    const appendTotpCard = () => {
+      if (!hasTotp) return;
+      const totpCard = document.createElement("div");
+      totpCard.className = "totp-container";
+      totpCard.innerHTML = `
+      <div class="totp-header">
+        <div class="totp-label-group">
+          <div class="totp-shield-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
           </div>
-          <div class="risk-chips-wrap">
-            <span class="risk-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
-            <span class="risk-chip ${risk.isReused ? "alert" : ""}">${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</span>
-            <span class="risk-chip ${risk.has2FA ? "success" : ""}">${risk.has2FA ? "\u{1F6E1}\uFE0F 2FA Active" : "\u26A0\uFE0F No 2FA"}</span>
-          </div>
-          ${item.passwordHistory && item.passwordHistory.length > 0 ? `
-            <div class="risk-history-info">
-              <span>\u{1F552} ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? "s" : ""} archived in history</span>
-            </div>
-          ` : ""}
-          ${item.importSource ? `
-            <div class="risk-source-info">
-              <span>\u{1F4E5} Source: <strong>${item.importSource}</strong></span>
-            </div>
-          ` : ""}
+          <span class="totp-title">Authenticator</span>
+        </div>
+        <div class="totp-countdown-pill" id="totp-countdown-pill">
+          <svg class="totp-countdown-svg" viewBox="0 0 24 24">
+            <circle class="totp-svg-bg" cx="12" cy="12" r="9"></circle>
+            <circle class="totp-svg-progress" id="totp-svg-progress" cx="12" cy="12" r="9"></circle>
+          </svg>
+          <span id="totp-timer-text">30s</span>
         </div>
       </div>
+      <div class="totp-body-row" id="copy-totp-row" title="Click to copy code">
+        <div class="totp-code-display" id="totp-code">------</div>
+        <button class="totp-copy-btn" id="copy-totp-btn">
+          <svg class="copy-icon-svg" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          <span id="totp-copy-text">Copy</span>
+        </button>
+      </div>
     `;
-      container.appendChild(riskCard);
+      container.appendChild(totpCard);
+      const handleCopy = async (e) => {
+        e.stopPropagation();
+        const codeEl = document.getElementById("totp-code");
+        const rawCode = (codeEl?.textContent || "").replace(/\s+/g, "");
+        if (!rawCode || rawCode === "------") return;
+        await copyToClipboardText(rawCode);
+        const copyBtn = document.getElementById("copy-totp-btn");
+        const copyText = document.getElementById("totp-copy-text");
+        if (copyBtn && copyText) {
+          copyBtn.classList.add("copied");
+          copyText.textContent = "Copied!";
+          setTimeout(() => {
+            copyBtn.classList.remove("copied");
+            copyText.textContent = "Copy";
+          }, 1800);
+        }
+      };
+      totpCard.querySelector("#copy-totp-row")?.addEventListener("click", handleCopy);
+      totpCard.querySelector("#copy-totp-btn")?.addEventListener("click", handleCopy);
+      startTotpCounter(item.totpSecret);
+    };
+    const appendRiskCard = () => {
+      if (item.type === "login" && item.password) {
+        const risk = evaluateCredentialRisk(item, allItems);
+        const riskCard = document.createElement("div");
+        riskCard.className = "card risk-detail-card";
+        riskCard.innerHTML = `
+        <div class="risk-card-inner">
+          <div class="risk-info-column" style="width: 100%;">
+            <div class="risk-header-row">
+              <span class="risk-title">Security & Risk Health</span>
+              <span class="risk-status-pill" style="background: ${risk.color}22; color: ${risk.color}; border: 1px solid ${risk.color}55;">
+                ${risk.label}
+              </span>
+            </div>
+            <div class="risk-chips-wrap">
+              <span class="risk-chip">\u{1F510} ${risk.entropyBits} bits entropy</span>
+              <span class="risk-chip ${risk.isReused ? "alert" : ""}">${risk.isReused ? `\u26A0\uFE0F Reused on ${risk.reusedCount + 1} sites` : "\u2713 Unique password"}</span>
+              <span class="risk-chip ${risk.has2FA ? "success" : ""}">${risk.has2FA ? "\u{1F6E1}\uFE0F 2FA Active" : "\u26A0\uFE0F No 2FA"}</span>
+            </div>
+            ${item.passwordHistory && item.passwordHistory.length > 0 ? `
+              <div class="risk-history-info">
+                <span>\u{1F552} ${item.passwordHistory.length} previous password${item.passwordHistory.length > 1 ? "s" : ""} archived in history</span>
+              </div>
+            ` : ""}
+            ${item.importSource ? `
+              <div class="risk-source-info">
+                <span>\u{1F4E5} Source: <strong>${item.importSource}</strong></span>
+              </div>
+            ` : ""}
+          </div>
+        </div>
+      `;
+        container.appendChild(riskCard);
+      }
+    };
+    if (currentFilterMode === "2fa") {
+      appendTotpCard();
+      appendCredentialCard();
+      appendRiskCard();
+    } else {
+      appendCredentialCard();
+      appendRiskCard();
+      appendTotpCard();
     }
     if (urls.length > 0) {
       const urlCard = document.createElement("div");

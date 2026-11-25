@@ -1624,17 +1624,21 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
           </div>
         </div>
 
+        ${(item.username || displayPassword) ? `
         <div class="kloak-bento-inputs">
+          ${item.username ? `
           <!-- Horizontal Textbox 1: Username -->
           <div class="kloak-bento-textbox" id="box-user-${itemId}">
             <span class="kloak-bento-label">USER</span>
-            <span class="kloak-bento-val" title="${item.username || 'No Username'}">${item.username || 'No Username'}</span>
+            <span class="kloak-bento-val" title="${item.username}">${item.username}</span>
             <div class="kloak-bento-actions">
               <button class="kloak-bento-btn fill-btn" id="fill-user-btn-${itemId}" title="Fill Username Only">⚡ Fill</button>
               <button class="kloak-bento-btn" id="copy-user-btn-${itemId}" title="Copy Username">📋</button>
             </div>
           </div>
+          ` : ''}
 
+          ${displayPassword ? `
           <!-- Horizontal Textbox 2: Password -->
           <div class="kloak-bento-textbox" id="box-pwd-${itemId}">
             <span class="kloak-bento-label">PASS</span>
@@ -1649,7 +1653,9 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
               <button class="kloak-bento-btn" id="copy-pwd-btn-${itemId}" title="Copy Password">📋</button>
             </div>
           </div>
+          ` : ''}
         </div>
+        ` : ''}
 
         <!-- Bento Authenticator Container (When item has totpSecret) -->
         ${hasTotp ? `
