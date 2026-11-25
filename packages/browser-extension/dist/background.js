@@ -1657,6 +1657,7 @@
             break;
           }
           const normalizedItem = {
+            ...item,
             id: item.id,
             type: item.type || "login",
             title: item.title || "Untitled",
@@ -1667,6 +1668,7 @@
             tags: Array.isArray(item.tags) ? item.tags : [],
             favorite: Boolean(item.favorite),
             trashed: Boolean(item.trashed),
+            usedRecoveryCodes: Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes : [],
             createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
             updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
             ...item.totpSecret ? { totpSecret: item.totpSecret } : {},

@@ -718,6 +718,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const normalizedItem = {
+          ...item,
           id: item.id,
           type: item.type || 'login',
           title: item.title || 'Untitled',
@@ -728,6 +729,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           tags: Array.isArray(item.tags) ? item.tags : [],
           favorite: Boolean(item.favorite),
           trashed: Boolean(item.trashed),
+          usedRecoveryCodes: Array.isArray(item.usedRecoveryCodes) ? item.usedRecoveryCodes : [],
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           ...(item.totpSecret ? { totpSecret: item.totpSecret } : {}),

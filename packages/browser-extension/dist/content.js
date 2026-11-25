@@ -2109,6 +2109,7 @@
       const hasPasswordInContainer = searchContainer.querySelector('input[type="password"]') !== null;
       if (!hasPasswordInContainer) return true;
     }
+    if (isOtpInput(input) || isRecoveryCodeInput(input)) return false;
     const autocomplete = (input.autocomplete || "").toLowerCase();
     const nonCredentialAutocompletes = [
       "off",
@@ -2135,8 +2136,7 @@
       "tel-national",
       "transaction-amount",
       "transaction-currency",
-      "language",
-      "one-time-code"
+      "language"
     ];
     if (nonCredentialAutocompletes.includes(autocomplete)) {
       if (autocomplete === "off") {
@@ -2169,7 +2169,10 @@
     const type = (input.type || "text").toLowerCase();
     const autocomplete = (input.autocomplete || "").toLowerCase();
     if (type === "password") return true;
-    if (["username", "email", "current-password", "new-password"].includes(autocomplete)) {
+    if (["username", "email", "current-password", "new-password", "one-time-code"].includes(autocomplete)) {
+      return true;
+    }
+    if (isOtpInput(input) || isRecoveryCodeInput(input)) {
       return true;
     }
     if (type === "email") {
@@ -2284,10 +2287,48 @@
     const aria = (input.getAttribute("aria-label") || "").toLowerCase();
     return /(recovery|backup|emergency|rescue)/i.test(`${name} ${id} ${placeholder} ${aria}`);
   }
-  function injectCredentials(username, password, targetInput, totpSecret, recoveryCodes, recoveryStorageKey, usedIndices) {
+  function markRecoveryCodeUsedAndSync(recoveryItem, recoveryStorageKey, newUsed) {
+    const cleanUsed = Array.from(new Set(newUsed)).sort((a, b) => a - b);
+    if (recoveryStorageKey) {
+      chrome.storage.local.set({ [recoveryStorageKey]: cleanUsed });
+    }
+    if (recoveryItem && recoveryItem.id) {
+      const updatedItem = { ...recoveryItem, usedRecoveryCodes: cleanUsed };
+      const idx = allVaultItems.findIndex((i) => i.id === updatedItem.id);
+      if (idx !== -1) allVaultItems[idx] = updatedItem;
+      chrome.runtime.sendMessage({ type: "UPDATE_ITEM", item: updatedItem }, () => {
+      });
+    }
+  }
+  function injectCredentials(username, password, targetInput, totpSecret, recoveryCodes, recoveryStorageKey, usedIndices, recoveryItem) {
     const activeInput = targetInput || currentTargetInput || document.activeElement;
-    const isTargetOtp = isOtpInput(activeInput);
-    const isTargetRecovery = isRecoveryCodeInput(activeInput);
+    const pageContext = analyzePageContext(activeInput);
+    const isTargetRecovery = isRecoveryCodeInput(activeInput) || !isOtpInput(activeInput) && pageContext.hasRecoveryField && !pageContext.hasPasswordField && !pageContext.hasUsernameField;
+    const isTargetOtp = !isTargetRecovery && (isOtpInput(activeInput) || pageContext.hasOtpField && !pageContext.hasPasswordField && !pageContext.hasUsernameField);
+    if (isTargetRecovery && recoveryCodes && recoveryCodes.length > 0) {
+      const targetRecField = activeInput && isRecoveryCodeInput(activeInput) ? activeInput : pageContext.recoveryInputs[0];
+      if (targetRecField) {
+        const used = usedIndices || [];
+        const nextIdx = recoveryCodes.findIndex((_, idx) => !used.includes(idx));
+        const targetIdx = nextIdx !== -1 ? nextIdx : 0;
+        const codeToUse = recoveryCodes[targetIdx];
+        if (codeToUse) {
+          setInputValue(targetRecField, codeToUse);
+          try {
+            navigator.clipboard.writeText(codeToUse);
+          } catch {
+          }
+          const newUsed = Array.from(/* @__PURE__ */ new Set([...used, targetIdx])).sort((a, b) => a - b);
+          markRecoveryCodeUsedAndSync(recoveryItem, recoveryStorageKey, newUsed);
+          showToastNotification(`\u2728 Filled recovery code #${targetIdx + 1} (${codeToUse})!`);
+          return;
+        }
+      }
+    }
+    if (isTargetOtp && totpSecret) {
+      handleTotpSync(totpSecret, activeInput);
+      return;
+    }
     const context = activeInput && !isTargetOtp && !isTargetRecovery ? analyzeFormContext(activeInput) : {
       form: null,
       usernameFields: [],
@@ -2310,7 +2351,7 @@
           passField = allDocInputs.find((i) => i.type === "password");
         }
       }
-      if (activeInput && activeInput.type !== "password") {
+      if (activeInput && activeInput.type !== "password" && !isOtpInput(activeInput) && !isRecoveryCodeInput(activeInput)) {
         userField = activeInput;
       } else if (activeInput && activeInput.type === "password") {
         passField = activeInput;
@@ -2323,7 +2364,7 @@
         setInputValue(passField, password);
         filledPassword = true;
       }
-      if (targetInput) {
+      if (targetInput && !isOtpInput(targetInput) && !isRecoveryCodeInput(targetInput)) {
         if (password && !filledPassword && targetInput.type === "password") {
           setInputValue(targetInput, password);
         } else if (username && !filledUsername && targetInput.type !== "password") {
@@ -2331,26 +2372,7 @@
         }
       }
     }
-    if (isTargetRecovery && recoveryCodes && recoveryCodes.length > 0 && activeInput) {
-      const used = usedIndices || [];
-      const nextIdx = recoveryCodes.findIndex((_, idx) => !used.includes(idx));
-      const targetIdx = nextIdx !== -1 ? nextIdx : 0;
-      const codeToUse = recoveryCodes[targetIdx];
-      if (codeToUse) {
-        setInputValue(activeInput, codeToUse);
-        try {
-          navigator.clipboard.writeText(codeToUse);
-        } catch {
-        }
-        if (recoveryStorageKey) {
-          const newUsed = Array.from(/* @__PURE__ */ new Set([...used, targetIdx]));
-          chrome.storage.local.set({ [recoveryStorageKey]: newUsed });
-        }
-        showToastNotification(`\u2728 Filled recovery code #${targetIdx + 1} (${codeToUse})!`);
-        return;
-      }
-    }
-    if (isTargetOtp || totpSecret) {
+    if (totpSecret) {
       handleTotpSync(totpSecret, activeInput);
     }
     if (username && password) {
@@ -3101,10 +3123,16 @@
     chrome.runtime.sendMessage({ type: "GET_CREDENTIALS", url: window.location.href }, (credRes) => {
       const newItems = credRes && Array.isArray(credRes.items) ? credRes.items : [];
       cachedCredentialsForSite = newItems;
-      setTimeout(() => {
-        buildPopupUI(newItems, input, true, true);
-        showToastNotification(`\u2713 Vault unlocked \u2022 ${newItems.length} password${newItems.length === 1 ? "" : "s"} available`);
-      }, 180);
+      chrome.runtime.sendMessage({ type: "SEARCH_VAULT", query: "" }, (vaultRes) => {
+        if (vaultRes && Array.isArray(vaultRes.items)) {
+          allVaultItems = vaultRes.items;
+        }
+        const effectiveItems = resolveFallbackSiteItems(input, newItems);
+        setTimeout(() => {
+          buildPopupUI(effectiveItems, input, true, true);
+          showToastNotification(`\u2713 Vault unlocked \u2022 ${effectiveItems.length} credential${effectiveItems.length === 1 ? "" : "s"} available`);
+        }, 180);
+      });
     });
   }
   function isRegistrationOrSignupPage() {
@@ -3121,24 +3149,21 @@
   }
   function analyzePageContext(focusedInput) {
     const allInputs = Array.from(document.querySelectorAll("input")).filter((el) => isVisible(el));
-    const otpInputs = allInputs.filter((input) => {
+    const recoveryInputs = allInputs.filter((input) => {
       const type = (input.type || "").toLowerCase();
       if (type === "hidden" || type === "submit" || type === "checkbox") return false;
-      const name = (input.name || "").toLowerCase();
-      const id = (input.id || "").toLowerCase();
-      const placeholder = (input.placeholder || "").toLowerCase();
-      const autocomplete = (input.autocomplete || "").toLowerCase();
-      const aria = (input.getAttribute("aria-label") || "").toLowerCase();
-      if (autocomplete === "one-time-code") return true;
-      if (/(otp|totp|2fa|mfa|verification|security-code|two-step|auth-code)/i.test(`${name} ${id} ${placeholder} ${aria}`)) return true;
-      if (input.maxLength === 6 && (input.inputMode === "numeric" || input.pattern?.includes("[0-9]"))) return true;
-      return false;
+      return isRecoveryCodeInput(input);
+    });
+    const hasRecoveryField = recoveryInputs.length > 0;
+    const otpInputs = allInputs.filter((input) => {
+      if (recoveryInputs.includes(input)) return false;
+      return isOtpInput(input);
     });
     const hasOtpField = otpInputs.length > 0;
     const passwordInputs = allInputs.filter((i) => (i.type || "").toLowerCase() === "password");
     const usernameInputs = allInputs.filter((i) => {
       const type = (i.type || "").toLowerCase();
-      return type !== "password" && type !== "hidden" && type !== "submit" && type !== "button" && type !== "checkbox" && !isSearchOrNonCredentialInput(i) && !otpInputs.includes(i);
+      return type !== "password" && type !== "hidden" && type !== "submit" && type !== "button" && type !== "checkbox" && !isSearchOrNonCredentialInput(i) && !otpInputs.includes(i) && !recoveryInputs.includes(i);
     });
     const hasUsernameField = usernameInputs.length > 0;
     const usernameInput = usernameInputs[0];
@@ -3149,9 +3174,14 @@
     const isPasswordFilled = !!(passwordInput && passwordInput.value.length > 0);
     const pageText = (document.title + " " + (document.querySelector('h1, h2, h3, h4, form, [role="form"], main')?.textContent || "")).toLowerCase();
     const isTwoStepPage = hasOtpField || /(two-factor|2-step|two-step|verification code|authenticator|enter the 6-digit|security code)/i.test(pageText);
+    const focusedIsRecovery = isRecoveryCodeInput(focusedInput);
+    const focusedIsOtp = !focusedIsRecovery && isOtpInput(focusedInput);
     let contextSummary = "Login form ready";
     let contextTag = "READY";
-    if (hasOtpField || isTwoStepPage && !hasPasswordField) {
+    if (focusedIsRecovery || hasRecoveryField && !hasPasswordField && !focusedIsOtp) {
+      contextSummary = "Recovery / backup code input detected";
+      contextTag = "RECOVERY";
+    } else if (focusedIsOtp || hasOtpField || isTwoStepPage && !hasPasswordField) {
       contextSummary = "2FA verification input detected";
       contextTag = "2FA ACTIVE";
     } else if (isUsernameFilled && !isPasswordFilled) {
@@ -3168,6 +3198,8 @@
     return {
       hasOtpField,
       otpInputs,
+      hasRecoveryField,
+      recoveryInputs,
       hasUsernameField,
       isUsernameFilled,
       usernameValue,
@@ -3227,31 +3259,52 @@
     const code = ((hmac[offset] & 127) << 24 | hmac[offset + 1] << 16 | hmac[offset + 2] << 8 | hmac[offset + 3]) % 1e6;
     return code.toString().padStart(6, "0");
   }
+  function isRecoveryCodeLine(line) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("//")) return false;
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith("note:") || lower.startsWith("imported from ") || lower.startsWith("import via ") || lower.startsWith("discovered from ")) {
+      return false;
+    }
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+      return /^[a-zA-Z0-9]{4,}(-[a-zA-Z0-9]{2,})*$/.test(tokens[0]);
+    }
+    if (tokens.length <= 4 && tokens.every((t) => /^[a-zA-Z0-9]{2,8}(-[a-zA-Z0-9]{2,8})*$/.test(t))) {
+      const hasDigitOrShortFixed = tokens.some((t) => /\d/.test(t)) || tokens.every((t) => t.length === tokens[0].length && t.length >= 4);
+      return hasDigitOrShortFixed;
+    }
+    return false;
+  }
   function isRecoveryCodeNote(item) {
     if (!item) return false;
     const tags = item.tags || [];
     if (tags.some((t) => /recovery/i.test(t))) return true;
     if (Array.isArray(item.usedRecoveryCodes) && item.usedRecoveryCodes.length > 0) return true;
     const lowerTitle = (item.title || "").toLowerCase();
-    if (lowerTitle.includes("recovery code") || lowerTitle.includes("recovery codes") || lowerTitle.includes("backup code") || lowerTitle.includes("backup codes") || lowerTitle.includes("recovery key") || lowerTitle.includes("emergency kit") || lowerTitle.includes("2fa backup") || lowerTitle.includes("recovery")) {
+    if (lowerTitle.includes("recovery code") || lowerTitle.includes("recovery codes") || lowerTitle.includes("backup code") || lowerTitle.includes("backup codes") || lowerTitle.includes("recovery key") || lowerTitle.includes("recovery keys") || lowerTitle.includes("emergency kit") || lowerTitle.includes("2fa backup") || lowerTitle.includes("recovery")) {
       return true;
     }
     const notes = item.notes || "";
     if (notes) {
+      if (/recovery code|backup code/i.test(notes)) return true;
       const lines = notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//"));
-      if (lines.length >= 2 && lines.length <= 40) {
-        const codeRegex = /^[a-zA-Z0-9]{4,}(-[a-zA-Z0-9]{3,})*$/;
-        const matches = lines.filter((l) => codeRegex.test(l.replace(/\s+/g, ""))).length;
-        if (matches >= Math.max(1, Math.floor(lines.length / 2))) {
-          return true;
-        }
+      const codeCount = lines.filter((l) => isRecoveryCodeLine(l)).length;
+      if (codeCount >= 2 && (lines.length <= 40 || codeCount >= 4)) {
+        return true;
       }
     }
     return false;
   }
   function getRecoveryCodesList(noteItem) {
     if (!noteItem || !noteItem.notes) return [];
-    return noteItem.notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//") && !l.toLowerCase().startsWith("note:"));
+    const lines = noteItem.notes.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0 && !l.startsWith("#") && !l.startsWith("//") && !l.toLowerCase().startsWith("note:"));
+    const codeLines = lines.filter((l) => isRecoveryCodeLine(l));
+    if (codeLines.length > 0) return codeLines;
+    if (isRecoveryCodeNote(noteItem)) {
+      return lines.filter((l) => !/^(imported from|import via|discovered from)\b/i.test(l));
+    }
+    return [];
   }
   function findAssociatedRecoveryNote(item, allItems) {
     if (!item) return null;
@@ -3375,7 +3428,7 @@
     });
     const contextBar = document.createElement("div");
     contextBar.className = "kloak-bento-context-bar";
-    const tagClass = !isUnlocked ? "kloak-bento-context-tag" : pageContext.hasOtpField ? "kloak-bento-context-tag" : "kloak-bento-context-tag info";
+    const tagClass = !isUnlocked ? "kloak-bento-context-tag" : pageContext.hasOtpField || pageContext.hasRecoveryField ? "kloak-bento-context-tag" : "kloak-bento-context-tag info";
     contextBar.innerHTML = `
     <div class="kloak-bento-context-left">
       <span>${!isUnlocked ? "\u{1F512}" : "\u{1F3AF}"}</span>
@@ -3492,14 +3545,13 @@
               ${recoveryCodes.map((c, cIdx) => `
                 <div class="kloak-bento-recovery-item" data-index="${cIdx}" id="rec-item-${itemId}-${cIdx}">
                   <input type="checkbox" class="kloak-bento-recovery-checkbox" data-index="${cIdx}" id="rec-check-${itemId}-${cIdx}">
-                  <span class="kloak-bento-recovery-code" data-code="${c}" title="Click to fill or copy">${c}</span>
-                  <button class="kloak-bento-recovery-copy" data-code="${c}" title="Copy Code">\u{1F4CB}</button>
+                  <span class="kloak-bento-recovery-code" data-code="${c}" data-index="${cIdx}" title="Click to fill or copy">${c}</span>
+                  <button class="kloak-bento-recovery-copy" data-code="${c}" data-index="${cIdx}" title="Copy Code">\u{1F4CB}</button>
                 </div>
               `).join("")}
             </div>
           </div>
         ` : ""}
-        </div>
       `;
         const avatarBox = card.querySelector(".kloak-bento-avatar");
         if (avatarBox) {
@@ -3519,7 +3571,7 @@
             const localUsed = res[storageKey] || [];
             const vaultUsed = matchedRecovery && Array.isArray(matchedRecovery.usedRecoveryCodes) ? matchedRecovery.usedRecoveryCodes : [];
             const used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed]));
-            injectCredentials(item.username, item.password, input, item.totpSecret, recoveryCodes, storageKey, used);
+            injectCredentials(item.username, item.password, input, item.totpSecret, recoveryCodes, storageKey, used, matchedRecovery || item);
           });
           setTimeout(() => {
             cleanDismiss();
@@ -3675,21 +3727,27 @@
           const storageKey = `recovery_used_${recItemId}`;
           const recoveryContainer = card.querySelector(`#bento-recovery-container-${itemId}`);
           if (recoveryContainer) {
-            chrome.storage.local.get([storageKey], (res) => {
-              const localUsed = res[storageKey] || [];
-              const vaultUsed = Array.isArray(matchedRecovery.usedRecoveryCodes) ? matchedRecovery.usedRecoveryCodes : [];
-              const used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed]));
-              used.forEach((idx2) => {
-                const itemRow = recoveryContainer.querySelector(`#rec-item-${itemId}-${idx2}`);
-                const checkbox = recoveryContainer.querySelector(`#rec-check-${itemId}-${idx2}`);
-                if (checkbox) checkbox.checked = true;
-                if (itemRow) itemRow.classList.add("used");
+            const applyUsedState = (used) => {
+              const usedSet = new Set(used);
+              recoveryCodes.forEach((_, cIdx) => {
+                const itemRow = recoveryContainer.querySelector(`#rec-item-${itemId}-${cIdx}`);
+                const checkbox = recoveryContainer.querySelector(`#rec-check-${itemId}-${cIdx}`);
+                const isUsed = usedSet.has(cIdx);
+                if (checkbox) checkbox.checked = isUsed;
+                itemRow?.classList.toggle("used", isUsed);
               });
               const badge = recoveryContainer.querySelector(`#bento-recovery-badge-${itemId}`);
               if (badge) {
-                const remaining = Math.max(0, recoveryCodes.length - used.length);
+                const validCount = recoveryCodes.filter((_, cIdx) => usedSet.has(cIdx)).length;
+                const remaining = Math.max(0, recoveryCodes.length - validCount);
                 badge.textContent = `${remaining}/${recoveryCodes.length} Left`;
               }
+            };
+            chrome.storage.local.get([storageKey], (res) => {
+              const localUsed = Array.isArray(res[storageKey]) ? res[storageKey] : [];
+              const vaultUsed = Array.isArray(matchedRecovery.usedRecoveryCodes) ? matchedRecovery.usedRecoveryCodes : [];
+              const used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed])).filter((i) => i >= 0 && i < recoveryCodes.length).sort((a, b) => a - b);
+              applyUsedState(used);
             });
             recoveryContainer.querySelectorAll(".kloak-bento-recovery-checkbox").forEach((cb) => {
               cb.addEventListener("click", (e) => {
@@ -3697,42 +3755,47 @@
               });
               cb.addEventListener("change", (e) => {
                 e.stopPropagation();
-                const checkbox = e.target;
-                const codeIdx = parseInt(checkbox.dataset.index || "0", 10);
-                chrome.storage.local.get([storageKey], (res) => {
-                  const localUsed = res[storageKey] || [];
-                  const vaultUsed = Array.isArray(matchedRecovery.usedRecoveryCodes) ? matchedRecovery.usedRecoveryCodes : [];
-                  let used = Array.from(/* @__PURE__ */ new Set([...localUsed, ...vaultUsed]));
-                  if (checkbox.checked) {
-                    if (!used.includes(codeIdx)) used.push(codeIdx);
-                  } else {
-                    used = used.filter((i) => i !== codeIdx);
-                  }
-                  chrome.storage.local.set({ [storageKey]: used });
-                  const itemRow = recoveryContainer.querySelector(`#rec-item-${itemId}-${codeIdx}`);
-                  if (checkbox.checked) {
-                    itemRow?.classList.add("used");
-                  } else {
-                    itemRow?.classList.remove("used");
-                  }
-                  const badge = recoveryContainer.querySelector(`#bento-recovery-badge-${itemId}`);
-                  if (badge) {
-                    const remaining = Math.max(0, recoveryCodes.length - used.length);
-                    badge.textContent = `${remaining}/${recoveryCodes.length} Left`;
+                const checkedIndices = [];
+                recoveryContainer.querySelectorAll(".kloak-bento-recovery-checkbox").forEach((box) => {
+                  if (box.checked) {
+                    const idx2 = parseInt(box.dataset.index || "-1", 10);
+                    if (idx2 >= 0) checkedIndices.push(idx2);
                   }
                 });
+                checkedIndices.sort((a, b) => a - b);
+                applyUsedState(checkedIndices);
+                markRecoveryCodeUsedAndSync(matchedRecovery, storageKey, checkedIndices);
               });
             });
             recoveryContainer.querySelectorAll(".kloak-bento-recovery-code, .kloak-bento-recovery-copy").forEach((el) => {
               el.addEventListener("click", async (e) => {
                 e.stopPropagation();
                 const codeText = el.getAttribute("data-code") || el.textContent || "";
+                const codeIdx = parseInt(el.getAttribute("data-index") || "-1", 10);
+                const isCopyBtn = el.classList.contains("kloak-bento-recovery-copy");
                 if (codeText) {
                   const clean = codeText.trim();
-                  await navigator.clipboard.writeText(clean);
-                  if (currentTargetInput && isVisible(currentTargetInput)) {
-                    setInputValue(currentTargetInput, clean);
+                  try {
+                    await navigator.clipboard.writeText(clean);
+                  } catch {
+                  }
+                  const recTargetField = currentTargetInput && isRecoveryCodeInput(currentTargetInput) && isVisible(currentTargetInput) ? currentTargetInput : pageContext.recoveryInputs.find((r) => isVisible(r));
+                  if (!isCopyBtn && recTargetField) {
+                    setInputValue(recTargetField, clean);
+                    if (codeIdx >= 0) {
+                      const checkedIndices = [codeIdx];
+                      recoveryContainer.querySelectorAll(".kloak-bento-recovery-checkbox").forEach((box) => {
+                        if (box.checked) {
+                          const idx2 = parseInt(box.dataset.index || "-1", 10);
+                          if (idx2 >= 0) checkedIndices.push(idx2);
+                        }
+                      });
+                      const nextUsed = Array.from(new Set(checkedIndices)).sort((a, b) => a - b);
+                      applyUsedState(nextUsed);
+                      markRecoveryCodeUsedAndSync(matchedRecovery, storageKey, nextUsed);
+                    }
                     showToastNotification(`\u2728 Filled recovery code: ${clean}`);
+                    setTimeout(() => cleanDismiss(), 220);
                   } else {
                     showToastNotification(`\u{1F4CB} Copied recovery code: ${clean}`);
                   }
@@ -3973,6 +4036,19 @@
       document.addEventListener("mousedown", handleOutsideClick);
     }, 100);
   }
+  function resolveFallbackSiteItems(input, baseItems) {
+    if (baseItems.length > 0) return baseItems;
+    if (!isOtpInput(input) && !isRecoveryCodeInput(input)) return baseItems;
+    if (!allVaultItems || allVaultItems.length === 0) return baseItems;
+    const host = window.location.hostname.replace(/^www\./, "").toLowerCase();
+    const sld = host.split(".")[0];
+    if (!sld || sld.length < 3) return baseItems;
+    return allVaultItems.filter((it) => {
+      const title = (it.title || "").toLowerCase();
+      const has2faOrRec = Boolean(it.totpSecret) || isRecoveryCodeNote(it);
+      return has2faOrRec && title.includes(sld);
+    });
+  }
   function triggerCredentialPopupForInput(input) {
     if (!isCredentialField(input)) return;
     currentTargetInput = input;
@@ -3989,10 +4065,12 @@
           if (vaultRes && Array.isArray(vaultRes.items)) {
             allVaultItems = vaultRes.items;
           }
-          buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
+          const effectiveItems = resolveFallbackSiteItems(input, cachedCredentialsForSite);
+          buildPopupUI(effectiveItems, input, isUnlocked);
         });
       } else {
-        buildPopupUI(cachedCredentialsForSite, input, isUnlocked);
+        const effectiveItems = resolveFallbackSiteItems(input, cachedCredentialsForSite);
+        buildPopupUI(effectiveItems, input, isUnlocked);
       }
     });
   }
@@ -4452,7 +4530,16 @@
   attachFormSubmitListeners();
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "INJECT_CREDENTIALS") {
-      injectCredentials(message.username, message.password);
+      injectCredentials(
+        message.username,
+        message.password,
+        void 0,
+        message.totpSecret,
+        message.recoveryCodes,
+        message.recoveryStorageKey,
+        message.usedIndices,
+        message.recoveryItem
+      );
       sendResponse({ success: true });
     } else if (message.type === "INJECT_GENERATED_PASSWORD") {
       if (message.password) {

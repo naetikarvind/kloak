@@ -623,6 +623,9 @@ public final class IPCServer: ObservableObject {
                 if let urls = patchDict["urls"]?.arrayValue {
                     existing.urls = urls.compactMap { $0.stringValue }
                 }
+                if let recUsed = patchDict["usedRecoveryCodes"]?.arrayValue {
+                    existing.usedRecoveryCodes = recUsed.compactMap { $0.intValue }
+                }
                 existing.updatedAt = ISO8601DateFormatter().string(from: Date())
                 store.saveItem(existing)
                 reply(.dictionary(["success": .bool(true), "id": .string(existing.id)]))
