@@ -14,6 +14,7 @@ public enum NavigationSection: Hashable {
     case folder(String)
     case duplicates
     case passwordHealth
+    case sessions
     case generator
     case combineCredentials
     case importExport
@@ -25,6 +26,7 @@ public struct SidebarView: View {
     @Binding var selection: NavigationSection
     var items: [VaultItem]
     @Binding var folders: [VaultFolder]
+    @ObservedObject private var sessionMonitor = SessionMonitorService.shared
     var onLock: () -> Void
     var onAddItem: () -> Void
     var onCreateFolder: ((String) -> Void)? = nil
@@ -227,6 +229,18 @@ public struct SidebarView: View {
                         .badge(totalHealthIssues)
                     }
                     .tag(NavigationSection.passwordHealth)
+
+                    let alertCount = sessionMonitor.activeAlerts.filter { !$0.dismissed }.count
+                    NavigationLink(value: NavigationSection.sessions) {
+                        Label {
+                            Text("Session Watch")
+                        } icon: {
+                            Image(systemName: "clock.badge.exclamationmark.fill")
+                                .foregroundColor(alertCount > 0 ? LiquidGlassTheme.amberAccent : LiquidGlassTheme.cyanAccent)
+                        }
+                        .badge(alertCount > 0 ? alertCount : sessionMonitor.trackedSessions.count)
+                    }
+                    .tag(NavigationSection.sessions)
                 }
 
                 Section(header: sectionHeader("Tools")) {
@@ -235,8 +249,10 @@ public struct SidebarView: View {
                     }
                     .tag(NavigationSection.generator)
 
+                    let recommendedCount = CredentialCombinerService.shared.findRecommendedCombinations(in: items).count
                     NavigationLink(value: NavigationSection.combineCredentials) {
                         Label("Combine Credentials", systemImage: "arrow.triangle.merge")
+                            .badge(recommendedCount)
                     }
                     .tag(NavigationSection.combineCredentials)
 

@@ -265,6 +265,7 @@ public final class VaultStore: ObservableObject {
         LogoService.shared.prefetchLogos(for: finalItems)
 
         startAutoLockTimer()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     // MARK: - Unlock with Master Password
@@ -371,6 +372,7 @@ public final class VaultStore: ObservableObject {
             }
 
             startAutoLockTimer()
+            SessionMonitorService.shared.syncWithVault()
             NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": true])
             return true
         } catch {
@@ -483,6 +485,7 @@ public final class VaultStore: ObservableObject {
                         }
 
                         self.startAutoLockTimer()
+                        SessionMonitorService.shared.syncWithVault()
                         NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": true])
                         continuation.resume(returning: true)
                     } catch {
@@ -500,6 +503,7 @@ public final class VaultStore: ObservableObject {
         self.vaultKey = nil
         self.isUnlocked = false
         stopAutoLockTimer()
+        SessionMonitorService.shared.stopMonitoring()
         NotificationCenter.default.post(name: .kloakVaultLockStateChanged, object: nil, userInfo: ["isUnlocked": false])
     }
 
@@ -566,6 +570,7 @@ public final class VaultStore: ObservableObject {
             self.settings = payload.settings
             self.syncIgnoredIssuesFromLoadedSettings()
             LogoService.shared.prefetchLogos(for: payload.items)
+            SessionMonitorService.shared.syncWithVault()
             return true
         } catch {
             return false
@@ -585,6 +590,7 @@ public final class VaultStore: ObservableObject {
         recordUserActivity()
         saveVault()
         LogoService.shared.prefetchLogos(for: [cleaned])
+        SessionMonitorService.shared.syncWithVault()
     }
 
     public func deleteItem(id: String, permanent: Bool = false) {
@@ -622,12 +628,14 @@ public final class VaultStore: ObservableObject {
         items.removeAll { $0.trashed }
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     public func deletePermanently(id: String) {
         items.removeAll { $0.id == id }
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     public func createFolder(name: String) -> VaultFolder {
@@ -645,6 +653,7 @@ public final class VaultStore: ObservableObject {
         self.folders.removeAll { $0.id == id }
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     public func updateSettings(_ newSettings: VaultSettings) {
@@ -663,10 +672,11 @@ public final class VaultStore: ObservableObject {
         }
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     public func bulkImport(_ importedItems: [VaultItem]) -> (Int, [String]) {
-        var addedCount = 0
+        var cleanedItems: [VaultItem] = []
         for var item in importedItems {
             if KeychainManager.isSystemOrDeveloperItem(
                 server: item.urls.first ?? "",
@@ -684,15 +694,47 @@ public final class VaultStore: ObservableObject {
             ) {
                 item.notes = nil
             }
-            if !items.contains(where: { $0.title == item.title && $0.username == item.username }) {
+            cleanedItems.append(item)
+        }
+
+        // Consolidate cross-type items inside the imported batch (e.g. GitHub + github recovery code)
+        let consolidation = SmartCredentialUnderstander.shared.consolidateIncomingBatch(cleanedItems) { primaryId, cluster in
+            CredentialCombinerService.shared.generatePreview(primaryId: primaryId, items: cluster) ?? cluster[0]
+        }
+
+        var addedCount = 0
+        var descriptions: [String] = consolidation.combinedDescriptions
+
+        for item in consolidation.items {
+            if items.contains(where: { !$0.trashed && $0.title == item.title && $0.username == item.username }) {
+                continue
+            }
+
+            if SmartCredentialUnderstander.shared.findRedundantDuplicateTarget(for: item, in: items) != nil {
+                continue
+            }
+
+            if let match = SmartCredentialUnderstander.shared.findBestExistingMatch(for: item, in: items),
+               let idx = items.firstIndex(where: { $0.id == match.item.id }),
+               var combined = CredentialCombinerService.shared.generatePreview(
+                   primaryId: match.item.id,
+                   items: [match.item, item],
+                   customTitle: BrandTitleService.cleanTitle(match.item.title, url: match.item.urls.first)
+               ) {
+                combined.updatedAt = ISO8601DateFormatter().string(from: Date())
+                items[idx] = combined
+                addedCount += 1
+                descriptions.append("Combined '\(item.title)' into '\(combined.title)'")
+            } else {
                 items.append(item)
                 addedCount += 1
             }
         }
+
         recordUserActivity()
         saveVault()
         LogoService.shared.prefetchLogos(for: self.items)
-        return (addedCount, [])
+        return (addedCount, descriptions)
     }
 
     public func toggleRecoveryCodeUsed(itemId: String, index: Int) {
@@ -756,6 +798,7 @@ public final class VaultStore: ObservableObject {
 
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     @discardableResult
@@ -775,6 +818,7 @@ public final class VaultStore: ObservableObject {
         _ = CredentialCombinerService.shared.combine(group: group, in: &items)
         recordUserActivity()
         saveVault()
+        SessionMonitorService.shared.syncWithVault()
     }
 
     @discardableResult
@@ -949,6 +993,7 @@ public final class VaultStore: ObservableObject {
 
     public func resetVault() {
         stopAutoLockTimer()
+        SessionMonitorService.shared.stopMonitoring()
         self.isUnlocked = false
         self.hasVault = false
         self.items = []

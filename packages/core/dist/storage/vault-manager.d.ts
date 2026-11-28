@@ -7,8 +7,10 @@ import { VaultItem, VaultSettings, VaultStatus, VaultFolder, HardwareKeyConfig, 
 import { SupportedImportFormat } from '../parsers/index.js';
 import { MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
 import { ExportOptions, ExportResult } from '../parsers/export.js';
+import { SessionCoordinator } from '../session/session-monitor.js';
 export interface ImportOptions {
     autoMerge?: boolean;
+    filename?: string;
 }
 export interface ImportDataResult {
     imported: number;
@@ -26,6 +28,7 @@ export declare class VaultManager {
     private activeVaultKey;
     private autoLockTimer;
     private lastActivityTime;
+    readonly sessions: SessionCoordinator;
     constructor(customVaultPath?: string);
     /**
      * Checks if a vault file exists on disk and is initialized.

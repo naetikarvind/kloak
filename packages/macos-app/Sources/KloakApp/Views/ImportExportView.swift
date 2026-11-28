@@ -224,12 +224,12 @@ public struct ImportExportView: View {
     private func selectAndImportFile() {
         NSApp.activate(ignoringOtherApps: true)
         let panel = NSOpenPanel()
-        panel.title = "Select Password Export File"
-        panel.prompt = "Import File"
+        panel.title = "Select Password or Recovery File(s)"
+        panel.prompt = "Import File(s)"
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.canCreateDirectories = false
-        panel.allowsMultipleSelection = false
+        panel.allowsMultipleSelection = true
         panel.allowsOtherFileTypes = true
 
         var allowedTypes: [UTType] = [
@@ -250,45 +250,63 @@ public struct ImportExportView: View {
         }
         panel.allowedContentTypes = allowedTypes
 
-        if panel.runModal() == .OK, let url = panel.url {
-            let isAccessing = url.startAccessingSecurityScopedResource()
-            defer {
-                if isAccessing {
-                    url.stopAccessingSecurityScopedResource()
+        if panel.runModal() == .OK, !panel.urls.isEmpty {
+            var allParsedItems: [VaultItem] = []
+            var fileNames: [String] = []
+
+            for url in panel.urls {
+                let isAccessing = url.startAccessingSecurityScopedResource()
+                defer {
+                    if isAccessing {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                do {
+                    var (parsedItems, _) = try KeychainManager.shared.importFromFile(url: url)
+                    if parsedItems.isEmpty {
+                        let content = try KeychainManager.readFileContent(at: url)
+                        let (res, _) = KeychainManager.shared.importFromContent(content, filename: url.lastPathComponent, provider: nil)
+                        parsedItems = res
+                    }
+                    allParsedItems.append(contentsOf: parsedItems)
+                    fileNames.append(url.lastPathComponent)
+                } catch {
+                    importStatus = "Failed to import \(url.lastPathComponent): \(error.localizedDescription)"
+                    return
                 }
             }
 
-            do {
-                var (parsedItems, _) = try KeychainManager.shared.importFromFile(url: url)
-                if parsedItems.isEmpty {
-                    let content = try KeychainManager.readFileContent(at: url)
-                    let (res, _) = KeychainManager.shared.importFromContent(content, filename: url.lastPathComponent, provider: nil)
-                    parsedItems = res
-                }
+            let sourceLabel = fileNames.count == 1 ? fileNames[0] : "\(fileNames.count) files"
+            guard !allParsedItems.isEmpty else {
+                importStatus = "No valid credentials found in \(sourceLabel)."
+                return
+            }
 
-                guard !parsedItems.isEmpty else {
-                    importStatus = "No valid credentials found in \(url.lastPathComponent)."
-                    return
-                }
+            // Smartly consolidate cross-type items inside the imported batch (e.g. GitHub + github recovery code)
+            let consolidation = SmartCredentialUnderstander.shared.consolidateIncomingBatch(allParsedItems) { primaryId, cluster in
+                CredentialCombinerService.shared.generatePreview(primaryId: primaryId, items: cluster) ?? cluster[0]
+            }
 
-                // Run comparison against existing vault
-                let comparison = DuplicateDetectorService.shared.compareFileWithVault(
-                    fileItems: parsedItems,
-                    vaultItems: items,
-                    fileName: url.lastPathComponent
-                )
+            // Run comparison against existing vault (detects exact dupes, conflicts, and cross-type Smart Combines)
+            let comparison = DuplicateDetectorService.shared.compareFileWithVault(
+                fileItems: consolidation.items,
+                vaultItems: items,
+                fileName: sourceLabel
+            )
 
-                if comparison.duplicateCount > 0 {
-                    // Present resolution sheet for duplicate review
-                    pendingComparison = comparison
+            if comparison.duplicateCount > 0 || comparison.smartCombineCount > 0 {
+                // Present resolution sheet for duplicate & smart combine review
+                pendingComparison = comparison
+            } else {
+                // Direct import as all items are new
+                let added = VaultStore.shared.bulkImportWithResolution(toAdd: consolidation.items, toUpdate: [])
+                items = VaultStore.shared.items
+                if consolidation.combinedCount > 0 {
+                    importStatus = "Imported \(added) credential(s) from \(sourceLabel) (smart-combined \(consolidation.combinedCount) cross-type item(s))!"
                 } else {
-                    // Direct import as all items are new
-                    let added = VaultStore.shared.bulkImportWithResolution(toAdd: parsedItems, toUpdate: [])
-                    items = VaultStore.shared.items
-                    importStatus = "Successfully imported \(added) new items from \(url.lastPathComponent)!"
+                    importStatus = "Successfully imported \(added) new items from \(sourceLabel)!"
                 }
-            } catch {
-                importStatus = "Failed to import file: \(error.localizedDescription)"
             }
         }
     }

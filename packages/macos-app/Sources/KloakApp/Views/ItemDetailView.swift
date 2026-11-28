@@ -116,6 +116,17 @@ public struct ItemDetailView: View {
     @State private var editAuthDigits: Int = 6
     @State private var editAuthPeriod: Int = 30
 
+    // Session Policy Edit States
+    @State private var editSessionEnabled: Bool = false
+    @State private var editSessionReauthMode: SessionReauthMode = .notifyOnly
+    @State private var editSessionAuthMech: SessionAuthMechanism = .cookieTimer
+    @State private var editSessionTtlMinutes: Int = 60
+    @State private var editSessionIdleMinutes: Int = 30
+    @State private var editSessionHardMaxMinutes: Int = 480
+    @State private var editSessionWarnMinutes: Int = 5
+    @State private var editSessionTokenEndpoint: String = ""
+    @State private var editSessionLoginUrl: String = ""
+
     public var body: some View {
         ScrollViewReader { scrollProxy in
             ScrollView {
@@ -667,11 +678,12 @@ public struct ItemDetailView: View {
             loginPasswordContainer
             loginCustomFieldsAndUrls
         } else {
-            // In normal tabs: username, password, custom fields, urls, and 2FA below
+            // In normal tabs: username, password, custom fields, urls, 2FA, and session policy below
             loginUsernameContainer
             loginPasswordContainer
             loginCustomFieldsAndUrls
             login2FAContainer
+            loginSessionPolicyContainer
         }
     }
 
@@ -844,6 +856,75 @@ public struct ItemDetailView: View {
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                }
+                .padding(10)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var loginSessionPolicyContainer: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("SESSION EXPIRATION & AUTO-REAUTH")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.secondary)
+
+                Spacer()
+
+                Button(action: { startEditing() }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: item.sessionPolicy?.enabled == true ? "pencil" : "plus")
+                        Text(item.sessionPolicy?.enabled == true ? "Edit Policy" : "Configure")
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(LiquidGlassTheme.primaryAccent)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if let policy = item.sessionPolicy, policy.enabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock.badge.checkmark.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(LiquidGlassTheme.cyanAccent)
+                        Text(policy.reauthMode.displayName)
+                            .font(.system(size: 12, weight: .semibold))
+                        Spacer()
+                        Text(policy.authMechanism.displayName)
+                            .font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(Capsule())
+                    }
+
+                    HStack(spacing: 12) {
+                        Text(policy.sessionTtlMinutes > 0 ? "TTL: \(policy.sessionTtlMinutes)m" : "TTL: Auto-detect")
+                        Text("Warn: \(policy.notifyLeadMinutes)m before")
+                        Text(policy.hardMaxLifetimeMinutes > 0 ? "Max: \(policy.hardMaxLifetimeMinutes / 60)h" : "Max: Unbounded")
+                    }
+                    .font(.system(size: 10.5))
+                    .foregroundColor(.secondary)
+
+                    if policy.reuseDetected == true {
+                        Text("Security notice: Refresh token reuse was detected; interactive re-login required.")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundColor(LiquidGlassTheme.roseAccent)
+                    }
+                }
+                .padding(10)
+                .background(Color.black.opacity(0.25))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                HStack {
+                    Text("Automatic cookie/web-app passive monitoring (default: Notify & Prompt)")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(.secondary.opacity(0.75))
+                    Spacer()
                 }
                 .padding(10)
                 .background(Color.black.opacity(0.25))
@@ -1104,6 +1185,113 @@ public struct ItemDetailView: View {
         // Authenticator
         if !is2FAContext {
             loginTotpEditField
+        }
+
+        // Session Expiration & Auto-Reauth Policy
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle("Enable Custom Session Expiration Policy", isOn: $editSessionEnabled)
+                .font(.system(size: 12, weight: .semibold))
+
+            if editSessionEnabled {
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("RE-AUTH BEHAVIOR").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                        Picker("", selection: $editSessionReauthMode) {
+                            ForEach(SessionReauthMode.allCases) { m in
+                                Text(m.displayName).tag(m)
+                            }
+                        }
+                        .labelsHidden()
+                        Text(editSessionReauthMode.description)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("AUTH TYPE").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            Picker("", selection: $editSessionAuthMech) {
+                                ForEach(SessionAuthMechanism.allCases) { a in
+                                    Text(a.displayName).tag(a)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("SESSION TTL").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            Picker("", selection: $editSessionTtlMinutes) {
+                                Text("Auto-Detect").tag(0)
+                                Text("15 min").tag(15)
+                                Text("30 min").tag(30)
+                                Text("1 hour").tag(60)
+                                Text("4 hours").tag(240)
+                                Text("8 hours").tag(480)
+                            }
+                            .labelsHidden()
+                        }
+                    }
+
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("WARN LEAD").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            Picker("", selection: $editSessionWarnMinutes) {
+                                Text("1 min").tag(1)
+                                Text("5 min").tag(5)
+                                Text("10 min").tag(10)
+                            }
+                            .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("IDLE CAP").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            Picker("", selection: $editSessionIdleMinutes) {
+                                Text("15 min").tag(15)
+                                Text("30 min").tag(30)
+                                Text("60 min").tag(60)
+                                Text("Off").tag(0)
+                            }
+                            .labelsHidden()
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("HARD MAX").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            Picker("", selection: $editSessionHardMaxMinutes) {
+                                Text("4h").tag(240)
+                                Text("8h").tag(480)
+                                Text("24h").tag(1440)
+                                Text("Off").tag(0)
+                            }
+                            .labelsHidden()
+                        }
+                    }
+
+                    if editSessionReauthMode == .autoOAuthRefresh || editSessionAuthMech == .oauth2OIDC {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("OAUTH TOKEN ENDPOINT (OPTIONAL)").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                            TextField("https://idp.example.com/oauth/token", text: $editSessionTokenEndpoint)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .padding(7)
+                                .background(Color.black.opacity(0.3))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SIGN-IN URL OVERRIDE (OPTIONAL)").font(.system(size: 9.5, weight: .bold)).foregroundColor(.secondary)
+                        TextField("https://example.com/login", text: $editSessionLoginUrl)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5))
+                            .padding(7)
+                            .background(Color.black.opacity(0.3))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                    }
+                }
+                .padding(10)
+                .background(Color.black.opacity(0.22))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
         }
     }
 
@@ -1883,6 +2071,29 @@ public struct ItemDetailView: View {
             editAuthPeriod = auth.period ?? 30
         }
 
+        // Session Policy
+        if let sp = item.sessionPolicy {
+            editSessionEnabled = sp.enabled
+            editSessionReauthMode = sp.reauthMode
+            editSessionAuthMech = sp.authMechanism
+            editSessionTtlMinutes = sp.sessionTtlMinutes
+            editSessionIdleMinutes = sp.idleTimeoutMinutes
+            editSessionHardMaxMinutes = sp.hardMaxLifetimeMinutes
+            editSessionWarnMinutes = sp.notifyLeadMinutes
+            editSessionTokenEndpoint = sp.tokenEndpoint ?? ""
+            editSessionLoginUrl = sp.loginUrl ?? ""
+        } else {
+            editSessionEnabled = false
+            editSessionReauthMode = .notifyOnly
+            editSessionAuthMech = (item.oauth?.refreshToken != nil) ? .oauth2OIDC : .cookieTimer
+            editSessionTtlMinutes = 60
+            editSessionIdleMinutes = 30
+            editSessionHardMaxMinutes = 480
+            editSessionWarnMinutes = 5
+            editSessionTokenEndpoint = ""
+            editSessionLoginUrl = ""
+        }
+
         if let matchingFolder = item.currentFolder(in: folders) {
             editFolderId = matchingFolder.id
         } else {
@@ -1930,6 +2141,23 @@ public struct ItemDetailView: View {
             updated.urls = editUrls.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
             let extractedTotp = TOTPEngine.shared.extractSecret(from: editTotpSecret).secret
             updated.totpSecret = extractedTotp.isEmpty ? nil : extractedTotp
+            if editSessionEnabled {
+                var policy = item.sessionPolicy ?? SessionPolicy()
+                policy.enabled = true
+                policy.reauthMode = editSessionReauthMode
+                policy.authMechanism = editSessionAuthMech
+                policy.sessionTtlMinutes = editSessionTtlMinutes
+                policy.idleTimeoutMinutes = editSessionIdleMinutes
+                policy.hardMaxLifetimeMinutes = editSessionHardMaxMinutes
+                policy.notifyLeadMinutes = editSessionWarnMinutes
+                let trimmedTokenEp = editSessionTokenEndpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+                policy.tokenEndpoint = trimmedTokenEp.isEmpty ? nil : trimmedTokenEp
+                let trimmedLoginUrl = editSessionLoginUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+                policy.loginUrl = trimmedLoginUrl.isEmpty ? nil : trimmedLoginUrl
+                updated.sessionPolicy = policy
+            } else {
+                updated.sessionPolicy = nil
+            }
 
         case .card:
             updated.username = editCardholderName.isEmpty ? nil : editCardholderName

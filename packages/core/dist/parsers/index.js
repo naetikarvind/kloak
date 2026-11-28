@@ -20,6 +20,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseTextNote = parseTextNote;
 exports.importFromContent = importFromContent;
+const understander_js_1 = require("./understander.js");
 const bitwarden_js_1 = require("./bitwarden.js");
 const onepassword_js_1 = require("./onepassword.js");
 const lastpass_js_1 = require("./lastpass.js");
@@ -30,7 +31,7 @@ const proton_js_1 = require("./proton.js");
 const dashlane_js_1 = require("./dashlane.js");
 const generic_csv_js_1 = require("./generic-csv.js");
 /**
- * Parses plain text / markdown files into a Secure Note VaultItem.
+ * Parses plain text / markdown files into a Secure Note (or Recovery Code) VaultItem.
  */
 function parseTextNote(content, filename) {
     const trimmed = content.trim();
@@ -55,20 +56,52 @@ function parseTextNote(content, filename) {
             title = firstLine.slice(0, 80).replace(/^#+\s*/, '');
         }
     }
+    // Discover URLs & username hints inside the text note
+    const urlMatches = trimmed.match(/https?:\/\/[^\s)\]>'"]+/gi) ?? [];
+    const urls = [];
+    for (const u of urlMatches) {
+        if (!urls.includes(u))
+            urls.push(u);
+    }
+    let discoveredUsername;
+    const noteLines = trimmed.split(/\r?\n/).map(l => l.trim());
+    for (const line of noteLines.slice(0, 10)) {
+        const lowerLine = line.toLowerCase();
+        for (const prefix of ['username:', 'user:', 'account:', 'email:', 'login:', '# username:', '# account:', '# email:']) {
+            const idx = lowerLine.indexOf(prefix);
+            if (idx !== -1) {
+                const val = line.slice(idx + prefix.length).trim();
+                if (val) {
+                    discoveredUsername = val;
+                    break;
+                }
+            }
+        }
+        if (discoveredUsername)
+            break;
+    }
     const now = new Date().toISOString();
+    const tags = ['Secure Note', 'Imported'];
     const item = {
         id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         type: 'secure_note',
         title,
+        username: discoveredUsername,
+        urls,
         notes: trimmed,
-        tags: ['Secure Note', 'Imported'],
-        urls: [],
+        tags,
         favorite: false,
         trashed: false,
         createdAt: now,
         updatedAt: now,
         importSource: 'Text File'
     };
+    if ((0, understander_js_1.isRecoveryCodeItem)(item)) {
+        if (!item.tags.includes('Recovery Codes'))
+            item.tags.push('Recovery Codes');
+        if (!item.tags.includes('2FA'))
+            item.tags.push('2FA');
+    }
     return {
         source: 'Secure Note (Plain Text)',
         items: [item],
@@ -172,6 +205,7 @@ function importFromContent(content, format = 'auto', customMapping, filename) {
 __exportStar(require("./types.js"), exports);
 __exportStar(require("./export.js"), exports);
 __exportStar(require("./merger.js"), exports);
+__exportStar(require("./understander.js"), exports);
 __exportStar(require("./bitwarden.js"), exports);
 __exportStar(require("./onepassword.js"), exports);
 __exportStar(require("./apple.js"), exports);

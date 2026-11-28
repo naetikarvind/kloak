@@ -33,17 +33,16 @@
       "run_at": "document_idle"
     }
   ],
-  "options_ui": {
-    "page": "options/options.html",
-    "open_in_tab": true
-  },
   "permissions": [
     "storage",
     "tabs",
     "activeTab",
     "nativeMessaging",
     "sidePanel",
-    "clipboardWrite"
+    "clipboardWrite",
+    "alarms",
+    "notifications",
+    "cookies"
   ],
   "host_permissions": [
     "<all_urls>"

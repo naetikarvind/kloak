@@ -5,6 +5,7 @@
 
 import { ImportResult } from './types.js';
 import { VaultItem } from '../models/vault.js';
+import { isRecoveryCodeItem } from './understander.js';
 import { parseBitwardenJson, parseBitwardenCsv } from './bitwarden.js';
 import { parseOnePassword1Pux, parseOnePassword1Pif } from './onepassword.js';
 import { parseLastPassCsv } from './lastpass.js';
@@ -38,7 +39,7 @@ export type SupportedImportFormat =
   | 'plain-text';
 
 /**
- * Parses plain text / markdown files into a Secure Note VaultItem.
+ * Parses plain text / markdown files into a Secure Note (or Recovery Code) VaultItem.
  */
 export function parseTextNote(content: string, filename?: string): ImportResult {
   const trimmed = content.trim();
@@ -63,20 +64,51 @@ export function parseTextNote(content: string, filename?: string): ImportResult 
     }
   }
 
+  // Discover URLs & username hints inside the text note
+  const urlMatches = trimmed.match(/https?:\/\/[^\s)\]>'"]+/gi) ?? [];
+  const urls: string[] = [];
+  for (const u of urlMatches) {
+    if (!urls.includes(u)) urls.push(u);
+  }
+
+  let discoveredUsername: string | undefined;
+  const noteLines = trimmed.split(/\r?\n/).map(l => l.trim());
+  for (const line of noteLines.slice(0, 10)) {
+    const lowerLine = line.toLowerCase();
+    for (const prefix of ['username:', 'user:', 'account:', 'email:', 'login:', '# username:', '# account:', '# email:']) {
+      const idx = lowerLine.indexOf(prefix);
+      if (idx !== -1) {
+        const val = line.slice(idx + prefix.length).trim();
+        if (val) {
+          discoveredUsername = val;
+          break;
+        }
+      }
+    }
+    if (discoveredUsername) break;
+  }
+
   const now = new Date().toISOString();
+  const tags = ['Secure Note', 'Imported'];
   const item: VaultItem = {
     id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: 'secure_note',
     title,
+    username: discoveredUsername,
+    urls,
     notes: trimmed,
-    tags: ['Secure Note', 'Imported'],
-    urls: [],
+    tags,
     favorite: false,
     trashed: false,
     createdAt: now,
     updatedAt: now,
     importSource: 'Text File'
   };
+
+  if (isRecoveryCodeItem(item)) {
+    if (!item.tags.includes('Recovery Codes')) item.tags.push('Recovery Codes');
+    if (!item.tags.includes('2FA')) item.tags.push('2FA');
+  }
 
   return {
     source: 'Secure Note (Plain Text)',
@@ -193,6 +225,7 @@ export function importFromContent(
 export * from './types.js';
 export * from './export.js';
 export * from './merger.js';
+export * from './understander.js';
 export * from './bitwarden.js';
 export * from './onepassword.js';
 export * from './apple.js';

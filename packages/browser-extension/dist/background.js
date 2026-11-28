@@ -1020,6 +1020,128 @@
     };
   }
 
+  // src/session-guardian.ts
+  var DEFAULT_SESSION_MONITOR_SETTINGS = {
+    enabled: true,
+    warnMinutes: 5,
+    defaultTtlMinutes: 0,
+    hardMaxLifetimeMinutes: 480,
+    autoOAuthRefresh: true,
+    desktopNotifications: true
+  };
+  var IGNORED_COOKIE_PATTERN = /^(_ga|_gid|_gat|_fbp|_fbc|_hj|_clck|_clsk|amplitude|mixpanel|intercom|crisp|hubspot|ajs_|optimizely|segment)/i;
+  var AUTH_COOKIE_PATTERN = /(sess|session|sid|auth|token|jwt|access_token|id_token|refresh_token|connect\.sid|jsessionid|phpsessid|xsrf|logged_in|_gh_sess|user_session|remember|next-auth|__session|__secure-)/i;
+  function isAuthSessionCookie(cookieName) {
+    if (!cookieName || IGNORED_COOKIE_PATTERN.test(cookieName)) return false;
+    return AUTH_COOKIE_PATTERN.test(cookieName);
+  }
+  function tryExtractJwtExpMs(rawValue) {
+    if (!rawValue || typeof rawValue !== "string") return null;
+    const trimmed = rawValue.trim().replace(/^Bearer\s+/i, "");
+    const parts = trimmed.split(".");
+    if (parts.length !== 3) return null;
+    try {
+      const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+      const padded = b64 + "===".slice((b64.length + 3) % 4);
+      const jsonStr = atob(padded);
+      const payload = JSON.parse(jsonStr);
+      if (typeof payload.exp === "number" && payload.exp > 1e9) {
+        return payload.exp * 1e3;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+  function extractDomainHost(urlStr) {
+    try {
+      return new URL(urlStr).hostname.replace(/^www\./, "").toLowerCase();
+    } catch {
+      return urlStr.replace(/^https?:\/\//i, "").replace(/^www\./, "").split("/")[0].toLowerCase();
+    }
+  }
+  function evaluateSessionGuardrail(params) {
+    const { session, item, settings, nowMs = Date.now(), refreshBufferSec = 90 } = params;
+    const policy = item?.sessionPolicy;
+    if (policy?.reuseDetected || session.status === "revoked") {
+      return {
+        decision: "REVOKE_SECURITY",
+        secondsRemaining: 0,
+        hardCapReached: true,
+        idleExceeded: false,
+        canSilentRefresh: false,
+        reason: "Refresh token reuse or revocation detected; interactive login required."
+      };
+    }
+    const startedMs = Date.parse(session.startedAt) || nowMs;
+    const lastActiveMs = Date.parse(session.lastActivityAt) || startedMs;
+    const hardMaxMin = policy?.hardMaxLifetimeMinutes ?? settings.hardMaxLifetimeMinutes ?? 480;
+    const idleMaxMin = policy?.idleTimeoutMinutes ?? 0;
+    const warnMin = policy?.notifyLeadMinutes ?? settings.warnMinutes ?? 5;
+    const hardDeadlineMs = session.hardDeadlineAt ? Date.parse(session.hardDeadlineAt) : hardMaxMin > 0 ? startedMs + hardMaxMin * 6e4 : Number.POSITIVE_INFINITY;
+    const idleDeadlineMs = idleMaxMin > 0 ? lastActiveMs + idleMaxMin * 6e4 : Number.POSITIVE_INFINITY;
+    const hardCapReached = Number.isFinite(hardDeadlineMs) && nowMs >= hardDeadlineMs;
+    const idleExceeded = Number.isFinite(idleDeadlineMs) && nowMs >= idleDeadlineMs;
+    let expiresAtMs = session.expiresAt ? Date.parse(session.expiresAt) : NaN;
+    if (Number.isNaN(expiresAtMs) && policy?.sessionTtlMinutes && policy.sessionTtlMinutes > 0) {
+      const baseMs = Date.parse(session.lastRefreshedAt || session.startedAt) || startedMs;
+      expiresAtMs = baseMs + policy.sessionTtlMinutes * 6e4;
+    }
+    const secondsRemaining = Number.isFinite(expiresAtMs) ? Math.max(0, Math.round((expiresAtMs - nowMs) / 1e3)) : Number.POSITIVE_INFINITY;
+    const isExplicitlyExpired = session.status === "expired" || session.source === "http_401" || session.source === "login_redirect" || Number.isFinite(expiresAtMs) && nowMs >= expiresAtMs;
+    const effectiveMode = policy?.reauthMode ?? session.reauthMode ?? "notify_only";
+    const hasOAuthRefresh = Boolean(item?.oauth?.refreshToken);
+    const canSilentRefresh = settings.autoOAuthRefresh && effectiveMode === "auto_oauth_refresh" && !hardCapReached && !idleExceeded && hasOAuthRefresh;
+    if (hardCapReached) {
+      return {
+        decision: "PROMPT_EXPIRED",
+        secondsRemaining: 0,
+        hardCapReached: true,
+        idleExceeded,
+        canSilentRefresh: false,
+        reason: "Max session lifetime reached; enforcing interactive sign-in."
+      };
+    }
+    if (canSilentRefresh && (isExplicitlyExpired || Number.isFinite(secondsRemaining) && secondsRemaining <= refreshBufferSec)) {
+      return {
+        decision: "AUTO_REFRESH",
+        secondsRemaining: Number.isFinite(secondsRemaining) ? secondsRemaining : 0,
+        hardCapReached: false,
+        idleExceeded: false,
+        canSilentRefresh: true,
+        reason: "Eligible for silent OAuth refresh token rotation."
+      };
+    }
+    if (isExplicitlyExpired) {
+      return {
+        decision: "PROMPT_EXPIRED",
+        secondsRemaining: 0,
+        hardCapReached: false,
+        idleExceeded,
+        canSilentRefresh,
+        reason: "Session expired; interactive re-authentication required."
+      };
+    }
+    if (Number.isFinite(secondsRemaining) && secondsRemaining <= Math.max(60, warnMin * 60)) {
+      return {
+        decision: "WARN_PRE_EXPIRY",
+        secondsRemaining,
+        hardCapReached: false,
+        idleExceeded,
+        canSilentRefresh,
+        reason: `Session expires in ${Math.max(1, Math.ceil(secondsRemaining / 60))}m.`
+      };
+    }
+    return {
+      decision: "HEALTHY",
+      secondsRemaining: Number.isFinite(secondsRemaining) ? secondsRemaining : -1,
+      hardCapReached: false,
+      idleExceeded,
+      canSilentRefresh,
+      reason: "Session is active."
+    };
+  }
+
   // src/background.ts
   var NATIVE_HOST = "app.kloak.native";
   var cachedItems = [];
@@ -1029,6 +1151,12 @@
     email: ""
   };
   var aiSecurityCache = /* @__PURE__ */ new Map();
+  var sessionRegistry = /* @__PURE__ */ new Map();
+  var sessionAlerts = /* @__PURE__ */ new Map();
+  var deliveredBrowserNotificationIds = /* @__PURE__ */ new Set();
+  var browserNotificationTargets = /* @__PURE__ */ new Map();
+  var sessionRefreshLocks = /* @__PURE__ */ new Set();
+  var sessionSettings = { ...DEFAULT_SESSION_MONITOR_SETTINGS };
   var lastActiveTabId = null;
   var lastActiveUrl = null;
   var rpcIdCounter = 1;
@@ -1179,6 +1307,20 @@
       if (Array.isArray(itemsRes)) {
         cachedItems = itemsRes;
       }
+      try {
+        const remoteSettings = await sendNativeRequest("vault.getSettings");
+        if (remoteSettings && typeof remoteSettings === "object" && !remoteSettings.__error) {
+          sessionSettings = {
+            enabled: remoteSettings.sessionMonitorEnabled ?? sessionSettings.enabled,
+            warnMinutes: remoteSettings.defaultSessionWarnMinutes ?? sessionSettings.warnMinutes,
+            defaultTtlMinutes: remoteSettings.defaultSessionTtlMinutes ?? sessionSettings.defaultTtlMinutes,
+            hardMaxLifetimeMinutes: remoteSettings.defaultHardMaxLifetimeMinutes ?? sessionSettings.hardMaxLifetimeMinutes,
+            autoOAuthRefresh: remoteSettings.autoOAuthRefreshEnabled ?? sessionSettings.autoOAuthRefresh,
+            desktopNotifications: remoteSettings.sessionDesktopNotificationsEnabled ?? sessionSettings.desktopNotifications
+          };
+        }
+      } catch {
+      }
     } else {
       cachedItems = [];
     }
@@ -1198,19 +1340,353 @@
       broadcastVaultState(isVaultUnlocked);
     }
   }
-  refreshVaultState();
+  loadSessionSettingsFromStorage().then(() => refreshVaultState());
+  try {
+    chrome.alarms?.create("kloak_session_tick", { periodInMinutes: 0.5 });
+    chrome.alarms?.onAlarm.addListener((alarm) => {
+      if (alarm.name === "kloak_session_tick") {
+        evaluateAllTrackedSessions();
+      }
+    });
+  } catch {
+  }
+  try {
+    chrome.notifications?.onClicked.addListener((notifId) => {
+      const target = browserNotificationTargets.get(notifId);
+      if (target) {
+        focusOrOpenLoginTab(target.loginUrl, target.tabId, target.reauthMode === "assisted_reauth");
+        try {
+          chrome.notifications.clear(notifId, () => {
+          });
+        } catch {
+        }
+      }
+    });
+    chrome.notifications?.onButtonClicked.addListener((notifId, buttonIdx) => {
+      const target = browserNotificationTargets.get(notifId);
+      if (buttonIdx === 0 && target) {
+        focusOrOpenLoginTab(target.loginUrl, target.tabId, target.reauthMode === "assisted_reauth");
+      }
+      try {
+        chrome.notifications.clear(notifId, () => {
+        });
+      } catch {
+      }
+    });
+  } catch {
+  }
+  async function loadSessionSettingsFromStorage() {
+    try {
+      const stored = await chrome.storage.local.get([
+        "kloak_session_monitor",
+        "kloak_session_warn_minutes",
+        "kloak_auto_oauth_refresh",
+        "kloak_session_desktop_notifications",
+        "kloak_tracked_sessions"
+      ]);
+      if (stored.kloak_session_monitor !== void 0) sessionSettings.enabled = Boolean(stored.kloak_session_monitor);
+      if (typeof stored.kloak_session_warn_minutes === "number") sessionSettings.warnMinutes = stored.kloak_session_warn_minutes;
+      if (stored.kloak_auto_oauth_refresh !== void 0) sessionSettings.autoOAuthRefresh = Boolean(stored.kloak_auto_oauth_refresh);
+      if (stored.kloak_session_desktop_notifications !== void 0) {
+        sessionSettings.desktopNotifications = Boolean(stored.kloak_session_desktop_notifications);
+      }
+      if (Array.isArray(stored.kloak_tracked_sessions)) {
+        for (const s of stored.kloak_tracked_sessions) {
+          if (s?.id) sessionRegistry.set(s.id, s);
+        }
+      }
+    } catch {
+    }
+  }
+  async function persistSessionsToStorage() {
+    try {
+      await chrome.storage.local.set({
+        kloak_tracked_sessions: Array.from(sessionRegistry.values()).slice(0, 60),
+        kloak_session_alerts: Array.from(sessionAlerts.values()).filter((a) => !a.dismissed).slice(0, 30)
+      });
+    } catch {
+    }
+  }
+  async function focusOrOpenLoginTab(loginUrl, tabId, armAssistedReauth = true) {
+    const safeUrl = /^https?:\/\//i.test(loginUrl) ? loginUrl : `https://${loginUrl}`;
+    try {
+      if (typeof tabId === "number") {
+        const tab = await chrome.tabs.get(tabId).catch(() => null);
+        if (tab?.id) {
+          await chrome.tabs.update(tab.id, { active: true, url: safeUrl });
+          if (tab.windowId) await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {
+          });
+          if (armAssistedReauth) {
+            setTimeout(() => {
+              chrome.tabs.sendMessage(tab.id, { type: "ARM_ASSISTED_REAUTH" }).catch(() => {
+              });
+            }, 900);
+          }
+          return;
+        }
+      }
+      const created = await chrome.tabs.create({ url: safeUrl, active: true });
+      if (created.id && armAssistedReauth) {
+        setTimeout(() => {
+          chrome.tabs.sendMessage(created.id, { type: "ARM_ASSISTED_REAUTH" }).catch(() => {
+          });
+        }, 1100);
+      }
+    } catch {
+    }
+  }
+  function findMatchedVaultItemForSession(urlStr, itemId) {
+    if (itemId) {
+      const exact = cachedItems.find((i) => i.id === itemId);
+      if (exact) return exact;
+    }
+    const matches = strictMatch(cachedItems, urlStr);
+    return matches[0];
+  }
+  async function processSessionSignal(signal) {
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const domain = (signal.domain || extractDomainHost(signal.url)).toLowerCase();
+    const matchedItem = findMatchedVaultItemForSession(signal.url, signal.itemId);
+    const sid = signal.sessionId || `${domain}:${matchedItem?.id || "site"}`;
+    const existing = sessionRegistry.get(sid);
+    const policy = matchedItem?.sessionPolicy;
+    let expiresAt = signal.expiresAt;
+    if (!expiresAt && signal.ttlSeconds && signal.ttlSeconds > 0) {
+      expiresAt = new Date(nowMs + signal.ttlSeconds * 1e3).toISOString();
+    } else if (!expiresAt && signal.status !== "expired" && existing?.expiresAt) {
+      expiresAt = existing.expiresAt;
+    } else if (!expiresAt && signal.status !== "expired" && matchedItem?.oauth?.expiresAt) {
+      expiresAt = matchedItem.oauth.expiresAt;
+    } else if (!expiresAt && signal.status !== "expired" && policy?.sessionTtlMinutes && policy.sessionTtlMinutes > 0) {
+      expiresAt = new Date(nowMs + policy.sessionTtlMinutes * 6e4).toISOString();
+    }
+    const startedAt = signal.status === "active" && existing?.status === "expired" ? nowIso : existing?.startedAt || nowIso;
+    const hardMaxMin = policy?.hardMaxLifetimeMinutes ?? sessionSettings.hardMaxLifetimeMinutes ?? 480;
+    const hardDeadlineAt = existing?.hardDeadlineAt && !(signal.status === "active" && existing.status === "expired") ? existing.hardDeadlineAt : hardMaxMin > 0 ? new Date(Date.parse(startedAt) + hardMaxMin * 6e4).toISOString() : void 0;
+    const session = {
+      id: sid,
+      itemId: matchedItem?.id || existing?.itemId,
+      appTitle: signal.appTitle || matchedItem?.title || existing?.appTitle || domain,
+      url: signal.url || existing?.url || matchedItem?.urls?.[0] || `https://${domain}`,
+      domain,
+      tabId: signal.tabId ?? existing?.tabId,
+      authMechanism: signal.authMechanism || policy?.authMechanism || (matchedItem?.oauth?.refreshToken ? "oauth2_oidc" : existing?.authMechanism || "cookie_timer"),
+      reauthMode: policy?.reauthMode || existing?.reauthMode || "notify_only",
+      status: signal.status || existing?.status || "active",
+      source: signal.source || existing?.source || "cookie_expiry",
+      startedAt,
+      lastActivityAt: signal.lastActivityAt || nowIso,
+      expiresAt,
+      hardDeadlineAt,
+      lastRefreshedAt: existing?.lastRefreshedAt,
+      refreshCount: existing?.refreshCount ?? 0,
+      lastError: signal.error
+    };
+    const evaluation = evaluateSessionGuardrail({
+      session,
+      item: matchedItem,
+      settings: sessionSettings,
+      nowMs
+    });
+    if (evaluation.decision === "REVOKE_SECURITY") {
+      session.status = "revoked";
+    } else if (evaluation.decision === "PROMPT_EXPIRED") {
+      session.status = "expired";
+    } else if (evaluation.decision === "WARN_PRE_EXPIRY" || evaluation.decision === "AUTO_REFRESH") {
+      session.status = "expiring_soon";
+    } else if (session.status !== "expired" && session.status !== "revoked") {
+      session.status = "active";
+    }
+    sessionRegistry.set(sid, session);
+    await handleSessionDecisionSideEffects(session, evaluation, matchedItem);
+    await persistSessionsToStorage();
+    sendNativeRequest("session.reportEvent", {
+      sessionId: session.id,
+      itemId: session.itemId,
+      appTitle: session.appTitle,
+      url: session.url,
+      domain: session.domain,
+      authMechanism: session.authMechanism,
+      reauthMode: session.reauthMode,
+      status: session.status,
+      source: session.source,
+      expiresAt: session.expiresAt,
+      lastActivityAt: session.lastActivityAt,
+      error: session.lastError
+    }).catch(() => {
+    });
+    return { session, evaluation };
+  }
+  async function handleSessionDecisionSideEffects(session, evaluation, matchedItem) {
+    if (!sessionSettings.enabled) return;
+    if (evaluation.decision === "AUTO_REFRESH" && matchedItem && !sessionRefreshLocks.has(session.id)) {
+      sessionRefreshLocks.add(session.id);
+      try {
+        const refreshRes = await sendNativeRequest("session.refresh", {
+          sessionId: session.id,
+          itemId: matchedItem.id,
+          domain: session.domain
+        });
+        if (refreshRes && refreshRes.ok && refreshRes.newExpiresAt) {
+          session.status = "active";
+          session.expiresAt = refreshRes.newExpiresAt;
+          session.lastRefreshedAt = (/* @__PURE__ */ new Date()).toISOString();
+          session.refreshCount += 1;
+          session.lastError = void 0;
+          sessionRegistry.set(session.id, session);
+          for (const sev of ["warning", "expired", "security_revoked"]) {
+            sessionAlerts.delete(`${session.id}:${sev}`);
+          }
+          await refreshVaultState();
+          await broadcastToDomainTabs(session.domain, {
+            type: "SESSION_RENEWED",
+            session,
+            rotated: Boolean(refreshRes.rotated)
+          });
+          return;
+        }
+        session.status = refreshRes?.reuseDetected ? "revoked" : "expired";
+        session.lastError = refreshRes?.reason;
+        sessionRegistry.set(session.id, session);
+      } catch {
+        session.status = "expired";
+      } finally {
+        sessionRefreshLocks.delete(session.id);
+      }
+    }
+    if (evaluation.decision === "WARN_PRE_EXPIRY" || evaluation.decision === "PROMPT_EXPIRED" || evaluation.decision === "REVOKE_SECURITY" || session.status === "expired" || session.status === "revoked") {
+      const severity = session.status === "revoked" || evaluation.decision === "REVOKE_SECURITY" ? "security_revoked" : session.status === "expired" || evaluation.decision === "PROMPT_EXPIRED" ? "expired" : "warning";
+      const alertKey = `${session.id}:${severity}`;
+      const existingAlert = sessionAlerts.get(alertKey);
+      const loginUrl = matchedItem?.sessionPolicy?.loginUrl || matchedItem?.urls?.[0] || session.url;
+      const msg = severity === "security_revoked" ? `${session.appTitle} refresh token was revoked or reused. Sign in interactively.` : severity === "expired" ? `${session.appTitle} session expired. Sign back in to continue.` : `${session.appTitle} session expires in ${Math.max(1, Math.ceil(evaluation.secondsRemaining / 60))}m.`;
+      const alert = {
+        id: alertKey,
+        sessionId: session.id,
+        itemId: session.itemId,
+        appTitle: session.appTitle,
+        domain: session.domain,
+        loginUrl,
+        reauthMode: session.reauthMode,
+        severity,
+        message: msg,
+        secondsRemaining: Math.max(0, evaluation.secondsRemaining),
+        createdAt: existingAlert?.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
+        dismissed: existingAlert?.dismissed ?? false,
+        canOAuthRefresh: evaluation.canSilentRefresh
+      };
+      sessionAlerts.set(alertKey, alert);
+      if (!alert.dismissed) {
+        await broadcastToDomainTabs(session.domain, {
+          type: "SESSION_STATUS_ALERT",
+          session,
+          alert
+        });
+        if (sessionSettings.desktopNotifications && !deliveredBrowserNotificationIds.has(alertKey)) {
+          deliveredBrowserNotificationIds.add(alertKey);
+          const notifId = `kloak-session-${alertKey}`;
+          browserNotificationTargets.set(notifId, {
+            loginUrl,
+            tabId: session.tabId,
+            domain: session.domain,
+            reauthMode: session.reauthMode
+          });
+          try {
+            chrome.notifications?.create(notifId, {
+              type: "basic",
+              iconUrl: chrome.runtime.getURL("icons/icon-128.png"),
+              title: severity === "warning" ? `${session.appTitle} Session Expiring Soon` : severity === "security_revoked" ? `${session.appTitle} Security Re-Auth Required` : `${session.appTitle} Session Expired`,
+              message: msg,
+              buttons: [{ title: "Sign Back In" }, { title: "Dismiss" }],
+              priority: severity === "warning" ? 1 : 2
+            });
+          } catch {
+          }
+        }
+      }
+    } else if (session.status === "active") {
+      for (const sev of ["warning", "expired", "security_revoked"]) {
+        sessionAlerts.delete(`${session.id}:${sev}`);
+        deliveredBrowserNotificationIds.delete(`${session.id}:${sev}`);
+      }
+    }
+  }
+  async function broadcastToDomainTabs(domain, payload) {
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (!tab.id || !tab.url) continue;
+        const tabDomain = extractDomainHost(tab.url);
+        if (tabDomain === domain || tabDomain.endsWith("." + domain) || domain.endsWith("." + tabDomain)) {
+          chrome.tabs.sendMessage(tab.id, payload).catch(() => {
+          });
+        }
+      }
+    } catch {
+    }
+  }
+  async function inspectTabCookiesAndSession(tabId, urlStr) {
+    if (!sessionSettings.enabled) return;
+    try {
+      const parsed = new URL(urlStr);
+      if (!parsed.protocol.startsWith("http")) return;
+      const cookies = await chrome.cookies?.getAll({ url: urlStr }).catch(() => []);
+      if (!Array.isArray(cookies) || cookies.length === 0) return;
+      const nowSec = Date.now() / 1e3;
+      const authCookies = cookies.filter((c) => isAuthSessionCookie(c.name) && typeof c.expirationDate === "number" && c.expirationDate > nowSec);
+      if (authCookies.length === 0) return;
+      let earliestMs = Math.min(...authCookies.map((c) => c.expirationDate * 1e3));
+      let signalSource = "cookie_expiry";
+      for (const c of authCookies) {
+        const jwtExp = tryExtractJwtExpMs(c.value || "");
+        if (jwtExp && jwtExp > Date.now() && jwtExp < earliestMs) {
+          earliestMs = jwtExp;
+          signalSource = "jwt_claim";
+        }
+      }
+      await processSessionSignal({
+        url: urlStr,
+        domain: extractDomainHost(urlStr),
+        tabId,
+        status: "active",
+        source: signalSource,
+        expiresAt: new Date(earliestMs).toISOString()
+      });
+    } catch {
+    }
+  }
+  async function evaluateAllTrackedSessions() {
+    if (!sessionSettings.enabled) return;
+    const nowMs = Date.now();
+    for (const session of Array.from(sessionRegistry.values())) {
+      const matchedItem = findMatchedVaultItemForSession(session.url, session.itemId);
+      const evalRes = evaluateSessionGuardrail({ session, item: matchedItem, settings: sessionSettings, nowMs });
+      if (evalRes.decision === "REVOKE_SECURITY") session.status = "revoked";
+      else if (evalRes.decision === "PROMPT_EXPIRED") session.status = "expired";
+      else if (evalRes.decision === "WARN_PRE_EXPIRY" || evalRes.decision === "AUTO_REFRESH") session.status = "expiring_soon";
+      sessionRegistry.set(session.id, session);
+      await handleSessionDecisionSideEffects(session, evalRes, matchedItem);
+    }
+    await persistSessionsToStorage();
+    if (lastActiveTabId && lastActiveUrl) {
+      await updateBadgeForTab(lastActiveTabId, lastActiveUrl);
+    }
+  }
   setInterval(async () => {
     await refreshVaultState();
   }, 2500);
   chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status !== "complete" || !tab.url) return;
     await refreshVaultState();
+    await inspectTabCookiesAndSession(tabId, tab.url);
     await updateBadgeForTab(tabId, tab.url);
   });
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
     await refreshVaultState();
     const tab = await chrome.tabs.get(activeInfo.tabId);
     if (tab?.url) {
+      await inspectTabCookiesAndSession(tab.id, tab.url);
       await updateBadgeForTab(tab.id, tab.url);
     }
   });
@@ -1250,8 +1726,18 @@
         matches = strictMatch(cachedItems, urlStr);
       }
       if (matches.length > 0) {
-        await chrome.action.setBadgeText({ tabId, text: String(matches.length) });
-        await chrome.action.setBadgeBackgroundColor({ tabId, color: "#3b82f6" });
+        const domain = extractDomainHost(urlStr);
+        const tabSession = Array.from(sessionRegistry.values()).find((s) => s.domain === domain);
+        if (tabSession && (tabSession.status === "expired" || tabSession.status === "revoked")) {
+          await chrome.action.setBadgeText({ tabId, text: "EXP" });
+          await chrome.action.setBadgeBackgroundColor({ tabId, color: "#EF4444" });
+        } else if (tabSession && tabSession.status === "expiring_soon") {
+          await chrome.action.setBadgeText({ tabId, text: "\u23F1" });
+          await chrome.action.setBadgeBackgroundColor({ tabId, color: "#F59E0B" });
+        } else {
+          await chrome.action.setBadgeText({ tabId, text: String(matches.length) });
+          await chrome.action.setBadgeBackgroundColor({ tabId, color: "#3b82f6" });
+        }
       } else {
         await chrome.action.setBadgeText({ tabId, text: "" });
       }
@@ -1672,6 +2158,8 @@
             createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
             updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
             ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+            ...item.oauth ? { oauth: item.oauth } : {},
+            ...item.sessionPolicy ? { sessionPolicy: item.sessionPolicy } : {},
             ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
           };
           try {
@@ -1723,6 +2211,8 @@
             createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
             updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
             ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+            ...item.oauth ? { oauth: item.oauth } : {},
+            ...item.sessionPolicy ? { sessionPolicy: item.sessionPolicy } : {},
             ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
           };
           try {
@@ -1744,7 +2234,11 @@
             const res = await sendNativeRequest("vault.import", {
               content: message.content,
               format: message.format || "auto",
-              options: message.options || { autoMerge: true }
+              options: {
+                autoMerge: true,
+                ...message.options || {},
+                ...message.filename ? { filename: message.filename } : {}
+              }
             });
             await refreshVaultState();
             sendResponse({ success: true, result: res });
@@ -1887,6 +2381,134 @@
           } catch (err) {
             sendResponse({ success: false, error: err?.message || "fetch_failed" });
           }
+          break;
+        }
+        case "REPORT_WEBAPP_SESSION": {
+          const targetUrl = message.url || sender.tab?.url || "";
+          if (!targetUrl || !targetUrl.startsWith("http")) {
+            sendResponse({ success: false });
+            break;
+          }
+          const result = await processSessionSignal({
+            sessionId: message.sessionId,
+            itemId: message.itemId,
+            appTitle: message.appTitle,
+            url: targetUrl,
+            domain: message.domain,
+            tabId: sender.tab?.id,
+            status: message.status,
+            source: message.source || "webapp_hook",
+            authMechanism: message.authMechanism,
+            expiresAt: message.expiresAt,
+            ttlSeconds: message.ttlSeconds,
+            lastActivityAt: message.lastActivityAt,
+            error: message.error
+          });
+          if (sender.tab?.id) {
+            updateBadgeForTab(sender.tab.id, targetUrl).catch(() => {
+            });
+          }
+          sendResponse({ success: true, ...result });
+          break;
+        }
+        case "SESSION_HEARTBEAT": {
+          const targetUrl = message.url || sender.tab?.url || "";
+          const domain = extractDomainHost(targetUrl);
+          for (const s of sessionRegistry.values()) {
+            if (s.domain === domain) {
+              s.lastActivityAt = (/* @__PURE__ */ new Date()).toISOString();
+              sessionRegistry.set(s.id, s);
+              sendNativeRequest("session.heartbeat", { sessionId: s.id }).catch(() => {
+              });
+            }
+          }
+          sendResponse({ success: true });
+          break;
+        }
+        case "GET_SESSION_WATCH_STATUS": {
+          let nativeStatus = null;
+          try {
+            nativeStatus = await sendNativeRequest("session.getStatus");
+          } catch {
+          }
+          if (nativeStatus && Array.isArray(nativeStatus.sessions)) {
+            for (const ns of nativeStatus.sessions) {
+              if (ns?.id && !sessionRegistry.has(ns.id)) {
+                sessionRegistry.set(ns.id, ns);
+              }
+            }
+          }
+          sendResponse({
+            success: true,
+            settings: sessionSettings,
+            sessions: Array.from(sessionRegistry.values()),
+            alerts: Array.from(sessionAlerts.values()).filter((a) => !a.dismissed)
+          });
+          break;
+        }
+        case "REFRESH_SESSION_OAUTH": {
+          try {
+            const res = await sendNativeRequest("session.refresh", {
+              sessionId: message.sessionId,
+              itemId: message.itemId,
+              domain: message.domain
+            });
+            if (res?.ok && message.sessionId && sessionRegistry.has(message.sessionId)) {
+              const s = sessionRegistry.get(message.sessionId);
+              s.status = "active";
+              s.expiresAt = res.newExpiresAt;
+              s.lastRefreshedAt = (/* @__PURE__ */ new Date()).toISOString();
+              s.refreshCount += 1;
+              sessionRegistry.set(s.id, s);
+              for (const sev of ["warning", "expired", "security_revoked"]) {
+                sessionAlerts.delete(`${s.id}:${sev}`);
+              }
+              await persistSessionsToStorage();
+              await broadcastToDomainTabs(s.domain, { type: "SESSION_RENEWED", session: s, rotated: Boolean(res.rotated) });
+            }
+            sendResponse({ success: Boolean(res?.ok), result: res });
+          } catch (err) {
+            sendResponse({ success: false, error: err?.message || "Refresh failed" });
+          }
+          break;
+        }
+        case "DISMISS_SESSION_ALERT": {
+          const alertId = message.alertId || "";
+          const existing = sessionAlerts.get(alertId);
+          if (existing) {
+            existing.dismissed = true;
+            sessionAlerts.set(alertId, existing);
+            await persistSessionsToStorage();
+          }
+          sendNativeRequest("session.dismissAlert", { alertId }).catch(() => {
+          });
+          sendResponse({ success: true });
+          break;
+        }
+        case "OPEN_LOGIN_AND_REAUTH": {
+          await focusOrOpenLoginTab(message.loginUrl || "", message.tabId || lastActiveTabId || void 0, true);
+          sendResponse({ success: true });
+          break;
+        }
+        case "UPDATE_SESSION_SETTINGS": {
+          sessionSettings = { ...sessionSettings, ...message.settings || {} };
+          await chrome.storage.local.set({
+            kloak_session_monitor: sessionSettings.enabled,
+            kloak_session_warn_minutes: sessionSettings.warnMinutes,
+            kloak_auto_oauth_refresh: sessionSettings.autoOAuthRefresh,
+            kloak_session_desktop_notifications: sessionSettings.desktopNotifications
+          });
+          sendNativeRequest("vault.updateSettings", {
+            settings: {
+              sessionMonitorEnabled: sessionSettings.enabled,
+              defaultSessionWarnMinutes: sessionSettings.warnMinutes,
+              defaultHardMaxLifetimeMinutes: sessionSettings.hardMaxLifetimeMinutes,
+              autoOAuthRefreshEnabled: sessionSettings.autoOAuthRefresh,
+              sessionDesktopNotificationsEnabled: sessionSettings.desktopNotifications
+            }
+          }).catch(() => {
+          });
+          sendResponse({ success: true, settings: sessionSettings });
           break;
         }
         default:

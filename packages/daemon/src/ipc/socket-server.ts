@@ -507,6 +507,39 @@ export class IpcSocketServer {
           autoMaskUntrusted: true
         };
 
+      case 'session.getStatus':
+        return this.vaultManager.sessions.getStatus();
+
+      case 'session.reportEvent': {
+        const items = this.vaultManager.isUnlocked() ? this.vaultManager.getItems() : [];
+        const matchedItem = params.itemId
+          ? items.find(i => i.id === params.itemId)
+          : items.find(i => (i.urls || []).some(u => u.toLowerCase().includes((params.domain || '').toLowerCase())));
+        const settings = this.vaultManager.isUnlocked() ? this.vaultManager.getSettings() : undefined;
+        return this.vaultManager.sessions.reportEvent(params, matchedItem, settings);
+      }
+
+      case 'session.heartbeat':
+        return { session: this.vaultManager.sessions.recordHeartbeat(params.sessionId || '') };
+
+      case 'session.dismissAlert':
+        return { dismissed: this.vaultManager.sessions.dismissAlert(params.alertId || '') };
+
+      case 'session.refresh': {
+        if (!this.vaultManager.isUnlocked()) throw new Error('Vault is locked');
+        const item = this.vaultManager.getItem(params.itemId || '');
+        if (!item) throw new Error('Item not found');
+        const settings = this.vaultManager.getSettings();
+        return await this.vaultManager.sessions.refreshOAuthSession({
+          sessionId: params.sessionId || `${params.domain || 'app'}:${item.id}`,
+          item,
+          settings,
+          persistItem: (updated) => {
+            this.vaultManager.updateItem(updated.id, updated);
+          },
+        });
+      }
+
       default:
         throw new Error(`Unknown method: ${method}`);
     }

@@ -10,3 +10,4 @@ export * from './crypto/generator.js';
 export * from './crypto/oauth.js';
 export * from './parsers/index.js';
 export * from './storage/vault-manager.js';
+export * from './session/session-monitor.js';

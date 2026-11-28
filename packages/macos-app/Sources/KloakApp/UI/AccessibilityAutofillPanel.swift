@@ -1,7 +1,7 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Floating Non-Activating NSPanel
+// MARK: - Floating Non-Activating Dynamic Island NSPanel
 
 public final class AccessibilityAutofillPanel: NSPanel {
     public init(contentRect: NSRect) {
@@ -12,6 +12,7 @@ public final class AccessibilityAutofillPanel: NSPanel {
             defer: false
         )
         self.isFloatingPanel = true
+        self.becomesKeyOnlyIfNeeded = false
         self.level = .popUpMenu
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         self.isOpaque = false
@@ -23,14 +24,22 @@ public final class AccessibilityAutofillPanel: NSPanel {
     }
 
     public override var canBecomeKey: Bool {
-        // Non-activating panel must NOT steal key-window focus from the target app.
-        // Returning false keeps the target field focused so AX coordinate lookup
-        // (done before show()) operated on the correct window.
-        return false
+        // Returning true lets TextField / SecureField inside this non-activating NSPanel
+        // accept keyboard focus and search typing without activating Kloak's main window.
+        return true
     }
 
     public override var canBecomeMain: Bool {
         return false
+    }
+
+    public override func sendEvent(_ event: NSEvent) {
+        // Ensure any click inside the floating island grants key status to its responder chain
+        // so the search bar or password unlock field receives typing immediately.
+        if event.type == .leftMouseDown && !self.isKeyWindow {
+            self.makeKey()
+        }
+        super.sendEvent(event)
     }
 
     public override func cancelOperation(_ sender: Any?) {
@@ -38,6 +47,31 @@ public final class AccessibilityAutofillPanel: NSPanel {
         if let target = AccessibilityAutofillService.shared.currentTargetApp {
             target.activate()
         }
+    }
+
+    public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        // Non-activating panels can bypass standard app Edit-menu shortcuts when NSApp is inactive.
+        // Forward Cmd+A/C/V/X/Z directly to the active field editor so search typing works seamlessly.
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if mods == .command, let chars = event.charactersIgnoringModifiers?.lowercased() {
+            let selector: Selector? = switch chars {
+            case "a": #selector(NSText.selectAll(_:))
+            case "c": #selector(NSText.copy(_:))
+            case "v": #selector(NSText.paste(_:))
+            case "x": #selector(NSText.cut(_:))
+            case "z": Selector(("undo:"))
+            default: nil
+            }
+            if let action = selector {
+                if let responder = self.firstResponder, responder.tryToPerform(action, with: self) {
+                    return true
+                }
+                if NSApp.sendAction(action, to: nil, from: self) {
+                    return true
+                }
+            }
+        }
+        return super.performKeyEquivalent(with: event)
     }
 }
 
@@ -51,20 +85,24 @@ public final class AccessibilityAutofillPanelManager {
     private var hostingView: NSHostingView<AccessibilityAutofillPopupView>? = nil
 
     private let panelWidth: CGFloat = 360
-    private var currentHeight: CGFloat = 320
+    private var currentHeight: CGFloat = 500
     private var currentAnchorRect: NSRect? = nil
 
     private init() {}
 
     public func show(anchoredTo rect: NSRect?, targetAppName: String) {
         self.currentAnchorRect = rect
-        let panelRect = calculateFrame(anchoredTo: rect, height: currentHeight)
+
+        let initialHeight = recommendedInitialHeight()
+        self.currentHeight = initialHeight
+        let panelRect = calculateFrame(anchoredTo: rect, height: initialHeight)
 
         if panel == nil {
             let newPanel = AccessibilityAutofillPanel(contentRect: panelRect)
             let view = AccessibilityAutofillPopupView()
             let hosting = NSHostingView(rootView: view)
-            hosting.frame = NSRect(x: 0, y: 0, width: panelWidth, height: currentHeight)
+            hosting.frame = NSRect(x: 0, y: 0, width: panelWidth, height: initialHeight)
+            hosting.autoresizingMask = [.width, .height]
             newPanel.contentView = hosting
 
             self.panel = newPanel
@@ -72,14 +110,23 @@ public final class AccessibilityAutofillPanelManager {
         }
 
         guard let p = panel else { return }
-
+        if let h = hostingView {
+            h.frame = NSRect(x: 0, y: 0, width: panelWidth, height: initialHeight)
+        }
         p.setFrame(panelRect, display: true, animate: false)
         p.orderFrontRegardless()
+        p.makeKey()
     }
 
     public func updateHeight(_ newHeight: CGFloat) {
-        let clamped = max(200, min(500, newHeight))
-        guard let p = panel, abs(currentHeight - clamped) > 3 else { return }
+        let maxAllowed = maxScreenPanelHeight(for: currentAnchorRect)
+        let clamped = max(310, min(maxAllowed, newHeight))
+        guard let p = panel else { return }
+
+        if abs(currentHeight - clamped) <= 3 && abs(p.frame.height - clamped) <= 3 {
+            return
+        }
+
         currentHeight = clamped
         let newFrame = calculateFrame(anchoredTo: currentAnchorRect, height: clamped)
         if let h = hostingView {
@@ -93,7 +140,29 @@ public final class AccessibilityAutofillPanelManager {
     }
 
     public func hide() {
+        panel?.resignKey()
         panel?.orderOut(nil)
+    }
+
+    private func recommendedInitialHeight() -> CGFloat {
+        let maxAllowed = maxScreenPanelHeight(for: currentAnchorRect)
+        if !VaultStore.shared.isUnlocked {
+            return min(340, maxAllowed)
+        }
+        return min(510, maxAllowed)
+    }
+
+    private func maxScreenPanelHeight(for targetRect: NSRect?) -> CGFloat {
+        let screens = NSScreen.screens
+        let primaryScreen = screens.first ?? NSScreen.main!
+        let screen: NSScreen
+        if let rect = targetRect {
+            screen = screens.first(where: { NSPointInRect(rect.origin, $0.frame) }) ?? primaryScreen
+        } else {
+            let mouse = NSEvent.mouseLocation
+            screen = screens.first(where: { NSPointInRect(mouse, $0.frame) }) ?? primaryScreen
+        }
+        return max(360, min(540, screen.visibleFrame.height - 28))
     }
 
     private func calculateFrame(anchoredTo targetRect: NSRect?, height: CGFloat? = nil) -> NSRect {
@@ -111,21 +180,21 @@ public final class AccessibilityAutofillPanelManager {
             var y = rect.origin.y - activeHeight - 8
 
             // Flip above if panel would clip bottom of screen
-            if y < screenFrame.minY {
-                y = rect.origin.y + rect.height + 8
+            if y < screenFrame.minY + 8 {
+                let aboveY = rect.origin.y + rect.height + 8
+                if aboveY + activeHeight <= screenFrame.maxY - 8 {
+                    y = aboveY
+                } else {
+                    y = max(screenFrame.minY + 12, screenFrame.maxY - activeHeight - 12)
+                }
             }
 
-            // Keep within horizontal screen bounds
-            if x + panelWidth > screenFrame.maxX {
-                x = screenFrame.maxX - panelWidth - 12
-            }
-            if x < screenFrame.minX {
-                x = screenFrame.minX + 12
-            }
+            x = min(max(x, screenFrame.minX + 12), screenFrame.maxX - panelWidth - 12)
+            y = min(max(y, screenFrame.minY + 12), screenFrame.maxY - activeHeight - 12)
 
             return NSRect(x: x, y: y, width: panelWidth, height: activeHeight)
         } else {
-            // Fallback: place below mouse pointer or centered on screen
+            // Fallback: place below mouse pointer or cleanly inside visible screen
             let mouse = NSEvent.mouseLocation
             let screen = screens.first(where: { NSPointInRect(mouse, $0.frame) }) ?? primaryScreen
             let screenFrame = screen.visibleFrame
@@ -133,7 +202,7 @@ public final class AccessibilityAutofillPanelManager {
             var x = mouse.x - (panelWidth / 2)
             var y = mouse.y - activeHeight - 12
 
-            if y < screenFrame.minY {
+            if y < screenFrame.minY + 8 {
                 y = mouse.y + 16
             }
 
@@ -145,25 +214,168 @@ public final class AccessibilityAutofillPanelManager {
     }
 }
 
-// MARK: - SwiftUI Overlay Popup View
+// MARK: - AppKit Frosted Glass Backing View
+
+private struct DynamicIslandGlassBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.appearance = NSAppearance(named: .darkAqua)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
+        nsView.material = .popover
+        nsView.blendingMode = .behindWindow
+        nsView.state = .active
+    }
+}
+
+// MARK: - Reliable AppKit Search Input for Non-Activating NSPanel
+
+private final class IslandSearchNSTextField: NSTextField {
+    override var acceptsFirstResponder: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        if let panel = self.window, !panel.isKeyWindow {
+            panel.makeKey()
+        }
+        super.mouseDown(with: event)
+        self.window?.makeFirstResponder(self)
+    }
+}
+
+private struct DynamicIslandSearchField: NSViewRepresentable {
+    @Binding var text: String
+    @Binding var isFocused: Bool
+    var focusSessionId: UUID
+    var placeholder: String
+    var onMoveUp: () -> Void
+    var onMoveDown: () -> Void
+    var onSubmit: () -> Void
+    var onEscape: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = IslandSearchNSTextField()
+        field.delegate = context.coordinator
+        field.isBordered = false
+        field.isBezeled = false
+        field.drawsBackground = false
+        field.backgroundColor = .clear
+        field.focusRingType = .none
+        field.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        field.textColor = .white
+        field.maximumNumberOfLines = 1
+        field.cell?.wraps = false
+        field.cell?.isScrollable = true
+        field.placeholderAttributedString = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .foregroundColor: NSColor.white.withAlphaComponent(0.42),
+                .font: NSFont.systemFont(ofSize: 13, weight: .regular)
+            ]
+        )
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+
+        if context.coordinator.lastSessionId != focusSessionId {
+            context.coordinator.lastSessionId = focusSessionId
+            DispatchQueue.main.async {
+                if let win = nsView.window {
+                    if !win.isKeyWindow { win.makeKey() }
+                    win.makeFirstResponder(nsView)
+                }
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: DynamicIslandSearchField
+        var lastSessionId: UUID? = nil
+
+        init(_ parent: DynamicIslandSearchField) {
+            self.parent = parent
+        }
+
+        func controlTextDidBeginEditing(_ obj: Notification) {
+            DispatchQueue.main.async {
+                self.parent.isFocused = true
+            }
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            DispatchQueue.main.async {
+                self.parent.isFocused = false
+            }
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            let newVal = field.stringValue
+            if self.parent.text != newVal {
+                DispatchQueue.main.async {
+                    self.parent.text = newVal
+                }
+            }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.moveUp(_:)) {
+                parent.onMoveUp()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.moveDown(_:)) {
+                parent.onMoveDown()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                parent.onSubmit()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+                parent.onEscape()
+                return true
+            }
+            return false
+        }
+    }
+}
+
+// MARK: - SwiftUI Overlay Popup View (Expanded iPhone Dynamic Island)
 
 public struct AccessibilityAutofillPopupView: View {
     @ObservedObject private var autofillService = AccessibilityAutofillService.shared
     @ObservedObject private var vaultStore = VaultStore.shared
 
     @State private var searchText: String = ""
+    @State private var isSearchFocused: Bool = false
+    @State private var selectedIndex: Int = 0
     @State private var unlockPassword: String = ""
     @State private var unlockError: String? = nil
     @State private var isUnlocking: Bool = false
-    @State private var copiedNotice: String? = nil
-    @FocusState private var isSearchFocused: Bool
+    @State private var revealedPasswords: Set<String> = []
+    @State private var totpTick: Int = 0
+
+    private let islandRadius: CGFloat = 28
 
     public init() {}
 
     private var targetAppName: String {
         autofillService.currentTargetApp?.localizedName ??
         autofillService.currentContext?.appName ??
-        "Active Application"
+        "Active App"
     }
 
     private var targetDomain: String? {
@@ -177,7 +389,7 @@ public struct AccessibilityAutofillPopupView: View {
             return all
         }
         let terms = trimmed.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
-        return all.filter { item in
+        let matching = all.filter { item in
             let title = item.title.lowercased()
             let username = item.username?.lowercased() ?? ""
             let urls = item.urls.map { $0.lowercased() }
@@ -189,6 +401,16 @@ public struct AccessibilityAutofillPopupView: View {
                 tags.contains { $0.contains(term) }
             }
         }
+
+        // Prioritize title prefix and favorite accounts first when searching
+        let queryLower = trimmed.lowercased()
+        return matching.sorted { a, b in
+            let aStarts = a.title.lowercased().hasPrefix(queryLower)
+            let bStarts = b.title.lowercased().hasPrefix(queryLower)
+            if aStarts != bStarts { return aStarts }
+            if a.favorite != b.favorite { return a.favorite }
+            return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+        }
     }
 
     private var displayedSuggestions: [VaultItem] {
@@ -198,259 +420,386 @@ public struct AccessibilityAutofillPopupView: View {
         return autofillService.smartSuggestions
     }
 
-    @State private var revealedPasswords: Set<String> = []
+    private var displayedOthers: [VaultItem] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return filteredItems.filter { item in !displayedSuggestions.contains(where: { $0.id == item.id }) }
+        }
+        return filteredItems
+    }
+
+    private var visibleOrderedItems: [VaultItem] {
+        displayedSuggestions + displayedOthers
+    }
 
     private var smartCalculatedHeight: CGFloat {
         if !vaultStore.isUnlocked {
-            return 225
+            return 340
         }
-        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return 440
+        let totalVisible = visibleOrderedItems.count
+        if totalVisible == 0 {
+            return 410
         }
-        if let top = displayedSuggestions.first {
-            var h: CGFloat = 265
-            if top.totpSecret != nil && !top.totpSecret!.isEmpty {
-                h += 38
-            }
-            if top.isRecoveryCode || top.recoveryCodesCount > 0 {
-                h += 42
-            }
-            if displayedSuggestions.count > 1 {
-                h = min(450, h + CGFloat(displayedSuggestions.count - 1) * 75)
-            }
-            return min(460, max(245, h))
+        if totalVisible == 1 {
+            return 460
         }
-        return 280
+        return 515
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            headerBar
+        ZStack {
+            // Unified full-capsule frosted glass backdrop fading linearly from pure OLED black at top
+            // into clear translucent Liquid Glass at the bottom.
+            DynamicIslandGlassBackdrop()
 
-            Divider().opacity(0.15)
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0.0),
+                    .init(color: .black, location: 0.56),
+                    .init(color: Color.black.opacity(0.05), location: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
-            if !vaultStore.isUnlocked {
-                lockedVaultView
-            } else {
-                searchAndContentView
+            VStack(spacing: 0) {
+                blackDynamicIslandHeader
+
+                if !vaultStore.isUnlocked {
+                    lockedVaultView
+                } else {
+                    searchAndContentView
+                }
+
+                footerBar
             }
-
-            footerBar
         }
         .frame(width: 360, height: smartCalculatedHeight)
+        .clipShape(RoundedRectangle(cornerRadius: islandRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: islandRadius, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.18),
+                            Color.white.opacity(0.08),
+                            Color.white.opacity(0.28)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 0.9
+                )
+        )
+        .shadow(color: Color.black.opacity(0.55), radius: 26, x: 0, y: 12)
         .onChange(of: smartCalculatedHeight) { _, newH in
             AccessibilityAutofillPanelManager.shared.updateHeight(newH)
+        }
+        .onChange(of: autofillService.panelSessionId) { _, _ in
+            searchText = ""
+            selectedIndex = 0
+            AccessibilityAutofillPanelManager.shared.updateHeight(smartCalculatedHeight)
+        }
+        .onChange(of: searchText) { _, _ in
+            selectedIndex = 0
         }
         .onAppear {
             AccessibilityAutofillPanelManager.shared.updateHeight(smartCalculatedHeight)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color(red: 0.07, green: 0.09, blue: 0.15).opacity(0.96))
-                .background(.ultraThinMaterial)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.14), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.45), radius: 20, x: 0, y: 10)
         .onExitCommand {
-            autofillService.hidePanel()
-            if let target = autofillService.currentTargetApp {
-                target.activate()
-            }
+            dismissToTargetApp()
         }
         .onReceive(Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()) { _ in
+            totpTick &+= 1
             autofillService.checkAccessibilityPermission()
         }
     }
 
-    // MARK: - Header Bar
-
-    private var headerBar: some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .fill(LinearGradient(colors: [LiquidGlassTheme.primaryAccent, Color.blue], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 24, height: 24)
-
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white)
-            }
-
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 5) {
-                    Text("Kloak Autofill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-
-                    Text("•")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-
-                    Text(targetAppName)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                        .lineLimit(1)
-                }
-
-                if let domain = targetDomain, !domain.isEmpty {
-                    Text(domain)
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                } else if let role = autofillService.focusedFieldRole {
-                    Text("Focused: \(role)")
-                        .font(.system(size: 9))
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button(action: {
-                autofillService.hidePanel()
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(.white.opacity(0.4))
-            }
-            .buttonStyle(.plain)
+    private func dismissToTargetApp() {
+        autofillService.hidePanel()
+        if let target = autofillService.currentTargetApp {
+            target.activate()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.03))
     }
 
-    // MARK: - Search & Content View
+    // MARK: - Above Part: Pitch Black Dynamic Island Crown
 
-    private var searchAndContentView: some View {
-        VStack(spacing: 8) {
-            // Search Input
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+    private var blackDynamicIslandHeader: some View {
+        VStack(spacing: 6) {
+            // Iconic Dynamic Island top sensor/grabber pill
+            Capsule()
+                .fill(Color.white.opacity(0.16))
+                .frame(width: 36, height: 3.5)
+                .padding(.top, 7)
 
-                TextField("Search all logins & credentials...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 12))
-                    .foregroundColor(.white)
-                    .focused($isSearchFocused)
-                    .onSubmit {
-                        if let first = (!displayedSuggestions.isEmpty ? displayedSuggestions.first : filteredItems.first) {
-                            autofillService.performAutofill(item: first, mode: .all)
-                        }
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [LiquidGlassTheme.purpleAccent, LiquidGlassTheme.primaryAccent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 28, height: 28)
+
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .shadow(color: LiquidGlassTheme.purpleAccent.opacity(0.45), radius: 6, x: 0, y: 2)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 5) {
+                        Text("Kloak")
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+
+                        Circle()
+                            .fill(LiquidGlassTheme.emeraldAccent)
+                            .frame(width: 5, height: 5)
+
+                        Text(targetAppName)
+                            .font(.system(size: 11.5, weight: .semibold))
+                            .foregroundColor(Color.white.opacity(0.88))
+                            .lineLimit(1)
                     }
 
+                    if let domain = targetDomain, !domain.isEmpty {
+                        Text(domain)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.55))
+                            .lineLimit(1)
+                    } else if let role = autofillService.focusedFieldRole {
+                        Text("Field: \(role.replacingOccurrences(of: "AX", with: ""))")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.55))
+                            .lineLimit(1)
+                    } else {
+                        Text("All-App Quick Autofill")
+                            .font(.system(size: 9.5, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.50))
+                    }
+                }
+
+                Spacer()
+
+                if vaultStore.isUnlocked {
+                    let matchCount = displayedSuggestions.count
+                    if matchCount > 0 && searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("\(matchCount) match\(matchCount == 1 ? "" : "es")")
+                            .font(.system(size: 9.5, weight: .bold))
+                            .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(LiquidGlassTheme.emeraldAccent.opacity(0.16))
+                            .clipShape(Capsule())
+                    }
+                }
+
+                Button(action: dismissToTargetApp) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.65))
+                        .frame(width: 24, height: 24)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Close (Esc)")
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+        }
+    }
+
+    // MARK: - Bottom Part: Search & Glass Content View
+
+    private var searchAndContentView: some View {
+        VStack(spacing: 10) {
+            // Working AppKit-backed Frosted Glass Search Pill
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundColor(isSearchFocused ? LiquidGlassTheme.primaryAccent : Color.white.opacity(0.55))
+
+                DynamicIslandSearchField(
+                    text: $searchText,
+                    isFocused: $isSearchFocused,
+                    focusSessionId: autofillService.panelSessionId,
+                    placeholder: "Search accounts, emails, or URLs...",
+                    onMoveUp: {
+                        let count = visibleOrderedItems.count
+                        guard count > 0 else { return }
+                        selectedIndex = (selectedIndex - 1 + count) % count
+                    },
+                    onMoveDown: {
+                        let count = visibleOrderedItems.count
+                        guard count > 0 else { return }
+                        selectedIndex = (selectedIndex + 1) % count
+                    },
+                    onSubmit: {
+                        let ordered = visibleOrderedItems
+                        if ordered.indices.contains(selectedIndex) {
+                            autofillService.performAutofill(item: ordered[selectedIndex], mode: .all)
+                        } else if let first = ordered.first {
+                            autofillService.performAutofill(item: first, mode: .all)
+                        }
+                    },
+                    onEscape: {
+                        if !searchText.isEmpty {
+                            searchText = ""
+                        } else {
+                            dismissToTargetApp()
+                        }
+                    }
+                )
+                .frame(height: 20)
+
                 if !searchText.isEmpty {
+                    Text("\(filteredItems.count)")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.55))
+
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.55))
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(Color.black.opacity(0.35))
-            .clipShape(RoundedRectangle(cornerRadius: 9))
-            .overlay(
-                RoundedRectangle(cornerRadius: 9)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.75)
-            )
             .padding(.horizontal, 12)
-            .padding(.top, 8)
+            .padding(.vertical, 8)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        isSearchFocused ? LiquidGlassTheme.primaryAccent.opacity(0.75) : Color.white.opacity(0.14),
+                        lineWidth: isSearchFocused ? 1.2 : 0.8
+                    )
+            )
+            .padding(.horizontal, 14)
+            .padding(.top, 12)
 
             if !autofillService.isAccessibilityTrusted {
                 accessibilityNoticeBanner
             }
 
             // Items List
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    if !displayedSuggestions.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(LiquidGlassTheme.primaryAccent)
-                                Text("MATCHED FOR \(targetAppName.uppercased())")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 4)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        let suggestions = displayedSuggestions
+                        let others = displayedOthers
+                        let ordered = visibleOrderedItems
+                        let selectedId = ordered.indices.contains(selectedIndex) ? ordered[selectedIndex].id : nil
 
-                            ForEach(displayedSuggestions) { item in
-                                autofillItemCard(item, isHighlighted: true)
-                            }
-                        }
-                    }
-
-                    // All Items or Search Results
-                    let others = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        ? filteredItems.filter { item in !displayedSuggestions.contains(where: { $0.id == item.id }) }
-                        : filteredItems
-
-                    if !others.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if !displayedSuggestions.isEmpty {
-                                HStack(spacing: 4) {
-                                    Text("OTHER ACCOUNTS")
+                        if !suggestions.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkles")
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(LiquidGlassTheme.purpleAccent)
+                                    Text("MATCHED FOR \(targetAppName.uppercased())")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(Color.white.opacity(0.65))
                                 }
                                 .padding(.horizontal, 4)
-                                .padding(.top, 6)
-                            }
 
-                            ForEach(others) { item in
-                                autofillItemCard(item, isHighlighted: false)
+                                ForEach(suggestions) { item in
+                                    autofillItemCard(
+                                        item,
+                                        isHighlighted: true,
+                                        isSelected: item.id == selectedId
+                                    )
+                                    .id(item.id)
+                                }
                             }
                         }
-                    }
 
-                    if displayedSuggestions.isEmpty && others.isEmpty {
-                        emptyStateView
+                        if !others.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                        ? (suggestions.isEmpty ? "ALL ACCOUNTS (\(others.count))" : "OTHER ACCOUNTS (\(others.count))")
+                                        : "SEARCH RESULTS (\(others.count))")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(Color.white.opacity(0.55))
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 4)
+                                .padding(.top, suggestions.isEmpty ? 0 : 6)
+
+                                ForEach(others) { item in
+                                    autofillItemCard(
+                                        item,
+                                        isHighlighted: false,
+                                        isSelected: item.id == selectedId
+                                    )
+                                    .id(item.id)
+                                }
+                            }
+                        }
+
+                        if suggestions.isEmpty && others.isEmpty {
+                            emptyStateView
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 8)
+                }
+                .onChange(of: selectedIndex) { _, newIdx in
+                    let ordered = visibleOrderedItems
+                    if ordered.indices.contains(newIdx) {
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            proxy.scrollTo(ordered[newIdx].id, anchor: .center)
+                        }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 4)
-            }
-        }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                isSearchFocused = true
             }
         }
     }
 
-    // MARK: - Individual Item Bento Card
+    // MARK: - Individual Item Glass Bento Card
 
     @ViewBuilder
-    private func autofillItemCard(_ item: VaultItem, isHighlighted: Bool) -> some View {
-        VStack(spacing: 6) {
-            // Bento Header Compartment
-            HStack(spacing: 8) {
-                FaviconView(urls: item.urls, title: item.title, itemType: item.type, size: 24)
+    private func autofillItemCard(_ item: VaultItem, isHighlighted: Bool, isSelected: Bool) -> some View {
+        let _ = totpTick // refresh live TOTP countdown once per second
 
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(item.title)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
+        VStack(spacing: 7) {
+            // Bento Header Compartment
+            HStack(spacing: 9) {
+                FaviconView(urls: item.urls, title: item.title, itemType: item.type, size: 26)
+
+                VStack(alignment: .leading, spacing: 1.5) {
+                    HStack(spacing: 4) {
+                        Text(item.title)
+                            .font(.system(size: 12.5, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+
+                        if item.favorite {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(LiquidGlassTheme.amberAccent)
+                        }
+                    }
 
                     if let domain = item.urls.first {
                         let cleanHost = domain.replacingOccurrences(of: "https://", with: "")
                             .replacingOccurrences(of: "http://", with: "")
                             .components(separatedBy: "/").first ?? ""
-                        Text("• \(cleanHost)")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(.secondary)
+                        Text(cleanHost)
+                            .font(.system(size: 10))
+                            .foregroundColor(Color.white.opacity(0.58))
+                            .lineLimit(1)
+                    } else if let user = item.username, !user.isEmpty {
+                        Text(user)
+                            .font(.system(size: 10))
+                            .foregroundColor(Color.white.opacity(0.58))
                             .lineLimit(1)
                     }
                 }
@@ -465,15 +814,15 @@ public struct AccessibilityAutofillPopupView: View {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 9))
                         Text("Fill All")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 10.5, weight: .bold))
                     }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
                     .background(
                         LinearGradient(
-                            colors: [LiquidGlassTheme.primaryAccent, Color.blue],
-                            startPoint: .top,
-                            endPoint: .bottom
+                            colors: [LiquidGlassTheme.purpleAccent, LiquidGlassTheme.primaryAccent],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
                     )
                     .foregroundColor(.white)
@@ -481,11 +830,9 @@ public struct AccessibilityAutofillPopupView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.bottom, 2)
 
             // Horizontal Bento Compartments (User, Password, 2FA OTP, Recovery)
-            VStack(spacing: 4) {
-                // USER Compartment
+            VStack(spacing: 5) {
                 if let user = item.username, !user.isEmpty {
                     bentoCompartmentRow(
                         label: "USER",
@@ -496,7 +843,6 @@ public struct AccessibilityAutofillPopupView: View {
                     )
                 }
 
-                // PASS Compartment
                 if let pass = item.password, !pass.isEmpty {
                     let isRevealed = revealedPasswords.contains(item.id)
                     bentoCompartmentRow(
@@ -513,7 +859,6 @@ public struct AccessibilityAutofillPopupView: View {
                     )
                 }
 
-                // 2FA OTP Compartment
                 if let secret = item.totpSecret, !secret.isEmpty {
                     if let totp = TOTPEngine.shared.generate(secretBase32: secret) {
                         bentoTotpRow(
@@ -525,19 +870,27 @@ public struct AccessibilityAutofillPopupView: View {
                     }
                 }
 
-                // RECOVERY CODES Compartment
                 if item.isRecoveryCode || item.recoveryCodesCount > 0 {
                     bentoRecoveryCodesRow(item: item)
                 }
             }
         }
-        .padding(10)
+        .padding(11)
         .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(isHighlighted ? Color.white.opacity(0.06) : Color.white.opacity(0.03))
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color.white.opacity(0.11)
+                        : (isHighlighted ? Color.white.opacity(0.08) : Color.black.opacity(0.24))
+                )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .stroke(isHighlighted ? LiquidGlassTheme.primaryAccent.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .stroke(
+                            isSelected
+                                ? LiquidGlassTheme.primaryAccent.opacity(0.75)
+                                : (isHighlighted ? LiquidGlassTheme.purpleAccent.opacity(0.45) : Color.white.opacity(0.10)),
+                            lineWidth: isSelected ? 1.25 : 0.9
+                        )
                 )
         )
     }
@@ -555,8 +908,8 @@ public struct AccessibilityAutofillPopupView: View {
         HStack(spacing: 6) {
             Text(label)
                 .font(.system(size: 8.5, weight: .bold))
-                .foregroundColor(.secondary.opacity(0.8))
-                .frame(width: 32, alignment: .leading)
+                .foregroundColor(Color.white.opacity(0.50))
+                .frame(width: 34, alignment: .leading)
 
             Text(value)
                 .font(isMono ? .system(size: 11.5, weight: .medium, design: .monospaced) : .system(size: 11.5))
@@ -569,8 +922,8 @@ public struct AccessibilityAutofillPopupView: View {
             if let rev = revealAction {
                 Button(action: rev) {
                     Image(systemName: isRevealed ? "eye.slash" : "eye")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 10.5))
+                        .foregroundColor(.white.opacity(0.6))
                 }
                 .buttonStyle(.plain)
             }
@@ -579,23 +932,24 @@ public struct AccessibilityAutofillPopupView: View {
                 Text("⚡ Fill")
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundColor(LiquidGlassTheme.primaryAccent)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(LiquidGlassTheme.primaryAccent.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2.5)
+                    .background(LiquidGlassTheme.primaryAccent.opacity(0.15))
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
 
             Button(action: onCopy) {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.6))
             }
             .buttonStyle(.plain)
         }
-        .padding(6)
-        .background(Color.black.opacity(0.25))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.28))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     @ViewBuilder
@@ -609,18 +963,18 @@ public struct AccessibilityAutofillPopupView: View {
             Text("2FA OTP")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(LiquidGlassTheme.amberAccent)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(LiquidGlassTheme.amberAccent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .background(LiquidGlassTheme.amberAccent.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
 
             Text(code)
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
                 .foregroundColor(LiquidGlassTheme.amberAccent)
 
-            Text("⏳ \(remainingSeconds)s")
-                .font(.system(size: 9.5))
-                .foregroundColor(.secondary)
+            Text("\(remainingSeconds)s")
+                .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                .foregroundColor(.white.opacity(0.6))
 
             Spacer()
 
@@ -628,23 +982,24 @@ public struct AccessibilityAutofillPopupView: View {
                 Text("⚡ Fill")
                     .font(.system(size: 9.5, weight: .semibold))
                     .foregroundColor(LiquidGlassTheme.amberAccent)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(LiquidGlassTheme.amberAccent.opacity(0.12))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2.5)
+                    .background(LiquidGlassTheme.amberAccent.opacity(0.15))
+                    .clipShape(Capsule())
             }
             .buttonStyle(.plain)
 
             Button(action: onCopy) {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 10))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.6))
             }
             .buttonStyle(.plain)
         }
-        .padding(6)
-        .background(Color.black.opacity(0.25))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.28))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     @ViewBuilder
@@ -658,10 +1013,10 @@ public struct AccessibilityAutofillPopupView: View {
             Text("2FA REC")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(LiquidGlassTheme.emeraldAccent)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(LiquidGlassTheme.emeraldAccent.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .background(LiquidGlassTheme.emeraldAccent.opacity(0.14))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
 
             if !nextCode.isEmpty && !isAllUsed {
                 Text("#\(nextIndex + 1): \(nextCode)")
@@ -671,7 +1026,7 @@ public struct AccessibilityAutofillPopupView: View {
             } else {
                 Text(isAllUsed ? "All codes used" : "Recovery codes")
                     .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.6))
             }
 
             Spacer()
@@ -681,7 +1036,7 @@ public struct AccessibilityAutofillPopupView: View {
                     VaultStore.shared.toggleRecoveryCodeUsed(itemId: item.id, index: nextIndex)
                 }) {
                     Image(systemName: "checkmark.circle")
-                        .font(.system(size: 11))
+                        .font(.system(size: 11.5))
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
                 }
                 .buttonStyle(.plain)
@@ -692,19 +1047,20 @@ public struct AccessibilityAutofillPopupView: View {
                     VaultStore.shared.toggleRecoveryCodeUsed(itemId: item.id, index: nextIndex)
                 }) {
                     Text("⚡ Fill")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 9.5, weight: .bold))
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
+                        .padding(.vertical, 2.5)
                         .background(LiquidGlassTheme.emeraldAccent.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(6)
-        .background(Color.black.opacity(0.25))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.28))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
     private func copyString(_ text: String) {
@@ -715,25 +1071,41 @@ public struct AccessibilityAutofillPopupView: View {
     // MARK: - Empty State
 
     private var emptyStateView: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
+            Spacer(minLength: 28)
+
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 26))
-                .foregroundColor(.secondary.opacity(0.6))
-                .padding(.top, 24)
+                .font(.system(size: 28, weight: .light))
+                .foregroundColor(.white.opacity(0.45))
 
             Text("No Matching Logins")
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 13.5, weight: .bold))
                 .foregroundColor(.white)
 
             let queryForDisplay = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-            Text("No saved passwords found for \"\(queryForDisplay.isEmpty ? targetAppName : queryForDisplay)\". Use the search bar above to find any item in your vault.")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+            Text("No saved credentials found for \"\(queryForDisplay.isEmpty ? targetAppName : queryForDisplay)\".")
+                .font(.system(size: 11.5))
+                .foregroundColor(.white.opacity(0.60))
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
+
+            if !queryForDisplay.isEmpty {
+                Button(action: { searchText = "" }) {
+                    Text("Clear Search")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Spacer(minLength: 28)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .padding(.vertical, 16)
     }
 
     // MARK: - Accessibility Notice Banner
@@ -746,11 +1118,11 @@ public struct AccessibilityAutofillPopupView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text("Accessibility not active")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 10.5, weight: .bold))
                     .foregroundColor(.white)
-                Text("Auto-typing disabled. Click any item to copy.")
-                    .font(.system(size: 9))
-                    .foregroundColor(.secondary)
+                Text("Auto-typing disabled. Click items to copy.")
+                    .font(.system(size: 9.5))
+                    .foregroundColor(.white.opacity(0.65))
             }
 
             Spacer()
@@ -760,8 +1132,8 @@ public struct AccessibilityAutofillPopupView: View {
             }) {
                 Text("Enable")
                     .font(.system(size: 10, weight: .bold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4)
                     .background(LiquidGlassTheme.primaryAccent)
                     .foregroundColor(.white)
                     .clipShape(Capsule())
@@ -774,7 +1146,7 @@ public struct AccessibilityAutofillPopupView: View {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(.white.opacity(0.85))
-                    .padding(4)
+                    .padding(5)
                     .background(Color.white.opacity(0.12))
                     .clipShape(Circle())
             }
@@ -782,38 +1154,54 @@ public struct AccessibilityAutofillPopupView: View {
             .help("Recheck accessibility status")
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(LiquidGlassTheme.amberAccent.opacity(0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .padding(.vertical, 7)
+        .background(LiquidGlassTheme.amberAccent.opacity(0.14))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(LiquidGlassTheme.amberAccent.opacity(0.35), lineWidth: 0.8)
         )
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 14)
     }
 
     // MARK: - Locked Vault View
 
     private var lockedVaultView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
+            Spacer()
+
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.08))
-                    .frame(width: 44, height: 44)
+                    .fill(Color.white.opacity(0.10))
+                    .frame(width: 48, height: 48)
 
                 Image(systemName: "lock.fill")
                     .font(.system(size: 20))
                     .foregroundColor(.white)
             }
-            .padding(.top, 14)
 
-            Text("Vault Locked")
-                .font(.system(size: 13, weight: .bold))
+            VStack(spacing: 4) {
+                Text("Vault Locked")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+
+                Text("Unlock to autofill in \(targetAppName)")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+
+            SecureField("Enter Master Password", text: $unlockPassword)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
                 .foregroundColor(.white)
-
-            SecureField("Enter Master Password to unlock", text: $unlockPassword)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 12))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color.white.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Color.white.opacity(0.16), lineWidth: 0.8)
+                )
                 .padding(.horizontal, 24)
                 .onSubmit {
                     attemptUnlock()
@@ -827,7 +1215,7 @@ public struct AccessibilityAutofillPopupView: View {
 
             HStack(spacing: 10) {
                 Button(action: attemptUnlock) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         if isUnlocking {
                             ProgressView()
                                 .scaleEffect(0.6)
@@ -837,10 +1225,16 @@ public struct AccessibilityAutofillPopupView: View {
                         }
                         Text("Unlock & Autofill")
                     }
-                    .font(.system(size: 11, weight: .bold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
-                    .background(LiquidGlassTheme.primaryAccent)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        LinearGradient(
+                            colors: [LiquidGlassTheme.purpleAccent, LiquidGlassTheme.primaryAccent],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .foregroundColor(.white)
                     .clipShape(Capsule())
                 }
@@ -857,19 +1251,20 @@ public struct AccessibilityAutofillPopupView: View {
                         }
                     }) {
                         Image(systemName: "touchid")
-                            .font(.system(size: 16))
-                            .foregroundColor(LiquidGlassTheme.primaryAccent)
-                            .padding(6)
-                            .background(Color.white.opacity(0.08))
+                            .font(.system(size: 17))
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.white.opacity(0.12))
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .help("Unlock with Touch ID")
                 }
             }
 
             Spacer()
         }
-        .padding(16)
+        .padding(.horizontal, 16)
     }
 
     private func attemptUnlock() {
@@ -889,22 +1284,23 @@ public struct AccessibilityAutofillPopupView: View {
         }
     }
 
-    // MARK: - Footer Bar
+    // MARK: - Glass Footer Bar
 
     private var footerBar: some View {
         HStack {
             if let toast = autofillService.toastMessage {
-                HStack(spacing: 4) {
+                HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
                     Text(toast)
                         .foregroundColor(LiquidGlassTheme.emeraldAccent)
                 }
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 10.5, weight: .semibold))
             } else {
-                Text("Shortcut: \(vaultStore.settings.autofillHotkeyDisplay)  •  Esc to cancel")
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.secondary)
+                Text("↑↓ Select  ·  ↵ Fill  ·  Esc Close")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.75))
+                    .shadow(color: .black.opacity(0.6), radius: 2, y: 1)
             }
 
             Spacer()
@@ -920,13 +1316,17 @@ public struct AccessibilityAutofillPopupView: View {
                     Text("Open Kloak")
                     Image(systemName: "arrow.up.right")
                 }
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(LiquidGlassTheme.primaryAccent)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundColor(.white.opacity(0.92))
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(Color.white.opacity(0.14))
+                .clipShape(Capsule())
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Color.black.opacity(0.3))
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
 }

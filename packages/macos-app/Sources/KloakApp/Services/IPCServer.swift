@@ -626,6 +626,16 @@ public final class IPCServer: ObservableObject {
                 if let recUsed = patchDict["usedRecoveryCodes"]?.arrayValue {
                     existing.usedRecoveryCodes = recUsed.compactMap { $0.intValue }
                 }
+                if let spVal = patchDict["sessionPolicy"],
+                   let spData = try? JSONEncoder().encode(spVal),
+                   let decodedPolicy = try? JSONDecoder().decode(SessionPolicy.self, from: spData) {
+                    existing.sessionPolicy = decodedPolicy
+                }
+                if let oauthVal = patchDict["oauth"],
+                   let oauthData = try? JSONEncoder().encode(oauthVal),
+                   let decodedOAuth = try? JSONDecoder().decode(OAuthDetails.self, from: oauthData) {
+                    existing.oauth = decodedOAuth
+                }
                 existing.updatedAt = ISO8601DateFormatter().string(from: Date())
                 store.saveItem(existing)
                 reply(.dictionary(["success": .bool(true), "id": .string(existing.id)]))
@@ -800,9 +810,188 @@ public final class IPCServer: ObservableObject {
                 reply(.dictionary(["success": .bool(true)]))
             }
 
+        case "vault.import":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            let content = params?["content"]?.stringValue ?? ""
+            let optionsDict = params?["options"]?.dictionaryValue
+            let filename = optionsDict?["filename"]?.stringValue ?? params?["filename"]?.stringValue
+            let (parsed, _) = KeychainManager.shared.importFromContent(content, filename: filename, provider: nil)
+            let beforeCount = store.items.count
+            let (processedCount, descriptions) = store.bulkImport(parsed)
+            let newCount = max(0, store.items.count - beforeCount)
+            reply(.dictionary([
+                "imported": .int(processedCount),
+                "warnings": .array([]),
+                "mergeReport": .dictionary([
+                    "totalProcessed": .int(parsed.count),
+                    "exactDuplicatesMerged": .int(0),
+                    "updatedPasswordsMerged": .int(0),
+                    "crossTypeCombined": .int(descriptions.count),
+                    "newItemsAdded": .int(newCount),
+                    "reusedPasswordGroups": .array([])
+                ])
+            ]))
+
+        case "vault.autoMerge":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            let combinedCount = store.combineAllCredentialGroups()
+            reply(.dictionary([
+                "totalProcessed": .int(store.items.count),
+                "exactDuplicatesMerged": .int(0),
+                "updatedPasswordsMerged": .int(0),
+                "crossTypeCombined": .int(combinedCount),
+                "newItemsAdded": .int(0),
+                "reusedPasswordGroups": .array([])
+            ]))
+
         case "vault.lock":
             store.lock()
             reply(.dictionary(["success": .bool(true)]))
+
+        case "vault.getSettings":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            if let encoded = try? JSONEncoder().encode(store.settings),
+               let codable = try? JSONDecoder().decode(AnyCodableValue.self, from: encoded) {
+                reply(codable)
+            } else {
+                reply(.dictionary([:]))
+            }
+
+        case "vault.updateSettings":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            if let sDict = params?["settings"] {
+                let patch = sDict.dictionaryValue ?? [:]
+                var updated = store.settings
+                if let v = patch["sessionMonitorEnabled"]?.boolValue { updated.sessionMonitorEnabled = v }
+                if let v = patch["defaultSessionWarnMinutes"]?.intValue { updated.defaultSessionWarnMinutes = v }
+                if let v = patch["defaultSessionTtlMinutes"]?.intValue { updated.defaultSessionTtlMinutes = v }
+                if let v = patch["defaultHardMaxLifetimeMinutes"]?.intValue { updated.defaultHardMaxLifetimeMinutes = v }
+                if let v = patch["autoOAuthRefreshEnabled"]?.boolValue { updated.autoOAuthRefreshEnabled = v }
+                if let v = patch["sessionDesktopNotificationsEnabled"]?.boolValue { updated.sessionDesktopNotificationsEnabled = v }
+                store.updateSettings(updated)
+                reply(.dictionary(["success": .bool(true)]))
+            } else {
+                replyError(-32602, "Invalid settings payload")
+            }
+
+        case "session.getStatus":
+            let monitor = SessionMonitorService.shared
+            let statusPayload: [String: Any] = [
+                "isMonitoring": monitor.isMonitoring,
+                "sessions": monitor.trackedSessions,
+                "alerts": monitor.activeAlerts.filter { !$0.dismissed }
+            ]
+            if let encodedSessions = try? JSONEncoder().encode(monitor.trackedSessions),
+               let codableSessions = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedSessions),
+               let encodedAlerts = try? JSONEncoder().encode(monitor.activeAlerts.filter { !$0.dismissed }),
+               let codableAlerts = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedAlerts),
+               let encodedSettings = try? JSONEncoder().encode(store.settings),
+               let codableSettings = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedSettings) {
+                _ = statusPayload
+                reply(.dictionary([
+                    "isMonitoring": .bool(monitor.isMonitoring),
+                    "sessions": codableSessions,
+                    "alerts": codableAlerts,
+                    "settings": store.isUnlocked ? codableSettings : .null
+                ]))
+            } else {
+                reply(.dictionary(["isMonitoring": .bool(monitor.isMonitoring), "sessions": .array([]), "alerts": .array([])]))
+            }
+
+        case "session.reportEvent":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            let monitor = SessionMonitorService.shared
+            let urlStr = params?["url"]?.stringValue ?? ""
+            let domain = params?["domain"]?.stringValue
+            let sessionId = params?["sessionId"]?.stringValue
+            let itemId = params?["itemId"]?.stringValue
+            let appTitle = params?["appTitle"]?.stringValue
+            let authMech = params?["authMechanism"]?.stringValue.flatMap { SessionAuthMechanism(rawValue: $0) }
+            let reauthMode = params?["reauthMode"]?.stringValue.flatMap { SessionReauthMode(rawValue: $0) }
+            let status = params?["status"]?.stringValue.flatMap { SessionStatus(rawValue: $0) }
+            let source = (params?["source"]?.stringValue.flatMap { SessionSignalSource(rawValue: $0) }) ?? .cookieExpiry
+            let expiresAt = params?["expiresAt"]?.stringValue
+            let ttlSeconds = params?["ttlSeconds"]?.intValue
+            let lastActivityAt = params?["lastActivityAt"]?.stringValue
+            let errMsg = params?["error"]?.stringValue
+
+            let (session, evaluation) = monitor.reportEvent(
+                sessionId: sessionId,
+                itemId: itemId,
+                appTitle: appTitle,
+                url: urlStr,
+                domain: domain,
+                authMechanism: authMech,
+                reauthMode: reauthMode,
+                status: status,
+                source: source,
+                expiresAt: expiresAt,
+                ttlSeconds: ttlSeconds,
+                lastActivityAt: lastActivityAt,
+                error: errMsg
+            )
+
+            if let encodedSession = try? JSONEncoder().encode(session),
+               let codableSession = try? JSONDecoder().decode(AnyCodableValue.self, from: encodedSession) {
+                reply(.dictionary([
+                    "session": codableSession,
+                    "evaluation": .dictionary([
+                        "decision": .string(evaluation.decision.rawValue),
+                        "secondsRemaining": .int(evaluation.secondsRemaining),
+                        "hardCapReached": .bool(evaluation.hardCapReached),
+                        "idleExceeded": .bool(evaluation.idleExceeded),
+                        "canSilentRefresh": .bool(evaluation.canSilentRefresh),
+                        "reason": .string(evaluation.reason)
+                    ])
+                ]))
+            } else {
+                reply(.dictionary(["success": .bool(true)]))
+            }
+
+        case "session.heartbeat":
+            let sessionId = params?["sessionId"]?.stringValue ?? ""
+            let updatedSession = SessionMonitorService.shared.recordHeartbeat(sessionId: sessionId)
+            reply(.dictionary(["success": .bool(updatedSession != nil)]))
+
+        case "session.dismissAlert":
+            let alertId = params?["alertId"]?.stringValue ?? ""
+            SessionMonitorService.shared.dismissAlert(id: alertId)
+            reply(.dictionary(["success": .bool(true)]))
+
+        case "session.refresh":
+            guard store.isUnlocked else {
+                replyError(-32001, "Vault is locked")
+                return
+            }
+            let sessionId = params?["sessionId"]?.stringValue ?? ""
+            let itemId = params?["itemId"]?.stringValue
+            let targetItem = itemId.flatMap { id in store.items.first(where: { $0.id == id && !$0.trashed }) }
+            Task { @MainActor in
+                let outcome = await SessionMonitorService.shared.refreshOAuthSession(sessionId: sessionId, item: targetItem)
+                reply(.dictionary([
+                    "ok": .bool(outcome.ok),
+                    "rotated": .bool(outcome.rotated),
+                    "newExpiresAt": outcome.newExpiresAt.map { .string($0) } ?? .null,
+                    "reuseDetected": .bool(outcome.reuseDetected),
+                    "requiresPrompt": .bool(outcome.requiresPrompt),
+                    "reason": .string(outcome.reason)
+                ]))
+            }
 
         default:
             sendError(on: connection, id: reqId, code: -32601, message: "Method not found: \(method)", isHttp: isHttp)

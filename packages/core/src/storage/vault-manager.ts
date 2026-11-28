@@ -32,9 +32,11 @@ import {
 import { importFromContent, SupportedImportFormat } from '../parsers/index.js';
 import { autoMergeVaultItems, calculateItemRisk, MergeReport, ItemRiskAssessment } from '../parsers/merger.js';
 import { exportVault, ExportOptions, ExportResult } from '../parsers/export.js';
+import { SessionCoordinator } from '../session/session-monitor.js';
 
 export interface ImportOptions {
   autoMerge?: boolean;
+  filename?: string;
 }
 
 export interface ImportDataResult {
@@ -65,7 +67,13 @@ export const DEFAULT_SETTINGS: VaultSettings = {
     symbols: true,
     avoidAmbiguous: false
   },
-  ignoredHealthIssueIds: []
+  ignoredHealthIssueIds: [],
+  sessionMonitorEnabled: true,
+  defaultSessionWarnMinutes: 5,
+  defaultSessionTtlMinutes: 0,
+  defaultHardMaxLifetimeMinutes: 480,
+  autoOAuthRefreshEnabled: true,
+  sessionDesktopNotificationsEnabled: true
 };
 
 export class VaultManager {
@@ -75,6 +83,7 @@ export class VaultManager {
   private activeVaultKey: Buffer | null = null;
   private autoLockTimer: NodeJS.Timeout | null = null;
   private lastActivityTime: number = Date.now();
+  public readonly sessions: SessionCoordinator = new SessionCoordinator();
 
   constructor(customVaultPath: string = DEFAULT_VAULT_PATH) {
     this.vaultPath = customVaultPath;
@@ -447,14 +456,14 @@ export class VaultManager {
     options: ImportOptions = { autoMerge: true }
   ): ImportDataResult {
     this.ensureUnlocked();
-    const result = importFromContent(content, format);
+    const result = importFromContent(content, format, undefined, options.filename);
 
     if (options.autoMerge !== false) {
       const { mergedItems, report } = autoMergeVaultItems(this.decryptedPayload!.items, result.items);
       this.decryptedPayload!.items = mergedItems;
       this.save();
       return {
-        imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged,
+        imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged + report.crossTypeCombined,
         warnings: result.warnings,
         mergeReport: report
       };

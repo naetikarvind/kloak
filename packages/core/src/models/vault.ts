@@ -56,6 +56,70 @@ export interface OAuthDetails {
   codeChallenge?: string;
 }
 
+export type SessionReauthMode = 'notify_only' | 'auto_oauth_refresh' | 'assisted_reauth';
+
+export type SessionAuthMechanism = 'password_mfa' | 'oauth2_oidc' | 'sso_passive' | 'cookie_timer';
+
+export type SessionStatus = 'active' | 'expiring_soon' | 'expired' | 'refreshing' | 'revoked';
+
+export type SessionSignalSource =
+  | 'cookie_expiry'
+  | 'jwt_claim'
+  | 'webapp_hook'
+  | 'http_401'
+  | 'login_redirect'
+  | 'item_timer'
+  | 'oauth_token';
+
+export interface SessionPolicy {
+  enabled: boolean;
+  reauthMode: SessionReauthMode;
+  authMechanism: SessionAuthMechanism;
+  sessionTtlMinutes: number;
+  idleTimeoutMinutes: number;
+  hardMaxLifetimeMinutes: number;
+  notifyLeadMinutes: number;
+  tokenEndpoint?: string;
+  loginUrl?: string;
+  lastAuthenticatedAt?: string;
+  lastRefreshedAt?: string;
+  tokenFamilyId?: string;
+  reuseDetected?: boolean;
+}
+
+export interface TrackedSession {
+  id: string;
+  itemId?: string;
+  appTitle: string;
+  url: string;
+  domain: string;
+  authMechanism: SessionAuthMechanism;
+  reauthMode: SessionReauthMode;
+  status: SessionStatus;
+  source: SessionSignalSource;
+  startedAt: string;
+  lastActivityAt: string;
+  expiresAt?: string;
+  hardDeadlineAt?: string;
+  lastRefreshedAt?: string;
+  refreshCount: number;
+  lastError?: string;
+}
+
+export interface SessionExpiryAlert {
+  id: string;
+  sessionId: string;
+  itemId?: string;
+  appTitle: string;
+  domain: string;
+  loginUrl: string;
+  severity: 'warning' | 'expired' | 'security_revoked';
+  message: string;
+  secondsRemaining: number;
+  createdAt: string;
+  dismissed: boolean;
+}
+
 export interface PasswordHistoryEntry {
   password: string;
   changedAt: string; // ISO 8601
@@ -70,9 +134,11 @@ export interface VaultItem {
   urls: string[];
   notes?: string;
   totpSecret?: string;
+  usedRecoveryCodes?: number[];
   card?: CardDetails;
   identity?: IdentityDetails;
   oauth?: OAuthDetails;
+  sessionPolicy?: SessionPolicy;
   customFields?: CustomField[];
   folderId?: string;
   tags: string[];
@@ -103,6 +169,12 @@ export interface VaultSettings {
     avoidAmbiguous: boolean;
   };
   ignoredHealthIssueIds?: string[];
+  sessionMonitorEnabled?: boolean;
+  defaultSessionWarnMinutes?: number;
+  defaultSessionTtlMinutes?: number;
+  defaultHardMaxLifetimeMinutes?: number;
+  autoOAuthRefreshEnabled?: boolean;
+  sessionDesktopNotificationsEnabled?: boolean;
 }
 
 export interface VaultPayload {

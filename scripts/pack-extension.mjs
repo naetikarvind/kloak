@@ -38,7 +38,6 @@ const filesToCopy = [
   'icons',
   'popup',
   'sidepanel',
-  'options',
 ];
 
 for (const item of filesToCopy) {

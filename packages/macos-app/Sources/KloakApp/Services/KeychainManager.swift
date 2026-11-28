@@ -843,26 +843,55 @@ public final class KeychainManager: @unchecked Sendable {
             }
         }
 
+        // Extract any explicit URLs or username/email hints inside text notes
+        var discoveredUrls: [String] = []
+        if let urlRegex = try? NSRegularExpression(pattern: #"https?://[^\s\)\]>\"']+"#, options: .caseInsensitive) {
+            let nsRange = NSRange(trimmed.startIndex..., in: trimmed)
+            for m in urlRegex.matches(in: trimmed, range: nsRange) {
+                if let r = Range(m.range, in: trimmed) {
+                    let u = String(trimmed[r])
+                    if !discoveredUrls.contains(u) { discoveredUrls.append(u) }
+                }
+            }
+        }
+
+        var discoveredUsername: String? = nil
+        let noteLines = trimmed.components(separatedBy: .newlines).map { $0.trimmingCharacters(in: .whitespaces) }
+        for line in noteLines.prefix(10) {
+            let lowerLine = line.lowercased()
+            for prefix in ["username:", "user:", "account:", "email:", "login:", "# username:", "# account:", "# email:"] {
+                if let range = lowerLine.range(of: prefix) {
+                    let val = String(line[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !val.isEmpty {
+                        discoveredUsername = val
+                        break
+                    }
+                }
+            }
+            if discoveredUsername != nil { break }
+        }
+
         var tags = ["Secure Note", "Imported"]
         let lowerFn = (filename ?? "").lowercased()
         let lowerTitle = title.lowercased()
         let lowerContent = trimmed.lowercased()
-        let isRecovery = lowerFn.contains("recovery") || lowerFn.contains("backup") || lowerFn.contains("codes") || lowerFn.contains("2fa") ||
-                         lowerTitle.contains("recovery") || lowerTitle.contains("backup") || lowerTitle.contains("codes") ||
-                         lowerContent.contains("recovery code") || lowerContent.contains("backup code")
-        if isRecovery {
-            tags.append("Recovery Codes")
-            tags.append("2FA")
-        }
+        let recoveryKeywords = [
+            "recovery", "backup code", "backup-code", "backup_code", "backup codes", "backup keys",
+            "scratch code", "one-time code", "onetime code", "emergency kit", "emergency code",
+            "rescue code", "2fa backup", "2fa recovery", "mfa recovery"
+        ]
+        var isRecovery = recoveryKeywords.contains(where: {
+            lowerFn.contains($0) || lowerTitle.contains($0) || lowerContent.contains($0)
+        })
 
         let now = ISO8601DateFormatter().string(from: Date())
-        return VaultItem(
+        var item = VaultItem(
             id: UUID().uuidString,
             type: .secureNote,
             title: title,
-            username: nil,
+            username: discoveredUsername,
             password: nil,
-            urls: [],
+            urls: discoveredUrls,
             notes: trimmed,
             totpSecret: nil,
             oauth: nil,
@@ -871,12 +900,23 @@ public final class KeychainManager: @unchecked Sendable {
             alias: nil,
             authenticatorDetails: nil,
             customFields: nil,
-            tags: ["Secure Note", "Imported"],
+            tags: tags,
             favorite: false,
             trashed: false,
             createdAt: now,
             updatedAt: now
         )
+
+        if !isRecovery {
+            isRecovery = item.isRecoveryCode
+        }
+        if isRecovery {
+            if !tags.contains("Recovery Codes") { tags.append("Recovery Codes") }
+            if !tags.contains("2FA") { tags.append("2FA") }
+            item.tags = tags
+        }
+
+        return item
     }
 
     private static func parseJSONExport(_ content: String, filename: String?, provider: CloudProvider?) -> (items: [VaultItem], providerName: String) {

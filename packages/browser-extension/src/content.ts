@@ -6,6 +6,7 @@
 
 import { renderFavicon } from './favicon-service';
 import { evaluateCredentialRisk, renderCircumferenceSvg } from './risk-assessment';
+import { extractDomainHost, tryExtractJwtExpMs } from './session-guardian';
 
 interface FormContext {
   form: HTMLFormElement | null;
@@ -411,10 +412,12 @@ function injectCredentials(username?: string, password?: string, targetInput?: H
   }
 
   if (username && password) {
+    markSiteAuthenticated();
     showToastNotification(`✨ Filled username (${username}) and password!`);
   } else if (username && !isTargetOtp && !isTargetRecovery) {
     showToastNotification(`👤 Filled username (${username})`);
   } else if (password && !isTargetOtp && !isTargetRecovery) {
+    markSiteAuthenticated();
     showToastNotification(`🔑 Filled password`);
   }
 }
@@ -2854,8 +2857,434 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       refreshBentoPopupWithAnimation(currentTargetInput);
     }
     sendResponse({ success: true });
+  } else if (message.type === 'SESSION_STATUS_ALERT') {
+    showSessionAlertBar(message.alert, message.session);
+    dispatchWebAppSessionUpdate('kloak:session-state', {
+      status: message.alert?.severity || message.session?.status || 'expiring',
+      domain: message.session?.domain,
+      expiresAt: message.session?.expiresAt,
+      secondsRemaining: message.alert?.secondsRemaining ?? 0,
+      reauthMode: message.session?.reauthMode,
+    });
+    sendResponse({ success: true });
+  } else if (message.type === 'SESSION_RENEWED') {
+    dismissSessionAlertBar();
+    markSiteAuthenticated();
+    dispatchWebAppSessionUpdate('kloak:session-renewed', {
+      status: 'active',
+      domain: message.session?.domain,
+      expiresAt: message.session?.expiresAt,
+      rotated: Boolean(message.rotated),
+    });
+    showToastNotification(
+      message.rotated
+        ? '🔄 Session token refreshed & rotated automatically!'
+        : '🔄 Session refreshed automatically by Kloak!'
+    );
+    sendResponse({ success: true });
+  } else if (message.type === 'ARM_ASSISTED_REAUTH') {
+    const firstCredInput = getAllCredentialInputs()[0];
+    if (firstCredInput) {
+      firstCredInput.focus();
+      triggerCredentialPopupForInput(firstCredInput);
+    }
+    sendResponse({ success: true });
   }
 });
+
+// ── Cross-Site Session Monitor, Draft Guard & Web App SDK Hooks ──
+const SESSION_BAR_STYLES = `
+  .kloak-session-bar {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    background: linear-gradient(135deg, #1B1829, #13111E);
+    border: 1px solid rgba(109, 74, 255, 0.4);
+    border-radius: 14px;
+    padding: 11px 14px;
+    box-shadow: 0 14px 36px rgba(0,0,0,0.65);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #fff;
+    max-width: 440px;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    animation: kloakSessionSlide 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .kloak-session-bar.warning { border-color: rgba(245, 158, 11, 0.55); }
+  .kloak-session-bar.expired { border-color: rgba(244, 63, 94, 0.65); }
+  @keyframes kloakSessionSlide {
+    0% { opacity: 0; transform: translateY(-10px) scale(0.97); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .kloak-session-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+  }
+  .kloak-session-bar.expired .kloak-session-badge {
+    background: rgba(244, 63, 94, 0.18);
+    color: #fb7185;
+  }
+  .kloak-session-copy { flex: 1; min-width: 0; }
+  .kloak-session-title { font-size: 12.5px; font-weight: 700; color: #f8fafc; }
+  .kloak-session-sub { font-size: 11px; color: #a1a1b5; margin-top: 2px; line-height: 1.35; }
+  .kloak-session-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .kloak-session-btn {
+    border: none;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .kloak-session-btn.primary { background: linear-gradient(135deg, #6D4AFF, #5238E8); color: #fff; }
+  .kloak-session-btn.emerald { background: linear-gradient(135deg, #10B981, #059669); color: #fff; }
+  .kloak-session-btn.ghost { background: rgba(255,255,255,0.08); color: #cbd5e1; }
+`;
+
+let activeSessionBar: HTMLElement | null = null;
+let sessionCountdownTimer: number | null = null;
+
+function dispatchWebAppSessionUpdate(eventName: string, detail: Record<string, any>) {
+  try {
+    window.dispatchEvent(new CustomEvent(eventName, { detail }));
+    window.postMessage({ source: 'kloak-extension', event: eventName, detail }, window.location.origin);
+  } catch {}
+}
+
+function markSiteAuthenticated() {
+  const domain = extractDomainHost(window.location.href);
+  if (!domain) return;
+  try {
+    sessionStorage.setItem(`kloak_site_authed_${domain}`, '1');
+  } catch {}
+  chrome.runtime.sendMessage({
+    type: 'REPORT_WEBAPP_SESSION',
+    url: window.location.href,
+    domain,
+    status: 'active',
+    source: 'item_timer',
+  }, () => {});
+}
+
+function getDraftStorageKey(): string {
+  return `kloak_draft_${window.location.origin}${window.location.pathname}`;
+}
+
+function savePageFormDraft() {
+  try {
+    const entries: { key: string; value: string }[] = [];
+    const fields = document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea');
+    fields.forEach((el, idx) => {
+      if (el instanceof HTMLInputElement) {
+        const type = (el.type || 'text').toLowerCase();
+        if (['password', 'hidden', 'submit', 'button', 'file', 'checkbox', 'radio'].includes(type)) return;
+        const attrs = `${el.name} ${el.id} ${el.autocomplete}`.toLowerCase();
+        if (/cc-|card|cvv|csc|ssn|otp|totp|password/.test(attrs)) return;
+      }
+      const val = el.value;
+      if (!val || val.length > 20_000) return;
+      const key = el.id || el.name || `field_${idx}`;
+      entries.push({ key, value: val });
+    });
+    if (entries.length > 0) {
+      sessionStorage.setItem(getDraftStorageKey(), JSON.stringify({ savedAt: Date.now(), entries }));
+    }
+  } catch {}
+}
+
+function hasSavedPageDraft(): boolean {
+  try {
+    const raw = sessionStorage.getItem(getDraftStorageKey());
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.entries) && parsed.entries.length > 0 && Date.now() - (parsed.savedAt || 0) < 3600_000;
+  } catch {
+    return false;
+  }
+}
+
+function restorePageFormDraft(): boolean {
+  try {
+    const raw = sessionStorage.getItem(getDraftStorageKey());
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.entries)) return false;
+    let restored = 0;
+    const fields = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('input, textarea'));
+    for (const item of parsed.entries) {
+      const target = fields.find((el, idx) => (el.id || el.name || `field_${idx}`) === item.key);
+      if (target && !target.value) {
+        target.value = item.value;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        restored++;
+      }
+    }
+    sessionStorage.removeItem(getDraftStorageKey());
+    return restored > 0;
+  } catch {
+    return false;
+  }
+}
+
+function dismissSessionAlertBar() {
+  if (sessionCountdownTimer) {
+    clearInterval(sessionCountdownTimer);
+    sessionCountdownTimer = null;
+  }
+  if (activeSessionBar) {
+    activeSessionBar.remove();
+    activeSessionBar = null;
+  }
+}
+
+function showSessionAlertBar(alert: any, session: any) {
+  if (!alert) return;
+  const root = ensureShadowRoot();
+  if (!root.querySelector('#kloak-session-bar-style')) {
+    const st = document.createElement('style');
+    st.id = 'kloak-session-bar-style';
+    st.textContent = SESSION_BAR_STYLES;
+    root.appendChild(st);
+  }
+
+  dismissSessionAlertBar();
+  savePageFormDraft();
+
+  const isExpired = alert.severity === 'expired' || alert.severity === 'security_revoked';
+  const bar = document.createElement('div');
+  bar.className = `kloak-session-bar ${isExpired ? 'expired' : 'warning'}`;
+
+  let secsLeft = typeof alert.secondsRemaining === 'number' ? alert.secondsRemaining : 0;
+  const formatClock = (s: number) => {
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return `${m}:${rem < 10 ? '0' : ''}${rem}`;
+  };
+
+  bar.innerHTML = `
+    <div class="kloak-session-badge">${isExpired ? '🔒' : '⏱️'}</div>
+    <div class="kloak-session-copy">
+      <div class="kloak-session-title">${
+        alert.severity === 'security_revoked'
+          ? 'Security Re-Auth Required'
+          : isExpired
+            ? 'Session Expired'
+            : 'Session Expiring Soon'
+      }</div>
+      <div class="kloak-session-sub" id="kloak-session-sub">${alert.message || ''}</div>
+    </div>
+    <div class="kloak-session-actions">
+      ${alert.canOAuthRefresh ? `<button class="kloak-session-btn emerald" id="kloak-session-refresh">Renew</button>` : ''}
+      <button class="kloak-session-btn primary" id="kloak-session-reauth">${isExpired ? 'Sign Back In' : 'Extend'}</button>
+      <button class="kloak-session-btn ghost" id="kloak-session-dismiss" title="Dismiss">✕</button>
+    </div>
+  `;
+
+  root.appendChild(bar);
+  activeSessionBar = bar;
+
+  if (!isExpired && secsLeft > 0) {
+    const subEl = bar.querySelector('#kloak-session-sub');
+    sessionCountdownTimer = window.setInterval(() => {
+      secsLeft = Math.max(0, secsLeft - 1);
+      if (subEl) {
+        subEl.textContent =
+          secsLeft > 0
+            ? `${alert.appTitle || 'Site'} expires in ${formatClock(secsLeft)}. Form drafts preserved.`
+            : `${alert.appTitle || 'Site'} session expired. Sign back in to continue.`;
+      }
+      if (secsLeft <= 0 && sessionCountdownTimer) {
+        clearInterval(sessionCountdownTimer);
+        sessionCountdownTimer = null;
+      }
+    }, 1000);
+  }
+
+  bar.querySelector('#kloak-session-refresh')?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({
+      type: 'REFRESH_SESSION_OAUTH',
+      sessionId: session?.id || alert.sessionId,
+      itemId: alert.itemId,
+      domain: alert.domain,
+    }, (res) => {
+      if (!res?.success) {
+        showToastNotification('🔐 Silent refresh requires interactive sign-in.');
+      }
+    });
+  });
+
+  bar.querySelector('#kloak-session-reauth')?.addEventListener('click', () => {
+    savePageFormDraft();
+    const firstCred = getAllCredentialInputs()[0];
+    if (firstCred) {
+      firstCred.focus();
+      triggerCredentialPopupForInput(firstCred);
+      dismissSessionAlertBar();
+    } else if (alert.loginUrl) {
+      chrome.runtime.sendMessage({ type: 'OPEN_LOGIN_AND_REAUTH', loginUrl: alert.loginUrl });
+      dismissSessionAlertBar();
+    }
+  });
+
+  bar.querySelector('#kloak-session-dismiss')?.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'DISMISS_SESSION_ALERT', alertId: alert.id });
+    dismissSessionAlertBar();
+  });
+}
+
+function scanPageTokenAndMetaSignals() {
+  if (!window.location.protocol.startsWith('http')) return;
+  const domain = extractDomainHost(window.location.href);
+
+  // 1. Inspect <meta name="kloak-session-expires"> / <meta name="session-expires-at">
+  const metaEl =
+    document.querySelector('meta[name="kloak-session-expires"]') ||
+    document.querySelector('meta[name="session-expires-at"]');
+  if (metaEl) {
+    const raw = metaEl.getAttribute('content') || '';
+    if (raw) {
+      const parsedMs = /^\d+$/.test(raw.trim()) ? Date.now() + parseInt(raw.trim(), 10) * 1000 : Date.parse(raw);
+      if (Number.isFinite(parsedMs)) {
+        chrome.runtime.sendMessage({
+          type: 'REPORT_WEBAPP_SESSION',
+          url: window.location.href,
+          domain,
+          status: parsedMs <= Date.now() ? 'expired' : 'active',
+          source: 'webapp_hook',
+          expiresAt: new Date(parsedMs).toISOString(),
+        });
+      }
+    }
+  }
+
+  // 2. Peek strictly at numeric `exp` claim of standard JWT keys in web app storage (never reads/sends tokens)
+  try {
+    const jwtKeys = ['access_token', 'id_token', 'token', 'auth_token', 'jwt'];
+    let earliestExp: number | null = null;
+    for (const store of [window.localStorage, window.sessionStorage]) {
+      for (const k of jwtKeys) {
+        const val = store?.getItem(k);
+        if (!val) continue;
+        const expMs = tryExtractJwtExpMs(val);
+        if (expMs && (!earliestExp || expMs < earliestExp)) {
+          earliestExp = expMs;
+        }
+      }
+    }
+    if (earliestExp) {
+      chrome.runtime.sendMessage({
+        type: 'REPORT_WEBAPP_SESSION',
+        url: window.location.href,
+        domain,
+        status: earliestExp <= Date.now() ? 'expired' : 'active',
+        source: 'jwt_claim',
+        authMechanism: 'oauth2_oidc',
+        expiresAt: new Date(earliestExp).toISOString(),
+      });
+    }
+  } catch {}
+}
+
+function checkLoginRedirectOrExpiredPage() {
+  if (!window.location.protocol.startsWith('http')) return;
+  const domain = extractDomainHost(window.location.href);
+  let wasAuthed = false;
+  try {
+    wasAuthed = sessionStorage.getItem(`kloak_site_authed_${domain}`) === '1';
+  } catch {}
+
+  const credInputs = getAllCredentialInputs();
+  const hasPassword = credInputs.some(i => (i.type || '').toLowerCase() === 'password');
+  const bodySnippet = (document.title + ' ' + (document.body?.innerText || '').slice(0, 1500)).toLowerCase();
+  const looksExpiredText =
+    /(session\s*(has\s*)?(expired|timed?\s*out)|you\s*(have\s*been|were)\s*logged\s*out|please\s*(log|sign)\s*in\s*again|inactivity\s*timeout)/i.test(bodySnippet);
+
+  if (hasPassword && (looksExpiredText || (wasAuthed && /\/(login|signin|sign-in|session-expired|auth)/i.test(window.location.pathname)))) {
+    chrome.runtime.sendMessage({
+      type: 'REPORT_WEBAPP_SESSION',
+      url: window.location.href,
+      domain,
+      status: 'expired',
+      source: 'login_redirect',
+    }, (res) => {
+      if (res?.session?.reauthMode === 'assisted_reauth' && credInputs[0]) {
+        triggerCredentialPopupForInput(credInputs[0]);
+      }
+    });
+  } else if (!hasPassword && hasSavedPageDraft()) {
+    const ok = restorePageFormDraft();
+    if (ok) {
+      showToastNotification('📝 Restored your preserved draft after re-authentication!');
+    }
+  }
+}
+
+function initWebAppSessionMonitor() {
+  // Listen for Web App SDK CustomEvents (`window.dispatchEvent(new CustomEvent('kloak:session', { detail }))`)
+  window.addEventListener('kloak:session', (evt: Event) => {
+    const detail = (evt as CustomEvent)?.detail;
+    if (!detail || typeof detail !== 'object') return;
+    chrome.runtime.sendMessage({
+      type: 'REPORT_WEBAPP_SESSION',
+      url: window.location.href,
+      domain: extractDomainHost(window.location.href),
+      appTitle: detail.appName || document.title,
+      status: detail.state === 'expired' ? 'expired' : (detail.state === 'expiring' ? 'expiring_soon' : 'active'),
+      source: detail.source || 'webapp_hook',
+      authMechanism: detail.authMechanism || 'oauth2_oidc',
+      expiresAt: detail.expiresAt,
+      ttlSeconds: typeof detail.ttlSeconds === 'number' ? detail.ttlSeconds : undefined,
+    });
+  });
+
+  // Listen for window.postMessage from Web App main world scripts
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== window || !event.data || event.data.source !== 'kloak-webapp-session') return;
+    const d = event.data;
+    chrome.runtime.sendMessage({
+      type: 'REPORT_WEBAPP_SESSION',
+      url: window.location.href,
+      domain: extractDomainHost(window.location.href),
+      appTitle: d.appName || document.title,
+      status: d.state === 'expired' ? 'expired' : (d.state === 'expiring' ? 'expiring_soon' : 'active'),
+      source: d.signalSource || 'webapp_hook',
+      authMechanism: d.authMechanism,
+      expiresAt: d.expiresAt,
+      ttlSeconds: typeof d.ttlSeconds === 'number' ? d.ttlSeconds : undefined,
+    });
+  });
+
+  // Throttled user activity heartbeat so idle timeouts stay accurate
+  let lastHeartbeatSent = 0;
+  const sendActivityHeartbeat = () => {
+    const now = Date.now();
+    if (now - lastHeartbeatSent < 45_000) return;
+    lastHeartbeatSent = now;
+    chrome.runtime.sendMessage({ type: 'SESSION_HEARTBEAT', url: window.location.href }, () => {});
+  };
+  document.addEventListener('click', sendActivityHeartbeat, { passive: true });
+  document.addEventListener('keydown', sendActivityHeartbeat, { passive: true });
+
+  setTimeout(() => {
+    scanPageTokenAndMetaSignals();
+    checkLoginRedirectOrExpiredPage();
+  }, 600);
+}
+
+initWebAppSessionMonitor();
 
 // Run threat detection check & field scans
 checkThreatShield();

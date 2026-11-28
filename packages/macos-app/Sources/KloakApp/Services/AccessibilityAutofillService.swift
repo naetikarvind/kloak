@@ -19,6 +19,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
     // MARK: - Published State
     @Published public var isPanelVisible: Bool = false
+    @Published public var panelSessionId: UUID = UUID()
     @Published public var currentTargetApp: NSRunningApplication? = nil
     @Published public var currentContext: ActiveContext? = nil
     @Published public var smartSuggestions: [VaultItem] = []
@@ -359,17 +360,11 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
         self.currentTargetApp = targetApp
 
-        // 2. Query Context and Smart Suggestions
+        // 2. Query Context before changing window focus
         let context = ActiveContextService.shared.getActiveContext()
         self.currentContext = context
 
-        Task { @MainActor in
-            let items = VaultStore.shared.items
-            let matches = ActiveContextService.shared.findSmartSuggestions(in: items, context: context)
-            self.smartSuggestions = matches
-        }
-
-        // 3. Inspect Focused Accessibility Element Coordinates
+        // 3. Inspect Focused Accessibility Element Coordinates (BEFORE showing key NSPanel)
         var targetRect: NSRect? = nil
         var fieldRole: String? = nil
 
@@ -417,10 +412,16 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
 
         self.focusedFieldRole = fieldRole
 
-        // 4. Show Floating Panel
-        DispatchQueue.main.async { [weak self] in
+        // 4. Populate smart suggestions on MainActor BEFORE presenting panel so height & cards render immediately
+        let resolvedRect = targetRect
+        let appDisplayName = targetApp?.localizedName ?? context.appName
+        Task { @MainActor [weak self] in
             guard let self = self else { return }
-            AccessibilityAutofillPanelManager.shared.show(anchoredTo: targetRect, targetAppName: targetApp?.localizedName ?? context.appName)
+            let items = VaultStore.shared.items
+            let matches = ActiveContextService.shared.findSmartSuggestions(in: items, context: context)
+            self.smartSuggestions = matches
+            self.panelSessionId = UUID()
+            AccessibilityAutofillPanelManager.shared.show(anchoredTo: resolvedRect, targetAppName: appDisplayName)
             self.isPanelVisible = true
             self.startClickOutsideMonitor()
         }
@@ -521,7 +522,7 @@ public final class AccessibilityAutofillService: ObservableObject, @unchecked Se
         targetApp.activate()
 
         // Perform keyboard injection on interactive background thread
-        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.12) { [weak self] in
+        DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + 0.16) { [weak self] in
             guard let self = self else { return }
 
             switch mode {

@@ -18,6 +18,62 @@ public struct ItemListView: View {
     var onEmptyTrash: (() -> Void)? = nil
 
     @State private var isShowingEmptyTrashConfirm: Bool = false
+    @State private var selectedTwoFATag: String? = nil
+
+    private struct IdentifiedTwoFARow: Identifiable {
+        let id: String
+        let item: VaultItem
+        let role: TwoFASubtype
+    }
+
+    private func twoFATag(for itemId: String, role: TwoFASubtype) -> String {
+        role == .authenticator ? "auth::\(itemId)" : "rec::\(itemId)"
+    }
+
+    private func extractItemId(from tag: String) -> String {
+        if tag.hasPrefix("auth::") {
+            return String(tag.dropFirst(6))
+        }
+        if tag.hasPrefix("rec::") {
+            return String(tag.dropFirst(5))
+        }
+        return tag
+    }
+
+    private var activeListSelection: Binding<String?> {
+        Binding(
+            get: {
+                guard is2FASection else { return selectedItemId }
+                if let tag = selectedTwoFATag, let sid = selectedItemId, extractItemId(from: tag) == sid {
+                    if tag.hasPrefix("auth::"), authenticatorItems.contains(where: { $0.id == sid }) {
+                        return tag
+                    }
+                    if tag.hasPrefix("rec::"), recoveryItems.contains(where: { $0.id == sid }) {
+                        return tag
+                    }
+                }
+                guard let sid = selectedItemId else { return nil }
+                if current2FASubtype == .recoveryCodes, recoveryItems.contains(where: { $0.id == sid }) {
+                    return twoFATag(for: sid, role: .recoveryCodes)
+                }
+                if authenticatorItems.contains(where: { $0.id == sid }) {
+                    return twoFATag(for: sid, role: .authenticator)
+                }
+                if recoveryItems.contains(where: { $0.id == sid }) {
+                    return twoFATag(for: sid, role: .recoveryCodes)
+                }
+                return nil
+            },
+            set: { newTag in
+                if is2FASection {
+                    selectedTwoFATag = newTag
+                    selectedItemId = newTag.map(extractItemId(from:))
+                } else {
+                    selectedItemId = newTag
+                }
+            }
+        )
+    }
 
     private var is2FASection: Bool {
         if case .category(let t) = currentSection, t == .authenticator { return true }
@@ -87,11 +143,12 @@ public struct ItemListView: View {
     }
 
     @ViewBuilder
-    private func itemRow(_ item: VaultItem) -> some View {
+    private func itemRow(_ item: VaultItem, twoFARowContext: TwoFASubtype? = nil, selectionTag: String? = nil) -> some View {
         ItemRowView(
             item: item,
             folders: folders,
             currentSection: currentSection,
+            twoFARowContext: twoFARowContext,
             onToggleFavorite: {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
                     onToggleFavorite(item.id)
@@ -102,7 +159,7 @@ public struct ItemListView: View {
             onRestoreItem: onRestoreItem,
             onDeletePermanently: onDeletePermanently
         )
-        .tag(item.id)
+        .tag(selectionTag ?? item.id)
         .transition(
             .asymmetric(
                 insertion: .opacity.combined(with: .offset(y: 8)),
@@ -220,12 +277,13 @@ public struct ItemListView: View {
                 .transition(.opacity)
             } else {
                 ScrollViewReader { proxy in
-                    List(selection: $selectedItemId) {
+                    List(selection: activeListSelection) {
                         if is2FASection && (!authenticatorItems.isEmpty || !recoveryItems.isEmpty) {
                             if !authenticatorItems.isEmpty {
                                 Section {
-                                    ForEach(authenticatorItems) { item in
-                                        itemRow(item)
+                                    ForEach(authenticatorItems.map { IdentifiedTwoFARow(id: twoFATag(for: $0.id, role: .authenticator), item: $0, role: .authenticator) }) { entry in
+                                        itemRow(entry.item, twoFARowContext: .authenticator, selectionTag: entry.id)
+                                            .id(entry.id)
                                     }
                                 } header: {
                                     twoFASectionHeader(title: "AUTHENTICATOR", count: authenticatorItems.count, icon: "timer", color: LiquidGlassTheme.primaryAccent)
@@ -235,8 +293,9 @@ public struct ItemListView: View {
 
                             if !recoveryItems.isEmpty {
                                 Section {
-                                    ForEach(recoveryItems) { item in
-                                        itemRow(item)
+                                    ForEach(recoveryItems.map { IdentifiedTwoFARow(id: twoFATag(for: $0.id, role: .recoveryCodes), item: $0, role: .recoveryCodes) }) { entry in
+                                        itemRow(entry.item, twoFARowContext: .recoveryCodes, selectionTag: entry.id)
+                                            .id(entry.id)
                                     }
                                 } header: {
                                     twoFASectionHeader(title: "RECOVERY CODES", count: recoveryItems.count, icon: "key.horizontal.fill", color: LiquidGlassTheme.emeraldAccent)
@@ -246,29 +305,36 @@ public struct ItemListView: View {
                         } else {
                             ForEach(items) { item in
                                 itemRow(item)
+                                    .id(item.id)
                             }
                         }
                     }
                     .listStyle(.inset)
+                    .id(is2FASection ? "list_2fa_sectioned" : "list_standard_flat")
                     .tint(LiquidGlassTheme.primaryAccent)
                     .accentColor(LiquidGlassTheme.primaryAccent)
                     .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items)
                     .onChange(of: currentSection) { _, newSection in
                         if case .twoFASubtype(let sub) = newSection {
+                            syncSelectionTag(for: sub)
                             performScrollToSubtype(sub, proxy: proxy)
                         } else if case .category(let cat) = newSection, cat == .authenticator {
+                            syncSelectionTag(for: .authenticator)
                             performScrollToSubtype(.authenticator, proxy: proxy)
                         }
                     }
                     .onChange(of: twoFAScrollTrigger) { _, _ in
                         if let target = requestedTwoFASubtype {
+                            syncSelectionTag(for: target)
                             performScrollToSubtype(target, proxy: proxy)
                         } else if case .twoFASubtype(let sub) = currentSection {
+                            syncSelectionTag(for: sub)
                             performScrollToSubtype(sub, proxy: proxy)
                         }
                     }
                     .onAppear {
                         if case .twoFASubtype(let sub) = currentSection {
+                            syncSelectionTag(for: sub)
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 performScrollToSubtype(sub, proxy: proxy)
                             }
@@ -280,22 +346,32 @@ public struct ItemListView: View {
         .animation(.spring(response: 0.36, dampingFraction: 0.76), value: items.isEmpty)
     }
 
+    private func syncSelectionTag(for sub: TwoFASubtype) {
+        guard let sid = selectedItemId else { return }
+        switch sub {
+        case .recoveryCodes:
+            if recoveryItems.contains(where: { $0.id == sid }) {
+                selectedTwoFATag = twoFATag(for: sid, role: .recoveryCodes)
+            }
+        case .authenticator, .all:
+            if authenticatorItems.contains(where: { $0.id == sid }) {
+                selectedTwoFATag = twoFATag(for: sid, role: .authenticator)
+            }
+        }
+    }
+
     private func performScrollToSubtype(_ sub: TwoFASubtype, proxy: ScrollViewProxy) {
         withAnimation(.spring(response: 0.38, dampingFraction: 0.82)) {
             switch sub {
             case .authenticator, .all:
                 if let firstId = authenticatorItems.first?.id {
-                    proxy.scrollTo(firstId, anchor: .top)
+                    proxy.scrollTo(twoFATag(for: firstId, role: .authenticator), anchor: .top)
                 } else {
                     proxy.scrollTo("section_authenticator", anchor: .top)
                 }
             case .recoveryCodes:
-                // Move the list up to see the RECOVERY CODES sub-heading on the top
-                // with the previous password (if there above the sub-heading) shown!
-                if let lastAuthId = authenticatorItems.last?.id {
-                    proxy.scrollTo(lastAuthId, anchor: .top)
-                } else if let firstRecId = recoveryItems.first?.id {
-                    proxy.scrollTo(firstRecId, anchor: .top)
+                if let firstRecId = recoveryItems.first?.id {
+                    proxy.scrollTo(twoFATag(for: firstRecId, role: .recoveryCodes), anchor: .top)
                 } else {
                     proxy.scrollTo("section_recovery", anchor: .top)
                 }
@@ -308,6 +384,7 @@ public struct ItemRowView: View {
     let item: VaultItem
     var folders: [VaultFolder] = []
     var currentSection: NavigationSection = .allItems
+    var twoFARowContext: TwoFASubtype? = nil
     var onToggleFavorite: () -> Void
     var onMoveToFolder: ((VaultItem, VaultFolder?) -> Void)? = nil
     var onDeleteItem: ((String) -> Void)? = nil
@@ -330,13 +407,20 @@ public struct ItemRowView: View {
     }
 
     private var subtitleText: String {
-        if currentSection == .twoFASubtype(.recoveryCodes) {
+        if twoFARowContext == .recoveryCodes || (twoFARowContext == nil && currentSection == .twoFASubtype(.recoveryCodes)) {
             let count = item.recoveryCodesCount
             let countStr = count > 0 ? "\(count) Recovery Codes" : "Recovery Codes"
             if let u = item.username, !u.isEmpty {
                 return "\(u) • \(countStr)"
             }
             return countStr
+        }
+
+        if twoFARowContext == .authenticator {
+            if item.type == .authenticator {
+                return item.authenticatorDetails?.issuer ?? item.username ?? "2FA Code"
+            }
+            return item.username ?? item.urls.first ?? "2FA Authenticator"
         }
 
         switch item.type {
@@ -419,7 +503,7 @@ public struct ItemRowView: View {
             .layoutPriority(1)
 
             HStack(spacing: 6) {
-                if currentSection == .twoFASubtype(.recoveryCodes) {
+                if twoFARowContext == .recoveryCodes || (twoFARowContext == nil && currentSection == .twoFASubtype(.recoveryCodes)) {
                     HStack(spacing: 3) {
                         Image(systemName: "key.horizontal.fill")
                             .font(.system(size: 8))

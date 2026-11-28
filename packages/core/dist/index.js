@@ -25,4 +25,5 @@ __exportStar(require("./crypto/generator.js"), exports);
 __exportStar(require("./crypto/oauth.js"), exports);
 __exportStar(require("./parsers/index.js"), exports);
 __exportStar(require("./storage/vault-manager.js"), exports);
+__exportStar(require("./session/session-monitor.js"), exports);
 //# sourceMappingURL=index.js.map

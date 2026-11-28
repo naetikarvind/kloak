@@ -23,6 +23,7 @@ public struct VaultMainView: View {
     @State private var isShowingNewItemSheet: Bool = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @ObservedObject private var updater = UpdaterService.shared
+    @ObservedObject private var sessionMonitor = SessionMonitorService.shared
 
     public init(
         isUnlocked: Binding<Bool>,
@@ -52,7 +53,7 @@ public struct VaultMainView: View {
 
     private var isUtilitySection: Bool {
         switch selection {
-        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials, .sessions:
             return true
         default:
             return false
@@ -88,7 +89,7 @@ public struct VaultMainView: View {
             }
         case .trash:
             base = items.filter { $0.trashed }
-        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials:
+        case .generator, .importExport, .settings, .duplicates, .passwordHealth, .combineCredentials, .sessions:
             base = []
         }
 
@@ -211,6 +212,13 @@ public struct VaultMainView: View {
             }
         case .generator:
             GeneratorView()
+        case .sessions:
+            SessionMonitorView(onSelectItem: { itemId in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedItemId = itemId
+                    selection = .allItems
+                }
+            })
         case .combineCredentials:
             CombineCredentialsView(
                 items: $items,
@@ -314,18 +322,64 @@ public struct VaultMainView: View {
             )
             .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 270)
         } detail: {
-            ZStack {
-                if isUtilitySection {
-                    utilityColumnView
-                        .id(selection)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .transition(
-                            .asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.985)).combined(with: .offset(x: 16)),
-                                removal: .opacity.combined(with: .scale(scale: 0.985)).combined(with: .offset(x: -16))
+            VStack(spacing: 0) {
+                if selection != .sessions,
+                   let topAlert = sessionMonitor.activeAlerts.first(where: { !$0.dismissed }) {
+                    let isExpired = topAlert.severity == "expired" || topAlert.severity == "security_revoked"
+                    let accentColor = isExpired ? LiquidGlassTheme.roseAccent : LiquidGlassTheme.amberAccent
+
+                    HStack(spacing: 10) {
+                        Image(systemName: isExpired ? "lock.trianglebadge.exclamationmark.fill" : "clock.badge.exclamationmark.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(accentColor)
+
+                        Text(topAlert.message)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .lineLimit(1)
+
+                        Spacer()
+
+                        if !topAlert.loginUrl.isEmpty {
+                            Button("Sign In") {
+                                sessionMonitor.openLoginUrl(topAlert.loginUrl)
+                            }
+                            .buttonStyle(GlassCapsuleButton(isPrimary: true, tintColor: accentColor))
+                        }
+
+                        Button("Sessions") {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selection = .sessions
+                            }
+                        }
+                        .buttonStyle(GlassCapsuleButton(isPrimary: false))
+
+                        Button(action: {
+                            sessionMonitor.dismissAlert(id: topAlert.id)
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(accentColor.opacity(0.14))
+                    .overlay(Rectangle().frame(height: 1).foregroundColor(accentColor.opacity(0.28)), alignment: .bottom)
+                }
+
+                ZStack {
+                    if isUtilitySection {
+                        utilityColumnView
+                            .id(selection)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(
+                                .asymmetric(
+                                    insertion: .opacity.combined(with: .scale(scale: 0.985)).combined(with: .offset(x: 16)),
+                                    removal: .opacity.combined(with: .scale(scale: 0.985)).combined(with: .offset(x: -16))
+                                )
                             )
-                        )
-                } else {
+                    } else {
                     HStack(spacing: 0) {
                         ItemListView(
                             items: filteredItems,
@@ -431,6 +485,7 @@ public struct VaultMainView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } // end outer detail VStack
         }
         .navigationSplitViewStyle(.balanced)
         .tint(LiquidGlassTheme.primaryAccent)

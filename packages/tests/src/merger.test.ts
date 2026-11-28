@@ -12,7 +12,11 @@ import {
   calculatePasswordSimilarity,
   calculateItemRisk,
   smartMergeItems,
-  autoMergeVaultItems
+  autoMergeVaultItems,
+  classifyCredentialRole,
+  validateCredentialCombination,
+  matchCrossTypeCredentials,
+  consolidateCrossTypeBatch
 } from '@kloak/core';
 
 function mockItem(partial: Partial<VaultItem>): VaultItem {
@@ -237,6 +241,105 @@ describe('Kloak Smart Deduplication & Auto-Merging Engine', () => {
     assert.ok(audit.overallScore > 0);
 
     // Clean up
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  test('Smart Credential Understander validates different-type combining and matches github + github recovery code', () => {
+    const ghLogin = mockItem({
+      id: 'gh-login',
+      type: 'login',
+      title: 'GitHub',
+      username: 'naetik.arvnd@gmail.com',
+      password: 'ghStrongPassword!',
+      urls: ['https://github.com/login']
+    });
+    const ghSecondLogin = mockItem({
+      id: 'gh-login-2',
+      type: 'login',
+      title: 'GitHub Work',
+      username: 'naetik.work@company.com',
+      password: 'workPassword!',
+      urls: ['https://github.com']
+    });
+    const ghRecovery = mockItem({
+      id: 'gh-rec',
+      type: 'secure_note',
+      title: 'github recovery code',
+      notes: '9b7c4e99\n4114fe8a\n8098ddd4\nad031734',
+      tags: ['Secure Note', 'Recovery Codes']
+    });
+    const ghAuth = mockItem({
+      id: 'gh-auth',
+      type: 'login',
+      title: 'GitHub 2FA',
+      username: 'naetik.arvnd@gmail.com',
+      totpSecret: 'JBSWY3DPEHPK3PXP'
+    });
+    const ghLoginWithTotp = mockItem({
+      id: 'gh-login-totp',
+      type: 'login',
+      title: 'GitHub',
+      username: 'naetik.arvnd@gmail.com',
+      password: 'ghStrongPassword!',
+      totpSecret: 'JBSWY3DPEHPK3PXP'
+    });
+
+    assert.strictEqual(classifyCredentialRole(ghLogin), 'login');
+    assert.strictEqual(classifyCredentialRole(ghAuth), 'authenticator');
+    assert.strictEqual(classifyCredentialRole(ghRecovery), 'recovery_code');
+
+    // Strictly forbid same-type or overlapping capability combining
+    assert.strictEqual(validateCredentialCombination([ghLogin, ghSecondLogin]).isAllowed, false);
+    assert.strictEqual(validateCredentialCombination([ghLoginWithTotp, ghAuth]).isAllowed, false);
+    assert.strictEqual(validateCredentialCombination([ghLogin, ghRecovery]).isAllowed, true);
+    assert.strictEqual(validateCredentialCombination([ghLogin, ghAuth, ghRecovery]).isAllowed, true);
+
+    const smartMatch = matchCrossTypeCredentials(ghLogin, ghRecovery);
+    assert.ok(smartMatch && smartMatch.confidence >= 0.9);
+
+    const consolidated = consolidateCrossTypeBatch([ghLogin, ghSecondLogin, ghRecovery, ghAuth]);
+    assert.strictEqual(consolidated.combinedCount, 2);
+    assert.strictEqual(consolidated.items.length, 2); // Unified GitHub + separate Work login
+    const unifiedGh = consolidated.items.find(i => i.id === 'gh-login');
+    assert.ok(unifiedGh);
+    assert.strictEqual(unifiedGh.totpSecret, 'JBSWY3DPEHPK3PXP');
+    assert.ok(unifiedGh.notes?.includes('9b7c4e99'));
+    assert.ok(unifiedGh.tags.includes('Recovery Codes'));
+  });
+
+  test('VaultManager.importData combines github recovery codes file with existing GitHub login', () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kloak-smart-import-test-'));
+    const vaultPath = path.join(tempDir, 'vault.kloak');
+    const vm = new VaultManager(vaultPath);
+
+    vm.createVault('MasterPass123!');
+    vm.addItem({
+      type: 'login',
+      title: 'GitHub',
+      username: 'naetik.arvnd@gmail.com',
+      password: 'GitHubPassword999!',
+      urls: ['https://github.com/login'],
+      tags: ['Development'],
+      favorite: false,
+      trashed: false
+    });
+
+    const recoveryText = '9b7c4e99\n4114fe8a\n8098ddd4\nad031734';
+    const importRes = vm.importData(recoveryText, 'auto', {
+      autoMerge: true,
+      filename: 'github-recovery-codes.txt'
+    });
+
+    assert.ok(importRes.mergeReport);
+    assert.strictEqual(importRes.mergeReport.crossTypeCombined, 1);
+
+    const items = vm.getItems();
+    assert.strictEqual(items.length, 1);
+    assert.strictEqual(items[0].title, 'GitHub');
+    assert.strictEqual(items[0].password, 'GitHubPassword999!');
+    assert.ok(items[0].notes?.includes('9b7c4e99'));
+    assert.ok(items[0].tags.includes('Recovery Codes'));
+
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 });

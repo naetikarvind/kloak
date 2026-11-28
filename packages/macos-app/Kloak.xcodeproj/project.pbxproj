@@ -55,6 +55,9 @@
 		C10000140000000000000014 /* HardwareSecurityKeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000140000000000000014 /* HardwareSecurityKeyService.swift */; };
 		F10000150000000000000015 /* CredentialCombinerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000150000000000000015 /* CredentialCombinerService.swift */; };
 		F10000160000000000000016 /* CombineCredentialsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000160000000000000016 /* CombineCredentialsView.swift */; };
+		F10000170000000000000017 /* SmartCredentialUnderstander.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000170000000000000017 /* SmartCredentialUnderstander.swift */; };
+		F10000180000000000000018 /* SessionMonitorService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000180000000000000018 /* SessionMonitorService.swift */; };
+		F10000190000000000000019 /* SessionMonitorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000190000000000000019 /* SessionMonitorView.swift */; };
 		E33CDBCF22EE4C0A86F94A1E /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */; };
 /* End PBXBuildFile section */
 
@@ -107,6 +110,9 @@
 		D10000140000000000000014 /* HardwareSecurityKeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/HardwareSecurityKeyService.swift"; sourceTree = "<group>"; };
 		E10000150000000000000015 /* CredentialCombinerService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/CredentialCombinerService.swift"; sourceTree = "<group>"; };
 		E10000160000000000000016 /* CombineCredentialsView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/CombineCredentialsView.swift"; sourceTree = "<group>"; };
+		E10000170000000000000017 /* SmartCredentialUnderstander.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/SmartCredentialUnderstander.swift"; sourceTree = "<group>"; };
+		E10000180000000000000018 /* SessionMonitorService.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Services/SessionMonitorService.swift"; sourceTree = "<group>"; };
+		E10000190000000000000019 /* SessionMonitorView.swift */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.swift"; path = "Sources/KloakApp/Views/SessionMonitorView.swift"; sourceTree = "<group>"; };
 		58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = "folder"; path = "AppIcon.icon"; sourceTree = "<group>"; };
 		8E2EDE0EB75F49198A06F3A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.xml"; path = "Info.plist"; sourceTree = "<group>"; };
 		96D7472670404CFB938AC830 /* Kloak.entitlements */ = {isa = PBXFileReference; lastKnownFileType = "text.plist.entitlements"; path = "Kloak.entitlements"; sourceTree = "<group>"; };
@@ -175,6 +181,9 @@
 				D10000140000000000000014 /* HardwareSecurityKeyService.swift */,
 				E10000150000000000000015 /* CredentialCombinerService.swift */,
 				E10000160000000000000016 /* CombineCredentialsView.swift */,
+				E10000170000000000000017 /* SmartCredentialUnderstander.swift */,
+				E10000180000000000000018 /* SessionMonitorService.swift */,
+				E10000190000000000000019 /* SessionMonitorView.swift */,
 				58A92B881FA94FBD94D2B7A3 /* AppIcon.icon */,
 				8E2EDE0EB75F49198A06F3A1 /* Info.plist */,
 				96D7472670404CFB938AC830 /* Kloak.entitlements */,
@@ -301,6 +310,9 @@
 				C10000140000000000000014 /* HardwareSecurityKeyService.swift in Sources */,
 				F10000150000000000000015 /* CredentialCombinerService.swift in Sources */,
 				F10000160000000000000016 /* CombineCredentialsView.swift in Sources */,
+				F10000170000000000000017 /* SmartCredentialUnderstander.swift in Sources */,
+				F10000180000000000000018 /* SessionMonitorService.swift in Sources */,
+				F10000190000000000000019 /* SessionMonitorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

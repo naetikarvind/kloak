@@ -85,19 +85,80 @@ public struct DuplicateDetectorService: Sendable {
     // MARK: - In-Vault Duplicate Detection
 
     public func findDuplicateAccounts(in items: [VaultItem]) -> [DuplicateAccountGroup] {
-        // Filter out trashed items; only inspect login or credentials with username or url
+        // Filter out trashed items
         let validItems = items.filter { !$0.trashed }
+        let understander = SmartCredentialUnderstander.shared
 
-        var grouped: [String: [VaultItem]] = [:]
-        for item in validItems {
+        var clusters: [[VaultItem]] = []
+        var assignedIndices: Set<Int> = []
+
+        // Pass 1: exact accountKey groups
+        var keyToIndices: [String: [Int]] = [:]
+        for (idx, item) in validItems.enumerated() {
             let key = accountKey(for: item)
             guard key != "::" && !key.hasPrefix("::") else { continue }
-            grouped[key, default: []].append(item)
+            keyToIndices[key, default: []].append(idx)
+        }
+
+        // Pass 2: fold brand-ecosystem duplicates (e.g. proton.me vs protonmail.com vs Proton)
+        // and redundant embedded recovery/2FA duplicates into the same duplicate group.
+        var groupedMap: [String: [Int]] = [:]
+        var clusterOrder: [String] = []
+
+        for (idx, item) in validItems.enumerated() {
+            let key = accountKey(for: item)
+            let userKey = normalizeUsername(item.username)
+            let serviceKey = understander.extractServiceKey(from: item)
+            let role = understander.classifyRole(item)
+
+            // Look for an existing bucket that matches either exact accountKey or same brand/role/username or redundant duplicate
+            var targetBucketKey: String? = (key != "::" && !key.hasPrefix("::") && groupedMap[key] != nil) ? key : nil
+
+            if targetBucketKey == nil {
+                for bKey in clusterOrder {
+                    guard let existingIndices = groupedMap[bKey], let anchorIdx = existingIndices.first else { continue }
+                    let anchor = validItems[anchorIdx]
+                    if understander.isRedundantDuplicate(of: anchor, candidate: item) ||
+                       understander.isRedundantDuplicate(of: item, candidate: anchor) {
+                        targetBucketKey = bKey
+                        break
+                    }
+                    let anchorUser = normalizeUsername(anchor.username)
+                    let anchorService = understander.extractServiceKey(from: anchor)
+                    let anchorRole = understander.classifyRole(anchor)
+                    if !userKey.isEmpty && userKey == anchorUser &&
+                       !serviceKey.isEmpty && serviceKey == anchorService &&
+                       role == anchorRole {
+                        targetBucketKey = bKey
+                        break
+                    }
+                }
+            }
+
+            if let matchedBucket = targetBucketKey {
+                groupedMap[matchedBucket, default: []].append(idx)
+                assignedIndices.insert(idx)
+            } else if key != "::" && !key.hasPrefix("::") {
+                groupedMap[key] = [idx]
+                clusterOrder.append(key)
+                assignedIndices.insert(idx)
+            } else if !serviceKey.isEmpty {
+                let fallbackKey = "svc::\(serviceKey)::\(role.rawValue)::\(idx)"
+                groupedMap[fallbackKey] = [idx]
+                clusterOrder.append(fallbackKey)
+                assignedIndices.insert(idx)
+            }
+        }
+
+        for bKey in clusterOrder {
+            guard let idxs = groupedMap[bKey], idxs.count > 1 else { continue }
+            clusters.append(idxs.map { validItems[$0] })
         }
 
         var results: [DuplicateAccountGroup] = []
-        for (key, groupItems) in grouped where groupItems.count > 1 {
+        for (offset, groupItems) in clusters.enumerated() where groupItems.count > 1 {
             let first = groupItems[0]
+            let key = "\(accountKey(for: first))_\(offset)"
             let displayTitle = first.title.isEmpty ? (first.urls.first ?? "Unknown") : first.title
             let displayUsername = first.username ?? ""
 
@@ -174,15 +235,20 @@ public struct DuplicateDetectorService: Sendable {
         }
 
         var merged = sorted[0]
+        if sorted.contains(where: { SmartCredentialUnderstander.shared.classifyRole($0) == .login }) {
+            merged.type = .login
+        }
         var trashedIds: [String] = []
 
         var allUrls = merged.urls
         var allTags = merged.tags
+        var allUsedCodes = Set(merged.usedRecoveryCodes)
         var combinedNotes = merged.notes?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         var isFavorite = merged.favorite
 
         for item in sorted.dropFirst() {
             trashedIds.append(item.id)
+            allUsedCodes.formUnion(item.usedRecoveryCodes)
 
             if isFavorite == false && item.favorite {
                 isFavorite = true
@@ -222,6 +288,9 @@ public struct DuplicateDetectorService: Sendable {
             // Merge TOTP secret if primary didn't have one
             if (merged.totpSecret == nil || merged.totpSecret?.isEmpty == true), let t = item.totpSecret, !t.isEmpty {
                 merged.totpSecret = t
+                if merged.authenticatorDetails == nil {
+                    merged.authenticatorDetails = item.authenticatorDetails
+                }
             }
 
             // Merge Custom Fields
@@ -235,12 +304,15 @@ public struct DuplicateDetectorService: Sendable {
                 merged.customFields = currentFields.isEmpty ? nil : currentFields
             }
 
-            // Merge Notes if different
+            // Merge Notes if genuinely distinct (skip redundant identical recovery code lists)
             if let secNotes = item.notes?.trimmingCharacters(in: .whitespacesAndNewlines),
                !secNotes.isEmpty && !combinedNotes.contains(secNotes) {
+                let itemCodes = Set(item.recoveryCodesList)
+                let existingCodes = Set(merged.recoveryCodesList)
+                let recoveryAlreadyContained = !itemCodes.isEmpty && itemCodes.isSubset(of: existingCodes)
                 if combinedNotes.isEmpty {
                     combinedNotes = secNotes
-                } else {
+                } else if !recoveryAlreadyContained {
                     combinedNotes += "\n\n[Merged from duplicate]: \(secNotes)"
                 }
             }
@@ -248,6 +320,7 @@ public struct DuplicateDetectorService: Sendable {
 
         merged.urls = allUrls
         merged.tags = allTags
+        merged.usedRecoveryCodes = Array(allUsedCodes).sorted()
         merged.favorite = isFavorite
         merged.notes = combinedNotes.isEmpty ? nil : combinedNotes
         merged.updatedAt = ISO8601DateFormatter().string(from: Date())
@@ -323,29 +396,53 @@ public struct DuplicateDetectorService: Sendable {
                 ?? (domainKey.isEmpty ? nil : domainUserToVaultItem[domainKey])
 
             if let matched = matchedVaultItem {
-                let filePass = cleanedItem.password ?? ""
-                let vaultPass = matched.password ?? ""
-                let fileTotp = cleanedItem.totpSecret ?? ""
-                let vaultTotp = matched.totpSecret ?? ""
-
-                let passwordsMatch = (filePass == vaultPass)
-                let totpMatch = fileTotp.isEmpty || (fileTotp == vaultTotp)
-
-                if passwordsMatch && totpMatch {
+                // Check if this direct match is actually a cross-type pair (e.g. GitHub Login + GitHub Authenticator/Recovery)
+                if SmartCredentialUnderstander.shared.validateCombination([matched, cleanedItem]).isAllowed {
                     comparisonItems.append(FileImportComparisonItem(
                         fileItem: cleanedItem,
                         matchedVaultItem: matched,
-                        status: .exactMatch,
-                        selectedStrategy: .skipDuplicate
-                    ))
-                } else {
-                    comparisonItems.append(FileImportComparisonItem(
-                        fileItem: cleanedItem,
-                        matchedVaultItem: matched,
-                        status: .conflict,
+                        status: .smartCombine,
                         selectedStrategy: .updateExisting
                     ))
+                } else {
+                    let filePass = cleanedItem.password ?? ""
+                    let vaultPass = matched.password ?? ""
+                    let fileTotp = cleanedItem.totpSecret ?? ""
+                    let vaultTotp = matched.totpSecret ?? ""
+
+                    let passwordsMatch = (filePass == vaultPass)
+                    let totpMatch = fileTotp.isEmpty || (fileTotp == vaultTotp)
+
+                    if passwordsMatch && totpMatch {
+                        comparisonItems.append(FileImportComparisonItem(
+                            fileItem: cleanedItem,
+                            matchedVaultItem: matched,
+                            status: .exactMatch,
+                            selectedStrategy: .skipDuplicate
+                        ))
+                    } else {
+                        comparisonItems.append(FileImportComparisonItem(
+                            fileItem: cleanedItem,
+                            matchedVaultItem: matched,
+                            status: .conflict,
+                            selectedStrategy: .updateExisting
+                        ))
+                    }
                 }
+            } else if let smartHit = SmartCredentialUnderstander.shared.findBestExistingMatch(for: cleanedItem, in: activeVault) {
+                comparisonItems.append(FileImportComparisonItem(
+                    fileItem: cleanedItem,
+                    matchedVaultItem: smartHit.item,
+                    status: .smartCombine,
+                    selectedStrategy: .updateExisting
+                ))
+            } else if let redundantTarget = SmartCredentialUnderstander.shared.findRedundantDuplicateTarget(for: cleanedItem, in: activeVault) {
+                comparisonItems.append(FileImportComparisonItem(
+                    fileItem: cleanedItem,
+                    matchedVaultItem: redundantTarget,
+                    status: .exactMatch,
+                    selectedStrategy: .skipDuplicate
+                ))
             } else {
                 comparisonItems.append(FileImportComparisonItem(
                     fileItem: cleanedItem,
@@ -367,7 +464,15 @@ public struct DuplicateDetectorService: Sendable {
         overrides: [String: ImportDuplicateStrategy]
     ) -> (toAdd: [VaultItem], toUpdate: [VaultItem]) {
         var toAdd: [VaultItem] = []
-        var toUpdate: [VaultItem] = []
+        var updatedById: [String: VaultItem] = [:]
+        var updatedOrder: [String] = []
+
+        func recordUpdate(_ item: VaultItem) {
+            if updatedById[item.id] == nil {
+                updatedOrder.append(item.id)
+            }
+            updatedById[item.id] = item
+        }
 
         for item in comparison.items {
             let strategy = overrides[item.id] ?? globalStrategy
@@ -381,7 +486,8 @@ public struct DuplicateDetectorService: Sendable {
                 case .skipDuplicate:
                     break
                 case .updateExisting:
-                    if var matched = item.matchedVaultItem {
+                    if let originalMatched = item.matchedVaultItem {
+                        var matched = updatedById[originalMatched.id] ?? originalMatched
                         var updated = false
                         for u in item.fileItem.urls where !matched.urls.contains(u) && !u.isEmpty {
                             matched.urls.append(u)
@@ -397,7 +503,7 @@ public struct DuplicateDetectorService: Sendable {
                         }
                         if updated {
                             matched.updatedAt = ISO8601DateFormatter().string(from: Date())
-                            toUpdate.append(matched)
+                            recordUpdate(matched)
                         }
                     }
                 case .keepBoth:
@@ -412,7 +518,8 @@ public struct DuplicateDetectorService: Sendable {
                 case .skipDuplicate:
                     break
                 case .updateExisting:
-                    if var matched = item.matchedVaultItem {
+                    if let originalMatched = item.matchedVaultItem {
+                        var matched = updatedById[originalMatched.id] ?? originalMatched
                         if let newPass = item.fileItem.password, !newPass.isEmpty {
                             matched.password = newPass
                         }
@@ -429,7 +536,33 @@ public struct DuplicateDetectorService: Sendable {
                             matched.notes = (matched.notes.map { "\($0)\n[Updated from import]: \(n)" }) ?? n
                         }
                         matched.updatedAt = ISO8601DateFormatter().string(from: Date())
-                        toUpdate.append(matched)
+                        recordUpdate(matched)
+                    }
+                case .keepBoth:
+                    var copy = item.fileItem
+                    copy.id = UUID().uuidString
+                    copy.title = "\(copy.title) (Imported)"
+                    toAdd.append(copy)
+                }
+
+            case .smartCombine:
+                switch strategy {
+                case .skipDuplicate:
+                    break
+                case .updateExisting:
+                    if let originalMatched = item.matchedVaultItem {
+                        let base = updatedById[originalMatched.id] ?? originalMatched
+                        if SmartCredentialUnderstander.shared.validateCombination([base, item.fileItem]).isAllowed,
+                           var combined = CredentialCombinerService.shared.generatePreview(
+                               primaryId: base.id,
+                               items: [base, item.fileItem],
+                               customTitle: BrandTitleService.cleanTitle(base.title, url: base.urls.first)
+                           ) {
+                            combined.updatedAt = ISO8601DateFormatter().string(from: Date())
+                            recordUpdate(combined)
+                        } else {
+                            toAdd.append(item.fileItem)
+                        }
                     }
                 case .keepBoth:
                     var copy = item.fileItem
@@ -440,6 +573,7 @@ public struct DuplicateDetectorService: Sendable {
             }
         }
 
+        let toUpdate = updatedOrder.compactMap { updatedById[$0] }
         return (toAdd, toUpdate)
     }
 

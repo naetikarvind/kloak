@@ -7,6 +7,10 @@
 import * as crypto from 'node:crypto';
 import { VaultItem, PasswordHistoryEntry } from '../models/vault.js';
 import { evaluatePasswordStrength } from '../crypto/generator.js';
+import {
+  consolidateCrossTypeBatch,
+  isRecoveryCodeItem,
+} from './understander.js';
 
 export interface ItemRiskAssessment {
   score: number; // 0 - 100 (100 is safest/lowest risk)
@@ -33,6 +37,7 @@ export interface MergeReport {
   finalCount: number;
   exactDuplicatesMerged: number;
   updatedPasswordsMerged: number;
+  crossTypeCombined: number;
   newItemsAdded: number;
   reusedPasswordGroups: ReusedPasswordGroup[];
 }
@@ -359,12 +364,26 @@ export function smartMergeItems(canonical: VaultItem, incoming: VaultItem): { me
     wasUpdated = true;
   }
 
+  // 5b. Used Recovery Codes: merge checked indices
+  if (canonical.usedRecoveryCodes?.length || incoming.usedRecoveryCodes?.length) {
+    const mergedUsed = Array.from(
+      new Set([...(canonical.usedRecoveryCodes || []), ...(incoming.usedRecoveryCodes || [])])
+    ).sort((a, b) => a - b);
+    if (mergedUsed.length !== (canonical.usedRecoveryCodes?.length ?? 0)) {
+      wasUpdated = true;
+    }
+    merged.usedRecoveryCodes = mergedUsed;
+  }
+
   // 6. Notes: combine notes if distinct
+  const isRecoveryMerge = isRecoveryCodeItem(canonical) || isRecoveryCodeItem(incoming);
   if (incoming.notes && !merged.notes) {
     merged.notes = incoming.notes;
     wasUpdated = true;
   } else if (incoming.notes && merged.notes && !merged.notes.includes(incoming.notes)) {
-    merged.notes = `${merged.notes}\n---\n[Imported Note]: ${incoming.notes}`.trim();
+    merged.notes = isRecoveryMerge
+      ? `${merged.notes}\n\n${incoming.notes}`.trim()
+      : `${merged.notes}\n---\n[Imported Note]: ${incoming.notes}`.trim();
     wasUpdated = true;
   }
 
@@ -474,7 +493,17 @@ export function autoMergeVaultItems(
     }
   }
 
-  const mergedItems = [...Array.from(accountMap.values()), ...unkeyedItems];
+  const preparedItems = [...Array.from(accountMap.values()), ...unkeyedItems];
+
+  // Cross-type Smart Consolidation Pass: combines different credential roles
+  // (`login` + `authenticator` / `recovery_code`) for similarly named services
+  // (e.g. `GitHub` + `github recovery code`) while strictly blocking same-type merges.
+  const crossTypeConsolidation = consolidateCrossTypeBatch(preparedItems);
+  const mergedItems = crossTypeConsolidation.items;
+  const crossTypeCombined = crossTypeConsolidation.combinedCount;
+  if (crossTypeCombined > 0 && newItemsAdded > 0) {
+    newItemsAdded = Math.max(0, newItemsAdded - crossTypeCombined);
+  }
 
   // Detect reused passwords across the merged set
   const pwdMap = new Map<string, Array<{ id: string; title: string; username?: string }>>();
@@ -505,6 +534,7 @@ export function autoMergeVaultItems(
     finalCount: mergedItems.length,
     exactDuplicatesMerged,
     updatedPasswordsMerged,
+    crossTypeCombined,
     newItemsAdded,
     reusedPasswordGroups
   };

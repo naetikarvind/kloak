@@ -48,6 +48,7 @@ const cipher_js_1 = require("../crypto/cipher.js");
 const index_js_1 = require("../parsers/index.js");
 const merger_js_1 = require("../parsers/merger.js");
 const export_js_1 = require("../parsers/export.js");
+const session_monitor_js_1 = require("../session/session-monitor.js");
 function getDefaultVaultDir() {
     if (process.platform === 'win32') {
         const appData = process.env.APPDATA || process.env.LOCALAPPDATA || os.homedir();
@@ -69,7 +70,13 @@ exports.DEFAULT_SETTINGS = {
         symbols: true,
         avoidAmbiguous: false
     },
-    ignoredHealthIssueIds: []
+    ignoredHealthIssueIds: [],
+    sessionMonitorEnabled: true,
+    defaultSessionWarnMinutes: 5,
+    defaultSessionTtlMinutes: 0,
+    defaultHardMaxLifetimeMinutes: 480,
+    autoOAuthRefreshEnabled: true,
+    sessionDesktopNotificationsEnabled: true
 };
 class VaultManager {
     vaultPath;
@@ -78,6 +85,7 @@ class VaultManager {
     activeVaultKey = null;
     autoLockTimer = null;
     lastActivityTime = Date.now();
+    sessions = new session_monitor_js_1.SessionCoordinator();
     constructor(customVaultPath = exports.DEFAULT_VAULT_PATH) {
         this.vaultPath = customVaultPath;
         this.loadVaultFileFromDisk();
@@ -396,13 +404,13 @@ class VaultManager {
     // --- Import / Export & Smart Merge ---
     importData(content, format = 'auto', options = { autoMerge: true }) {
         this.ensureUnlocked();
-        const result = (0, index_js_1.importFromContent)(content, format);
+        const result = (0, index_js_1.importFromContent)(content, format, undefined, options.filename);
         if (options.autoMerge !== false) {
             const { mergedItems, report } = (0, merger_js_1.autoMergeVaultItems)(this.decryptedPayload.items, result.items);
             this.decryptedPayload.items = mergedItems;
             this.save();
             return {
-                imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged,
+                imported: report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged + report.crossTypeCombined,
                 warnings: result.warnings,
                 mergeReport: report
             };

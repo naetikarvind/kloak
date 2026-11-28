@@ -1391,6 +1391,10 @@ public struct SetupView: View {
                     allStaged[idx] = merged
                 }
             }
+            let consolidation = SmartCredentialUnderstander.shared.consolidateIncomingBatch(allStaged) { primaryId, cluster in
+                CredentialCombinerService.shared.generatePreview(primaryId: primaryId, items: cluster) ?? cluster[0]
+            }
+            allStaged = consolidation.items
             importedFileItems = allStaged
 
             importedFileName = url.lastPathComponent

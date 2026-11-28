@@ -89,6 +89,7 @@ public struct SettingsView: View {
 
                     case .autofill:
                         accessibilityAutofillSection
+                        sessionExpirationSection
                         ipcSection
 
                     case .sync:
@@ -227,6 +228,7 @@ public struct SettingsView: View {
                 }
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -397,6 +399,7 @@ public struct SettingsView: View {
                 }
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -535,6 +538,7 @@ public struct SettingsView: View {
                 }
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -645,6 +649,7 @@ public struct SettingsView: View {
                 .padding(.top, 2)
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -952,6 +957,79 @@ public struct SettingsView: View {
                 .buttonStyle(GlassCapsuleButton(isPrimary: false))
             }
             .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.black.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .padding(14)
+        .glassEffect(cornerRadius: 16)
+    }
+
+    // MARK: - Section: Session Expiration & Auto-Reauth
+    @ViewBuilder
+    private var sessionExpirationSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("Session Expiration & Auto-Reauth", systemImage: "clock.badge.exclamationmark.fill")
+                    .font(.system(size: 14, weight: .bold))
+                Spacer()
+                Text(settings.sessionMonitorEnabled ? "MONITORING" : "PAUSED")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(settings.sessionMonitorEnabled ? LiquidGlassTheme.emeraldAccent : .secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background((settings.sessionMonitorEnabled ? LiquidGlassTheme.emeraldAccent : Color.white).opacity(0.12))
+                    .clipShape(Capsule())
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Monitors website cookies, web-app `kloak:session` SDK events, HTTP 401 signals, and OAuth token lifetimes across tabs. Never stores plaintext passwords or weakens MFA policies.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Toggle("Enable Cross-App Session Expiration Monitor", isOn: $settings.sessionMonitorEnabled)
+                    .onChange(of: settings.sessionMonitorEnabled) { _, _ in onSaveSettings(settings) }
+
+                Toggle("Enable Native Desktop Expiration Notifications", isOn: $settings.sessionDesktopNotificationsEnabled)
+                    .onChange(of: settings.sessionDesktopNotificationsEnabled) { _, _ in onSaveSettings(settings) }
+
+                Toggle("Allow Silent OAuth Refresh Token Rotation (OAuth Apps Only)", isOn: $settings.autoOAuthRefreshEnabled)
+                    .onChange(of: settings.autoOAuthRefreshEnabled) { _, _ in onSaveSettings(settings) }
+
+                Divider().opacity(0.15)
+
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Pre-Expiry Alert Lead")
+                            .font(.system(size: 12, weight: .medium))
+                        Picker("", selection: $settings.defaultSessionWarnMinutes) {
+                            Text("1 Minute").tag(1)
+                            Text("3 Minutes").tag(3)
+                            Text("5 Minutes (Recommended)").tag(5)
+                            Text("10 Minutes").tag(10)
+                            Text("15 Minutes").tag(15)
+                        }
+                        .labelsHidden()
+                        .onChange(of: settings.defaultSessionWarnMinutes) { _, _ in onSaveSettings(settings) }
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Max Silent Session Lifetime")
+                            .font(.system(size: 12, weight: .medium))
+                        Picker("", selection: $settings.defaultHardMaxLifetimeMinutes) {
+                            Text("2 Hours").tag(120)
+                            Text("4 Hours").tag(240)
+                            Text("8 Hours (Recommended)").tag(480)
+                            Text("24 Hours").tag(1440)
+                            Text("No Hard Cap").tag(0)
+                        }
+                        .labelsHidden()
+                        .onChange(of: settings.defaultHardMaxLifetimeMinutes) { _, _ in onSaveSettings(settings) }
+                    }
+                }
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -999,6 +1077,7 @@ public struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
             .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -1256,6 +1335,7 @@ public struct SettingsView: View {
                 }
             }
             .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -1291,6 +1371,7 @@ public struct SettingsView: View {
                 .disabled(oldPass.isEmpty || newPass1.isEmpty || newPass1 != newPass2)
             }
             .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -1398,6 +1479,7 @@ public struct SettingsView: View {
                 }
             }
             .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.2))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }

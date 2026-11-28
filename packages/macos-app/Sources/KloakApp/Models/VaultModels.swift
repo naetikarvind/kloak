@@ -209,6 +209,211 @@ public struct CustomField: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+// MARK: - Session Expiration & Auto-Reauth Policy Models
+
+public enum SessionReauthMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case notifyOnly = "notify_only"
+    case autoOAuthRefresh = "auto_oauth_refresh"
+    case assistedReauth = "assisted_reauth"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .notifyOnly: return "Notify & Prompt Login"
+        case .autoOAuthRefresh: return "Auto OAuth Token Refresh"
+        case .assistedReauth: return "1-Click Guided Re-Auth"
+        }
+    }
+
+    public var shortLabel: String {
+        switch self {
+        case .notifyOnly: return "Notify Only"
+        case .autoOAuthRefresh: return "Auto OAuth Refresh"
+        case .assistedReauth: return "1-Click Re-Auth"
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .notifyOnly:
+            return "Warns before expiration and notifies you to re-authenticate interactively when the session ends."
+        case .autoOAuthRefresh:
+            return "Silently rotates OAuth refresh tokens while respecting idle and max-lifetime caps; fails closed to prompt on MFA or revocation."
+        case .assistedReauth:
+            return "Preserves page drafts, alerts on expiry, and launches Kloak's 1-click sign-in assist on the login screen."
+        }
+    }
+}
+
+public enum SessionAuthMechanism: String, Codable, CaseIterable, Identifiable, Sendable {
+    case passwordMFA = "password_mfa"
+    case oauth2OIDC = "oauth2_oidc"
+    case ssoPassive = "sso_passive"
+    case cookieTimer = "cookie_timer"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .passwordMFA: return "Password + MFA"
+        case .oauth2OIDC: return "OAuth 2.0 / OIDC"
+        case .ssoPassive: return "Enterprise SSO"
+        case .cookieTimer: return "Web Session Cookie"
+        }
+    }
+}
+
+public enum SessionStatus: String, Codable, Sendable {
+    case active
+    case expiringSoon = "expiring_soon"
+    case expired
+    case refreshing
+    case revoked
+}
+
+public enum SessionSignalSource: String, Codable, Sendable {
+    case cookieExpiry = "cookie_expiry"
+    case jwtClaim = "jwt_claim"
+    case webAppHook = "webapp_hook"
+    case http401 = "http_401"
+    case loginRedirect = "login_redirect"
+    case itemTimer = "item_timer"
+    case oauthToken = "oauth_token"
+}
+
+public struct SessionPolicy: Codable, Hashable, Sendable {
+    public var enabled: Bool
+    public var reauthMode: SessionReauthMode
+    public var authMechanism: SessionAuthMechanism
+    public var sessionTtlMinutes: Int
+    public var idleTimeoutMinutes: Int
+    public var hardMaxLifetimeMinutes: Int
+    public var notifyLeadMinutes: Int
+    public var tokenEndpoint: String?
+    public var loginUrl: String?
+    public var lastAuthenticatedAt: String?
+    public var lastRefreshedAt: String?
+    public var tokenFamilyId: String?
+    public var reuseDetected: Bool?
+
+    public init(
+        enabled: Bool = true,
+        reauthMode: SessionReauthMode = .notifyOnly,
+        authMechanism: SessionAuthMechanism = .cookieTimer,
+        sessionTtlMinutes: Int = 60,
+        idleTimeoutMinutes: Int = 30,
+        hardMaxLifetimeMinutes: Int = 480,
+        notifyLeadMinutes: Int = 5,
+        tokenEndpoint: String? = nil,
+        loginUrl: String? = nil,
+        lastAuthenticatedAt: String? = nil,
+        lastRefreshedAt: String? = nil,
+        tokenFamilyId: String? = nil,
+        reuseDetected: Bool? = nil
+    ) {
+        self.enabled = enabled
+        self.reauthMode = reauthMode
+        self.authMechanism = authMechanism
+        self.sessionTtlMinutes = sessionTtlMinutes
+        self.idleTimeoutMinutes = idleTimeoutMinutes
+        self.hardMaxLifetimeMinutes = hardMaxLifetimeMinutes
+        self.notifyLeadMinutes = notifyLeadMinutes
+        self.tokenEndpoint = tokenEndpoint
+        self.loginUrl = loginUrl
+        self.lastAuthenticatedAt = lastAuthenticatedAt
+        self.lastRefreshedAt = lastRefreshedAt
+        self.tokenFamilyId = tokenFamilyId
+        self.reuseDetected = reuseDetected
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = (try? c.decode(Bool.self, forKey: .enabled)) ?? true
+        self.reauthMode = (try? c.decode(SessionReauthMode.self, forKey: .reauthMode)) ?? .notifyOnly
+        self.authMechanism = (try? c.decode(SessionAuthMechanism.self, forKey: .authMechanism)) ?? .cookieTimer
+        self.sessionTtlMinutes = (try? c.decode(Int.self, forKey: .sessionTtlMinutes)) ?? 60
+        self.idleTimeoutMinutes = (try? c.decode(Int.self, forKey: .idleTimeoutMinutes)) ?? 30
+        self.hardMaxLifetimeMinutes = (try? c.decode(Int.self, forKey: .hardMaxLifetimeMinutes)) ?? 480
+        self.notifyLeadMinutes = (try? c.decode(Int.self, forKey: .notifyLeadMinutes)) ?? 5
+        self.tokenEndpoint = try? c.decodeIfPresent(String.self, forKey: .tokenEndpoint)
+        self.loginUrl = try? c.decodeIfPresent(String.self, forKey: .loginUrl)
+        self.lastAuthenticatedAt = try? c.decodeIfPresent(String.self, forKey: .lastAuthenticatedAt)
+        self.lastRefreshedAt = try? c.decodeIfPresent(String.self, forKey: .lastRefreshedAt)
+        self.tokenFamilyId = try? c.decodeIfPresent(String.self, forKey: .tokenFamilyId)
+        self.reuseDetected = try? c.decodeIfPresent(Bool.self, forKey: .reuseDetected)
+    }
+}
+
+public struct TrackedSession: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var itemId: String?
+    public var appTitle: String
+    public var url: String
+    public var domain: String
+    public var authMechanism: SessionAuthMechanism
+    public var reauthMode: SessionReauthMode
+    public var status: SessionStatus
+    public var source: SessionSignalSource
+    public var startedAt: String
+    public var lastActivityAt: String
+    public var expiresAt: String?
+    public var hardDeadlineAt: String?
+    public var lastRefreshedAt: String?
+    public var refreshCount: Int
+    public var lastError: String?
+
+    public init(
+        id: String,
+        itemId: String? = nil,
+        appTitle: String,
+        url: String,
+        domain: String,
+        authMechanism: SessionAuthMechanism = .cookieTimer,
+        reauthMode: SessionReauthMode = .notifyOnly,
+        status: SessionStatus = .active,
+        source: SessionSignalSource = .cookieExpiry,
+        startedAt: String = ISO8601DateFormatter().string(from: Date()),
+        lastActivityAt: String = ISO8601DateFormatter().string(from: Date()),
+        expiresAt: String? = nil,
+        hardDeadlineAt: String? = nil,
+        lastRefreshedAt: String? = nil,
+        refreshCount: Int = 0,
+        lastError: String? = nil
+    ) {
+        self.id = id
+        self.itemId = itemId
+        self.appTitle = appTitle
+        self.url = url
+        self.domain = domain
+        self.authMechanism = authMechanism
+        self.reauthMode = reauthMode
+        self.status = status
+        self.source = source
+        self.startedAt = startedAt
+        self.lastActivityAt = lastActivityAt
+        self.expiresAt = expiresAt
+        self.hardDeadlineAt = hardDeadlineAt
+        self.lastRefreshedAt = lastRefreshedAt
+        self.refreshCount = refreshCount
+        self.lastError = lastError
+    }
+}
+
+public struct SessionExpiryAlert: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var sessionId: String
+    public var itemId: String?
+    public var appTitle: String
+    public var domain: String
+    public var loginUrl: String
+    public var severity: String // "warning", "expired", "security_revoked"
+    public var message: String
+    public var secondsRemaining: Int
+    public var createdAt: String
+    public var dismissed: Bool
+}
+
 // MARK: - Vault Item
 
 public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
@@ -221,6 +426,7 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
     public var notes: String?
     public var totpSecret: String?
     public var oauth: OAuthDetails?
+    public var sessionPolicy: SessionPolicy?
     public var card: CardDetails?
     public var identity: IdentityDetails?
     public var alias: AliasDetails?
@@ -243,6 +449,7 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         notes: String? = nil,
         totpSecret: String? = nil,
         oauth: OAuthDetails? = nil,
+        sessionPolicy: SessionPolicy? = nil,
         card: CardDetails? = nil,
         identity: IdentityDetails? = nil,
         alias: AliasDetails? = nil,
@@ -264,6 +471,7 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.notes = notes
         self.totpSecret = totpSecret
         self.oauth = oauth
+        self.sessionPolicy = sessionPolicy
         self.card = card
         self.identity = identity
         self.alias = alias
@@ -288,6 +496,7 @@ public struct VaultItem: Codable, Identifiable, Hashable, Sendable {
         self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
         self.totpSecret = try container.decodeIfPresent(String.self, forKey: .totpSecret)
         self.oauth = try container.decodeIfPresent(OAuthDetails.self, forKey: .oauth)
+        self.sessionPolicy = try container.decodeIfPresent(SessionPolicy.self, forKey: .sessionPolicy)
         self.card = try container.decodeIfPresent(CardDetails.self, forKey: .card)
         self.identity = try container.decodeIfPresent(IdentityDetails.self, forKey: .identity)
         self.alias = try container.decodeIfPresent(AliasDetails.self, forKey: .alias)
@@ -449,6 +658,14 @@ public struct VaultSettings: Codable, Hashable, Sendable {
     // Password Health Ignored Issues
     public var ignoredHealthIssueIds: [String]
 
+    // Session Expiration & Auto-Login Preferences
+    public var sessionMonitorEnabled: Bool
+    public var defaultSessionWarnMinutes: Int
+    public var defaultSessionTtlMinutes: Int
+    public var defaultHardMaxLifetimeMinutes: Int
+    public var autoOAuthRefreshEnabled: Bool
+    public var sessionDesktopNotificationsEnabled: Bool
+
     public static let `default` = VaultSettings(
         autoLockMinutes: 5,
         clearClipboardSeconds: 30,
@@ -472,7 +689,13 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         hardwareKeyName: nil,
         hardwareKeyEnrolledDate: nil,
         hardwareKeyUnlockMode: "hardware_only",
-        ignoredHealthIssueIds: []
+        ignoredHealthIssueIds: [],
+        sessionMonitorEnabled: true,
+        defaultSessionWarnMinutes: 5,
+        defaultSessionTtlMinutes: 0,
+        defaultHardMaxLifetimeMinutes: 480,
+        autoOAuthRefreshEnabled: true,
+        sessionDesktopNotificationsEnabled: true
     )
 
     public init(
@@ -498,7 +721,13 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         hardwareKeyName: String? = nil,
         hardwareKeyEnrolledDate: String? = nil,
         hardwareKeyUnlockMode: String = "hardware_only",
-        ignoredHealthIssueIds: [String] = []
+        ignoredHealthIssueIds: [String] = [],
+        sessionMonitorEnabled: Bool = true,
+        defaultSessionWarnMinutes: Int = 5,
+        defaultSessionTtlMinutes: Int = 0,
+        defaultHardMaxLifetimeMinutes: Int = 480,
+        autoOAuthRefreshEnabled: Bool = true,
+        sessionDesktopNotificationsEnabled: Bool = true
     ) {
         self.autoLockMinutes = autoLockMinutes
         self.clearClipboardSeconds = clearClipboardSeconds
@@ -523,6 +752,12 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.hardwareKeyEnrolledDate = hardwareKeyEnrolledDate
         self.hardwareKeyUnlockMode = hardwareKeyUnlockMode
         self.ignoredHealthIssueIds = ignoredHealthIssueIds
+        self.sessionMonitorEnabled = sessionMonitorEnabled
+        self.defaultSessionWarnMinutes = defaultSessionWarnMinutes
+        self.defaultSessionTtlMinutes = defaultSessionTtlMinutes
+        self.defaultHardMaxLifetimeMinutes = defaultHardMaxLifetimeMinutes
+        self.autoOAuthRefreshEnabled = autoOAuthRefreshEnabled
+        self.sessionDesktopNotificationsEnabled = sessionDesktopNotificationsEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -550,6 +785,12 @@ public struct VaultSettings: Codable, Hashable, Sendable {
         self.hardwareKeyEnrolledDate = try container.decodeIfPresent(String.self, forKey: .hardwareKeyEnrolledDate)
         self.hardwareKeyUnlockMode = try container.decodeIfPresent(String.self, forKey: .hardwareKeyUnlockMode) ?? "hardware_only"
         self.ignoredHealthIssueIds = try container.decodeIfPresent([String].self, forKey: .ignoredHealthIssueIds) ?? []
+        self.sessionMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .sessionMonitorEnabled) ?? true
+        self.defaultSessionWarnMinutes = try container.decodeIfPresent(Int.self, forKey: .defaultSessionWarnMinutes) ?? 5
+        self.defaultSessionTtlMinutes = try container.decodeIfPresent(Int.self, forKey: .defaultSessionTtlMinutes) ?? 0
+        self.defaultHardMaxLifetimeMinutes = try container.decodeIfPresent(Int.self, forKey: .defaultHardMaxLifetimeMinutes) ?? 480
+        self.autoOAuthRefreshEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoOAuthRefreshEnabled) ?? true
+        self.sessionDesktopNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .sessionDesktopNotificationsEnabled) ?? true
     }
 }
 
@@ -629,6 +870,7 @@ public enum FileImportItemStatus: String, CaseIterable, Identifiable, Sendable {
     case new = "new"
     case exactMatch = "exact_match"
     case conflict = "conflict"
+    case smartCombine = "smart_combine"
 
     public var id: String { rawValue }
 
@@ -637,6 +879,7 @@ public enum FileImportItemStatus: String, CaseIterable, Identifiable, Sendable {
         case .new: return "New Item"
         case .exactMatch: return "Exact Duplicate"
         case .conflict: return "Conflicting Duplicate"
+        case .smartCombine: return "Smart Combine"
         }
     }
 }
@@ -686,6 +929,10 @@ public struct FileImportComparisonResult: Identifiable, Sendable {
         items.filter { $0.status == .conflict }.count
     }
 
+    public var smartCombineCount: Int {
+        items.filter { $0.status == .smartCombine }.count
+    }
+
     public var duplicateCount: Int {
         exactMatchCount + conflictCount
     }
@@ -703,14 +950,21 @@ extension VaultItem {
             return true
         }
         let lowerTitle = title.lowercased()
-        if lowerTitle.contains("recovery code") || lowerTitle.contains("recovery codes") ||
-           lowerTitle.contains("backup code") || lowerTitle.contains("backup codes") ||
-           lowerTitle.contains("recovery key") || lowerTitle.contains("recovery keys") ||
-           lowerTitle.contains("emergency kit") || lowerTitle.contains("2fa backup") {
+        let recoveryTitleKeywords = [
+            "recovery code", "recovery codes", "recovery-code", "recovery-codes", "recovery_code", "recovery_codes",
+            "backup code", "backup codes", "backup-code", "backup-codes", "backup_code", "backup_codes",
+            "recovery key", "recovery keys", "recovery-key", "recovery-keys",
+            "emergency kit", "emergency code", "emergency codes",
+            "2fa backup", "2fa recovery", "mfa backup", "mfa recovery",
+            "scratch code", "scratch codes", "one-time code", "one-time codes", "onetime code", "rescue code"
+        ]
+        if recoveryTitleKeywords.contains(where: { lowerTitle.contains($0) }) ||
+           (type == .secureNote && (lowerTitle.contains("recovery") || lowerTitle.contains("backup"))) {
             return true
         }
         if let notes = notes, !notes.isEmpty {
-            if notes.localizedCaseInsensitiveContains("recovery code") || notes.localizedCaseInsensitiveContains("backup code") {
+            let lowerNotes = notes.lowercased()
+            if recoveryTitleKeywords.contains(where: { lowerNotes.contains($0) }) {
                 return true
             }
             let lines = notes.components(separatedBy: .newlines)
@@ -744,9 +998,25 @@ extension VaultItem {
     /// Extracted list of recovery codes if this item is a recovery code note.
     public var recoveryCodesList: [String] {
         guard let notes = notes, !notes.isEmpty else { return [] }
+        let headerPrefixes = [
+            "username:", "user:", "account:", "email:", "login:",
+            "url:", "website:", "service:", "issuer:", "http://", "https://"
+        ]
         return notes.components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("#") && !$0.hasPrefix("//") }
+            .map { raw -> String in
+                var line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                // Strip simple bullet/numbered prefixes like "1. ", "1) ", "- ", "* "
+                if let range = line.range(of: #"^(?:\d+[\.\)]\s+|[-*•]\s+)"#, options: .regularExpression) {
+                    line = String(line[range.upperBound...]).trimmingCharacters(in: .whitespaces)
+                }
+                return line
+            }
+            .filter { line in
+                guard !line.isEmpty, !line.hasPrefix("#"), !line.hasPrefix("//") else { return false }
+                let lower = line.lowercased()
+                if headerPrefixes.contains(where: { lower.hasPrefix($0) }) { return false }
+                return true
+            }
     }
 
     /// Count of individual recovery codes.

@@ -39,9 +39,7 @@ public struct ImportDuplicateResolverSheet: View {
             switch item.status {
             case .new:
                 return true
-            case .exactMatch:
-                return strat != .skipDuplicate
-            case .conflict:
+            case .exactMatch, .conflict, .smartCombine:
                 return strat != .skipDuplicate
             }
         }.count
@@ -170,6 +168,9 @@ public struct ImportDuplicateResolverSheet: View {
             // Filter Pills
             filterPill(title: "All (\(comparison.items.count))", status: nil)
             filterPill(title: "New (\(comparison.newCount))", status: .new)
+            if comparison.smartCombineCount > 0 {
+                filterPill(title: "Smart Combine (\(comparison.smartCombineCount))", status: .smartCombine)
+            }
             filterPill(title: "Conflicts (\(comparison.conflictCount))", status: .conflict)
             filterPill(title: "Exact (\(comparison.exactMatchCount))", status: .exactMatch)
 
@@ -345,6 +346,28 @@ public struct ImportDuplicateResolverSheet: View {
                 .padding(8)
                 .background(Color.black.opacity(0.25))
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else if item.status == .smartCombine, let matched = item.matchedVaultItem {
+                let existingRole = SmartCredentialUnderstander.shared.classifyRole(matched).shortLabel
+                let incomingRole = SmartCredentialUnderstander.shared.classifyRole(item.fileItem).shortLabel
+                let matchReason = SmartCredentialUnderstander.shared.match(matched, item.fileItem)?.reason ?? "Smart Credential Understander match"
+
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(LiquidGlassTheme.emeraldAccent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Combines \(incomingRole) into existing \"\(matched.title)\" (\(existingRole))")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Text(matchReason)
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(8)
+                .background(LiquidGlassTheme.emeraldAccent.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
         .padding(12)
@@ -352,35 +375,36 @@ public struct ImportDuplicateResolverSheet: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(item.status == .conflict ? LiquidGlassTheme.amberAccent.opacity(0.3) : Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(
+                    item.status == .conflict ? LiquidGlassTheme.amberAccent.opacity(0.3) :
+                    (item.status == .smartCombine ? LiquidGlassTheme.emeraldAccent.opacity(0.35) : Color.white.opacity(0.05)),
+                    lineWidth: 1
+                )
         )
     }
 
     private func statusBadge(_ status: FileImportItemStatus) -> some View {
-        HStack(spacing: 4) {
+        let color: Color = {
+            switch status {
+            case .new: return LiquidGlassTheme.emeraldAccent
+            case .exactMatch: return LiquidGlassTheme.primaryAccent
+            case .conflict: return LiquidGlassTheme.amberAccent
+            case .smartCombine: return LiquidGlassTheme.emeraldAccent
+            }
+        }()
+
+        return HStack(spacing: 4) {
             Circle()
-                .fill(
-                    status == .new ? LiquidGlassTheme.emeraldAccent :
-                    status == .exactMatch ? LiquidGlassTheme.primaryAccent :
-                    LiquidGlassTheme.amberAccent
-                )
+                .fill(color)
                 .frame(width: 6, height: 6)
 
             Text(status.displayName)
                 .font(.system(size: 9, weight: .bold))
         }
-        .foregroundColor(
-            status == .new ? LiquidGlassTheme.emeraldAccent :
-            status == .exactMatch ? LiquidGlassTheme.primaryAccent :
-            LiquidGlassTheme.amberAccent
-        )
+        .foregroundColor(color)
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
-        .background(
-            (status == .new ? LiquidGlassTheme.emeraldAccent :
-             status == .exactMatch ? LiquidGlassTheme.primaryAccent :
-             LiquidGlassTheme.amberAccent).opacity(0.12)
-        )
+        .background(color.opacity(0.12))
         .clipShape(Capsule())
     }
 

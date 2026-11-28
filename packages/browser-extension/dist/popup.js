@@ -2226,6 +2226,7 @@
   var activeTabUrl = "";
   var activeDomain = "";
   var isGeneratorOpen = false;
+  var isSessionsViewOpen = false;
   var genLength = 20;
   var genUseUpper = true;
   var genUseLower = true;
@@ -2429,82 +2430,196 @@
     await loadLogins();
     if (requestedTab === "generator" || storedTab === "generator") {
       showGeneratorView();
+    } else if (requestedTab === "sessions" || storedTab === "sessions") {
+      showSessionsView();
     }
   });
+  var activeWorkspace = "vault";
+  var currentCategory = "all";
+  var favoritesOnly = false;
   var currentSortMode = "recent";
-  var currentFilterMode = "all";
-  function setupSearch() {
-    const searchInput = document.getElementById("search-input");
-    searchInput?.addEventListener("input", () => {
-      if (isGeneratorOpen) {
-        isGeneratorOpen = false;
-        updateActiveFilterTab(document.getElementById("filter-all"));
+  var isImportViewOpen = false;
+  var isSettingsViewOpen = false;
+  function matchesCategory(item, category) {
+    if (category === "all") return true;
+    if (category === "login") return item.type === "login" || !item.type;
+    if (category === "2fa") return item.type === "authenticator" || Boolean(item.totpSecret) || isRecoveryCodeNote(item);
+    if (category === "email_alias") return item.type === "email_alias" || item.type === "alias";
+    if (category === "card") return item.type === "card";
+    if (category === "secure_note") return item.type === "secure_note" || item.type === "note";
+    if (category === "identity") return item.type === "identity";
+    return true;
+  }
+  function updateCategoryCounts(items) {
+    const categories = ["all", "login", "2fa", "email_alias", "card", "secure_note", "identity"];
+    categories.forEach((cat) => {
+      const count = items.filter((item) => matchesCategory(item, cat)).length;
+      const badge = document.getElementById(`count-${cat}`);
+      if (badge) {
+        badge.textContent = String(count);
+        badge.classList.toggle("is-zero", count === 0);
       }
-      applyFilterAndSort(true);
     });
   }
-  function updateActiveFilterTab(activeBtn) {
-    document.getElementById("filter-all")?.classList.remove("active");
-    document.getElementById("filter-logins")?.classList.remove("active");
-    document.getElementById("filter-favorites")?.classList.remove("active");
-    document.getElementById("filter-2fa")?.classList.remove("active");
-    document.getElementById("filter-generator")?.classList.remove("active");
+  function setWorkspaceMode(mode) {
+    activeWorkspace = mode;
+    isGeneratorOpen = mode === "generator";
+    isSessionsViewOpen = mode === "sessions";
+    isImportViewOpen = mode === "import";
+    isSettingsViewOpen = mode === "settings";
+    const mainView = document.getElementById("main-view");
+    if (mainView) {
+      mainView.classList.toggle("workspace-tool-mode", mode !== "vault");
+    }
+    document.getElementById("rail-vault")?.classList.toggle("active", mode === "vault");
+    document.getElementById("rail-generator")?.classList.toggle("active", mode === "generator");
+    document.getElementById("rail-sessions")?.classList.toggle("active", mode === "sessions");
+    document.getElementById("rail-retrieve")?.classList.toggle("active", mode === "import");
+    document.getElementById("rail-settings")?.classList.toggle("active", mode === "settings");
+  }
+  function refreshSessionAlertDot() {
+    const dot = document.getElementById("rail-sessions-dot");
+    if (!dot) return;
+    try {
+      chrome.runtime.sendMessage({ type: "GET_SESSION_WATCH_STATUS" }, (res) => {
+        if (chrome.runtime.lastError) return;
+        const alerts = Array.isArray(res?.alerts) ? res.alerts : [];
+        const sessions = Array.isArray(res?.sessions) ? res.sessions : [];
+        const hasAlert = alerts.length > 0 || sessions.some((s) => s.status === "expired" || s.status === "revoked");
+        dot.style.display = hasAlert ? "block" : "none";
+      });
+    } catch {
+    }
+  }
+  function setupSearch() {
+    const searchInput = document.getElementById("search-input");
+    const clearBtn = document.getElementById("btn-search-clear");
+    const syncClearBtn = () => {
+      if (clearBtn) {
+        clearBtn.style.display = (searchInput?.value || "").length > 0 ? "flex" : "none";
+      }
+    };
+    searchInput?.addEventListener("input", () => {
+      syncClearBtn();
+      if (activeWorkspace !== "vault") {
+        setWorkspaceMode("vault");
+        if (activeItem) {
+          renderDetailPane(activeItem);
+        }
+      }
+      applyFilterAndSort(true);
+      if (!activeItem && activeWorkspace === "vault") {
+        const visible = getFilteredAndSortedItems();
+        if (visible.length > 0) selectItem(visible[0]);
+      }
+    });
+    clearBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (searchInput) {
+        searchInput.value = "";
+        syncClearBtn();
+        searchInput.focus();
+        applyFilterAndSort(true);
+      }
+    });
+    document.addEventListener("keydown", (e) => {
+      const unlockView = document.getElementById("unlock-view");
+      if (unlockView && unlockView.style.display !== "none") return;
+      const target = e.target;
+      const isTypingField = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT");
+      if (e.key === "/" && !isTypingField) {
+        e.preventDefault();
+        if (activeWorkspace !== "vault") setWorkspaceMode("vault");
+        searchInput?.focus();
+        searchInput?.select();
+        return;
+      }
+      if (e.key === "Escape" && document.activeElement === searchInput && searchInput.value) {
+        e.preventDefault();
+        searchInput.value = "";
+        syncClearBtn();
+        applyFilterAndSort(true);
+        return;
+      }
+      if ((e.key === "ArrowDown" || e.key === "ArrowUp") && document.activeElement === searchInput && activeWorkspace === "vault") {
+        e.preventDefault();
+        const visible = getFilteredAndSortedItems();
+        if (visible.length === 0) return;
+        const idx = activeItem ? visible.findIndex((i) => i.id === activeItem.id) : -1;
+        const nextIdx = e.key === "ArrowDown" ? (idx + 1) % visible.length : idx <= 0 ? visible.length - 1 : idx - 1;
+        selectItem(visible[nextIdx]);
+        const row = document.querySelector(`.list-item[data-item-id="${visible[nextIdx].id}"]`);
+        row?.scrollIntoView({ block: "nearest" });
+      }
+    });
+  }
+  function updateActiveCategoryButton(activeBtn) {
+    document.querySelectorAll(".cat-btn").forEach((btn) => btn.classList.remove("active"));
     activeBtn?.classList.add("active");
   }
   function setupFilters() {
-    const filterAllBtn = document.getElementById("filter-all");
-    const filterLoginsBtn = document.getElementById("filter-logins");
-    const filterFavsBtn = document.getElementById("filter-favorites");
-    const filter2faBtn = document.getElementById("filter-2fa");
-    const filterGenBtn = document.getElementById("filter-generator");
-    const headerGenBtn = document.getElementById("btn-header-gen");
-    filterAllBtn?.addEventListener("click", () => {
-      isGeneratorOpen = false;
-      currentFilterMode = "all";
-      updateActiveFilterTab(filterAllBtn);
+    const railVault = document.getElementById("rail-vault");
+    const railGenerator = document.getElementById("rail-generator");
+    const railSessions = document.getElementById("rail-sessions");
+    const railRetrieve = document.getElementById("rail-retrieve");
+    const railSettings = document.getElementById("rail-settings");
+    const favToggleBtn = document.getElementById("btn-favorites-toggle");
+    railVault?.addEventListener("click", () => {
+      setWorkspaceMode("vault");
       applyFilterAndSort(true);
-      if (allItems.length > 0 && (!activeItem || !allItems.some((i) => i.id === activeItem.id))) {
-        selectItem(allItems[0]);
+      const visible = getFilteredAndSortedItems();
+      if (visible.length > 0 && (!activeItem || !visible.some((i) => i.id === activeItem.id))) {
+        selectItem(visible[0]);
+      } else if (activeItem) {
+        renderDetailPane(activeItem);
+      } else {
+        const detailPane = document.getElementById("detail-pane");
+        if (detailPane) detailPane.innerHTML = '<div class="detail-empty">Select an item to view details</div>';
       }
     });
-    filterLoginsBtn?.addEventListener("click", () => {
-      isGeneratorOpen = false;
-      currentFilterMode = "logins";
-      updateActiveFilterTab(filterLoginsBtn);
-      applyFilterAndSort(true);
-      const loginItems = allItems.filter((i) => i.type === "login" || !i.type);
-      if (loginItems.length > 0 && (!activeItem || !loginItems.some((i) => i.id === activeItem.id))) {
-        selectItem(loginItems[0]);
-      }
-    });
-    filterFavsBtn?.addEventListener("click", () => {
-      isGeneratorOpen = false;
-      currentFilterMode = "favorites";
-      updateActiveFilterTab(filterFavsBtn);
-      applyFilterAndSort(true);
-      const favItems = allItems.filter((i) => Boolean(i.favorite));
-      if (favItems.length > 0 && (!activeItem || !favItems.some((i) => i.id === activeItem.id))) {
-        selectItem(favItems[0]);
-      }
-    });
-    filter2faBtn?.addEventListener("click", () => {
-      isGeneratorOpen = false;
-      currentFilterMode = "2fa";
-      updateActiveFilterTab(filter2faBtn);
-      applyFilterAndSort(true);
-      const twoFaItems = allItems.filter((i) => i.type === "authenticator" || Boolean(i.totpSecret) || isRecoveryCodeNote(i));
-      if (twoFaItems.length > 0 && (!activeItem || !twoFaItems.some((i) => i.id === activeItem.id))) {
-        selectItem(twoFaItems[0]);
-      }
-    });
-    filterGenBtn?.addEventListener("click", () => {
-      updateActiveFilterTab(filterGenBtn);
+    railGenerator?.addEventListener("click", () => {
+      setWorkspaceMode("generator");
       showGeneratorView();
     });
-    headerGenBtn?.addEventListener("click", () => {
-      updateActiveFilterTab(filterGenBtn);
-      showGeneratorView();
+    railSessions?.addEventListener("click", () => {
+      setWorkspaceMode("sessions");
+      showSessionsView();
     });
+    railRetrieve?.addEventListener("click", () => {
+      showImportExportView("import");
+    });
+    railSettings?.addEventListener("click", () => {
+      showSettingsView();
+    });
+    favToggleBtn?.addEventListener("click", () => {
+      favoritesOnly = !favoritesOnly;
+      favToggleBtn.classList.toggle("active", favoritesOnly);
+      favToggleBtn.setAttribute("aria-pressed", favoritesOnly ? "true" : "false");
+      setWorkspaceMode("vault");
+      applyFilterAndSort(true);
+      const visible = getFilteredAndSortedItems();
+      if (visible.length > 0 && (!activeItem || !visible.some((i) => i.id === activeItem.id))) {
+        selectItem(visible[0]);
+      }
+    });
+    document.querySelectorAll(".cat-btn[data-category]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const cat = btn.dataset.category || "all";
+        currentCategory = cat;
+        setWorkspaceMode("vault");
+        updateActiveCategoryButton(btn);
+        applyFilterAndSort(true);
+        const visible = getFilteredAndSortedItems();
+        if (visible.length > 0 && (!activeItem || !visible.some((i) => i.id === activeItem.id))) {
+          selectItem(visible[0]);
+        } else if (visible.length === 0) {
+          activeItem = null;
+          const detailPane = document.getElementById("detail-pane");
+          if (detailPane) detailPane.innerHTML = '<div class="detail-empty">No items in this category</div>';
+        }
+      });
+    });
+    refreshSessionAlertDot();
   }
   function setupSortDropdown() {
     const btnSort = document.getElementById("btn-sort");
@@ -2514,6 +2629,7 @@
     btnSort.addEventListener("click", (e) => {
       e.stopPropagation();
       document.getElementById("add-dropdown")?.classList.remove("open");
+      document.getElementById("btn-add")?.classList.remove("open");
       const isOpen = sortDropdown.classList.toggle("open");
       sortWrapper?.classList.toggle("open", isOpen);
     });
@@ -2569,16 +2685,12 @@
         });
     }
   }
-  function applyFilterAndSort(animate = true) {
+  function getFilteredAndSortedItems() {
     const searchInput = document.getElementById("search-input");
     const rawQuery = (searchInput?.value || "").trim().toLowerCase();
-    let filtered = allItems;
-    if (currentFilterMode === "favorites") {
+    let filtered = allItems.filter((item) => matchesCategory(item, currentCategory));
+    if (favoritesOnly) {
       filtered = filtered.filter((item) => Boolean(item.favorite));
-    } else if (currentFilterMode === "logins") {
-      filtered = filtered.filter((item) => item.type === "login" || !item.type);
-    } else if (currentFilterMode === "2fa") {
-      filtered = filtered.filter((item) => item.type === "authenticator" || Boolean(item.totpSecret) || isRecoveryCodeNote(item));
     }
     if (rawQuery) {
       const terms = rawQuery.split(/\s+/).filter(Boolean);
@@ -2591,25 +2703,46 @@
         );
       });
     }
-    const sorted = sortItems(filtered);
+    return sortItems(filtered);
+  }
+  function applyFilterAndSort(animate = true) {
+    updateCategoryCounts(allItems);
+    const sorted = getFilteredAndSortedItems();
+    const countLabel = document.getElementById("list-count-label");
+    if (countLabel) {
+      const prefix = favoritesOnly ? "\u2605 " : "";
+      countLabel.textContent = `${prefix}${sorted.length} ${sorted.length === 1 ? "item" : "items"}`;
+    }
     renderSidebarList(sorted, animate);
   }
   function setupAddDropdown() {
     const btn = document.getElementById("btn-add");
     const dropdown = document.getElementById("add-dropdown");
     if (!btn || !dropdown) return;
+    const setOpenState = (open) => {
+      dropdown.classList.toggle("open", open);
+      btn.classList.toggle("open", open);
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    };
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      dropdown.classList.toggle("open");
+      const nextOpen = !dropdown.classList.contains("open");
+      setOpenState(nextOpen);
     });
     document.addEventListener("click", () => {
-      dropdown.classList.remove("open");
+      setOpenState(false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && dropdown.classList.contains("open")) {
+        setOpenState(false);
+      }
     });
     dropdown.querySelectorAll(".add-dropdown-item").forEach((item) => {
       item.addEventListener("click", (e) => {
         e.stopPropagation();
-        const type = item.dataset.type || "login";
-        dropdown.classList.remove("open");
+        const type = item.dataset.type;
+        setOpenState(false);
+        if (!type) return;
         showAddForm(type);
       });
     });
@@ -2617,9 +2750,7 @@
   function showAddForm(type, initialValues) {
     const container = document.getElementById("detail-pane");
     if (!container) return;
-    isGeneratorOpen = false;
-    document.getElementById("filter-generator")?.classList.remove("active");
-    document.getElementById("filter-all")?.classList.add("active");
+    setWorkspaceMode("vault");
     if (totpInterval) {
       clearInterval(totpInterval);
       totpInterval = null;
@@ -3437,7 +3568,7 @@ ${notes}`;
         if (res?.success) {
           const created = res.item || newItem;
           allItems.push(created);
-          renderSidebarList(allItems);
+          applyFilterAndSort(false);
           selectItem(created);
         }
       });
@@ -3520,9 +3651,9 @@ ${notes}`;
       addTotpInterval = null;
     }
     isGeneratorOpen = true;
+    isSessionsViewOpen = false;
     activeItem = null;
-    document.getElementById("filter-all")?.classList.remove("active");
-    document.getElementById("filter-generator")?.classList.add("active");
+    setWorkspaceMode("generator");
     document.querySelectorAll(".list-item").forEach((el) => el.classList.remove("active"));
     if (!currentGenPassword) {
       currentGenPassword = generateSecurePassword();
@@ -4094,6 +4225,8 @@ ${notes}`;
       createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
       updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
       ...item.totpSecret ? { totpSecret: item.totpSecret } : {},
+      ...item.oauth ? { oauth: item.oauth } : {},
+      ...item.sessionPolicy ? { sessionPolicy: item.sessionPolicy } : {},
       ...Array.isArray(item.passwordHistory) && item.passwordHistory.length > 0 ? { passwordHistory: item.passwordHistory } : {}
     };
     try {
@@ -4391,8 +4524,12 @@ ${notes}`;
         allItems = direct.items;
         renderSmartSuggestions(allItems);
         applyFilterAndSort();
-        const sorted = sortItems(allItems);
-        if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
+        refreshSessionAlertDot();
+        const sorted = getFilteredAndSortedItems();
+        if (sorted.length > 0 && !activeItem && activeWorkspace === "vault") selectItem(sorted[0]);
+        if (activeWorkspace === "vault") {
+          setTimeout(() => document.getElementById("search-input")?.focus(), 40);
+        }
         return;
       } else {
         showUnlockView();
@@ -4405,8 +4542,12 @@ ${notes}`;
         allItems = searchRes.items || [];
         renderSmartSuggestions(allItems);
         applyFilterAndSort();
-        const sorted = sortItems(allItems);
-        if (sorted.length > 0 && !activeItem && !isGeneratorOpen) selectItem(sorted[0]);
+        refreshSessionAlertDot();
+        const sorted = getFilteredAndSortedItems();
+        if (sorted.length > 0 && !activeItem && activeWorkspace === "vault") selectItem(sorted[0]);
+        if (activeWorkspace === "vault") {
+          setTimeout(() => document.getElementById("search-input")?.focus(), 40);
+        }
       } else {
         chrome.runtime.sendMessage({ type: "GET_STATUS" }, (statusRes) => {
           if (statusRes && statusRes.isUnlocked && retryCount < 2) {
@@ -4482,11 +4623,52 @@ ${notes}`;
     }
     executeRenderSidebarList(items, animate);
   }
+  function createQuickCopyBtn(title, svgPath, value, toastMessage) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "list-quick-btn";
+    btn.title = title;
+    const originalIcon = `<svg viewBox="0 0 24 24"><path d="${svgPath}"/></svg>`;
+    const checkIcon = `<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>`;
+    btn.innerHTML = originalIcon;
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await copyToClipboardText(value);
+      btn.classList.add("copied");
+      btn.innerHTML = checkIcon;
+      showToast(toastMessage);
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.innerHTML = originalIcon;
+      }, 1400);
+    });
+    return btn;
+  }
   function executeRenderSidebarList(items, animate = true) {
     const container = document.getElementById("sidebar-list");
     if (!container) return;
     if (items.length === 0) {
-      container.innerHTML = '<div style="padding: 16px; color: var(--text-muted); text-align: center; font-size: 11px;">No items found.</div>';
+      const searchVal = document.getElementById("search-input")?.value?.trim();
+      const hasFilter = Boolean(searchVal || favoritesOnly || currentCategory !== "all");
+      container.innerHTML = `
+      <div style="padding: 20px 12px; color: var(--text-muted); text-align: center; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <span>No matching items found.</span>
+        ${hasFilter ? '<button type="button" id="btn-reset-list-filters" style="padding: 4px 10px; border-radius: 6px; border: 1px solid rgba(109,74,255,0.4); background: rgba(109,74,255,0.14); color: #DDD6FE; font-size: 10.5px; font-weight: 600; cursor: pointer;">Clear filters</button>' : ""}
+      </div>
+    `;
+      document.getElementById("btn-reset-list-filters")?.addEventListener("click", () => {
+        const searchEl = document.getElementById("search-input");
+        if (searchEl) searchEl.value = "";
+        const clearBtn = document.getElementById("btn-search-clear");
+        if (clearBtn) clearBtn.style.display = "none";
+        favoritesOnly = false;
+        const favBtn = document.getElementById("btn-favorites-toggle");
+        favBtn?.classList.remove("active");
+        favBtn?.setAttribute("aria-pressed", "false");
+        currentCategory = "all";
+        updateActiveCategoryButton(document.getElementById("filter-all"));
+        applyFilterAndSort(true);
+      });
       return;
     }
     const firstPositions = /* @__PURE__ */ new Map();
@@ -4500,10 +4682,6 @@ ${notes}`;
       });
     }
     container.innerHTML = "";
-    const groupHeader = document.createElement("div");
-    groupHeader.className = "list-group-header";
-    groupHeader.textContent = currentFilterMode === "favorites" ? "Favorites" : currentFilterMode === "logins" ? "Logins" : currentFilterMode === "2fa" ? "2FA / Authenticator" : "All items";
-    container.appendChild(groupHeader);
     const newRows = [];
     items.forEach((item) => {
       const row = document.createElement("div");
@@ -4511,12 +4689,26 @@ ${notes}`;
       row.dataset.itemId = item.id;
       const avatar = document.createElement("div");
       avatar.className = "item-avatar";
-      renderItemAvatar(avatar, item, 32);
+      renderItemAvatar(avatar, item, 30);
       const info = document.createElement("div");
       info.className = "item-info";
       const titleEl = document.createElement("div");
       titleEl.className = "item-title";
-      titleEl.textContent = item.title || "Untitled";
+      titleEl.style.display = "flex";
+      titleEl.style.alignItems = "center";
+      const titleSpan = document.createElement("span");
+      titleSpan.style.overflow = "hidden";
+      titleSpan.style.textOverflow = "ellipsis";
+      titleSpan.style.whiteSpace = "nowrap";
+      titleSpan.textContent = item.title || "Untitled";
+      titleEl.appendChild(titleSpan);
+      if (item.favorite && !favoritesOnly) {
+        const star = document.createElement("span");
+        star.className = "list-fav-star";
+        star.title = "Favorite";
+        star.textContent = "\u2605";
+        titleEl.appendChild(star);
+      }
       const subEl = document.createElement("div");
       subEl.className = "item-subtitle";
       let subText;
@@ -4533,8 +4725,33 @@ ${notes}`;
       info.appendChild(subEl);
       row.appendChild(avatar);
       row.appendChild(info);
+      if (item.username || item.password) {
+        const actions = document.createElement("div");
+        actions.className = "list-item-actions";
+        if (item.username) {
+          actions.appendChild(
+            createQuickCopyBtn(
+              "Copy username / email",
+              "M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z",
+              item.username,
+              "\u2713 Username copied"
+            )
+          );
+        }
+        if (item.password) {
+          actions.appendChild(
+            createQuickCopyBtn(
+              "Copy password",
+              "M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z",
+              item.password,
+              "\u2713 Password copied"
+            )
+          );
+        }
+        row.appendChild(actions);
+      }
       if (item.type === "login" && item.password) {
-        const risk = evaluateCredentialRisk(item, items);
+        const risk = evaluateCredentialRisk(item, allItems);
         const gaugeWrap = document.createElement("div");
         gaugeWrap.className = "sidebar-risk-wrap";
         gaugeWrap.title = `${risk.label}: ${risk.score}% (${risk.entropyBits} bits entropy)`;
@@ -4574,7 +4791,7 @@ ${notes}`;
     }
   }
   function selectItem(item) {
-    isGeneratorOpen = false;
+    setWorkspaceMode("vault");
     activeItem = item;
     if (totpInterval) {
       clearInterval(totpInterval);
@@ -4900,7 +5117,7 @@ ${notes}`;
         container.appendChild(riskCard);
       }
     };
-    if (currentFilterMode === "2fa") {
+    if (currentCategory === "2fa") {
       appendTotpCard();
       appendCredentialCard();
       appendRiskCard();
@@ -4919,6 +5136,24 @@ ${notes}`;
       urlHtml += "</div></div></div>";
       urlCard.innerHTML = urlHtml;
       container.appendChild(urlCard);
+    }
+    if (item.type === "login" || !item.type) {
+      const sp = item.sessionPolicy;
+      const modeLabel = sp?.reauthMode === "auto_oauth_refresh" ? "Auto OAuth Refresh" : sp?.reauthMode === "assisted_reauth" ? "1-Click Re-Auth" : "Notify & Prompt";
+      const sessCard = document.createElement("div");
+      sessCard.className = "card";
+      sessCard.innerHTML = `
+      <div class="card-row" style="justify-content: space-between; align-items: center;">
+        <div class="card-content">
+          <div class="card-label">Session Expiration & Auto-Reauth</div>
+          <div class="card-value" style="font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 3px;">
+            <span style="background: rgba(109, 74, 255, 0.16); color: #B098FF; padding: 2px 8px; border-radius: 99px; font-weight: 600; font-size: 11px;">${sp?.enabled ? modeLabel : "Passive Watch (Notify)"}</span>
+            <span style="color: var(--text-muted); font-size: 11px;">${sp?.enabled ? sp.sessionTtlMinutes > 0 ? `${sp.sessionTtlMinutes}m TTL` : "Auto Cookie/JWT" : "Cookie & Redirect Watch"}</span>
+          </div>
+        </div>
+      </div>
+    `;
+      container.appendChild(sessCard);
     }
     const displayNotes = getExtraNotesExcludingRecovery(item);
     if (displayNotes) {
@@ -5283,8 +5518,44 @@ ${notes}`;
           <textarea class="edit-input" id="edit-notes" rows="3" style="resize: vertical;">${escHtml(item.notes || "")}</textarea>
         </div>
       </div>
+      <div class="card-row" style="flex-direction: column; align-items: stretch; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <div class="card-label" style="margin: 0;">Session Expiration Policy</div>
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-main); cursor: pointer;">
+            <input type="checkbox" id="edit-session-enabled" ${item.sessionPolicy?.enabled ? "checked" : ""}>
+            Custom Policy
+          </label>
+        </div>
+        <div id="edit-session-fields" style="display: ${item.sessionPolicy?.enabled ? "grid" : "none"}; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <div>
+            <div class="card-label">Re-Auth Mode</div>
+            <select class="edit-input" id="edit-session-mode" style="padding: 5px; font-size: 11px;">
+              <option value="notify_only" ${(item.sessionPolicy?.reauthMode || "notify_only") === "notify_only" ? "selected" : ""}>Notify & Prompt</option>
+              <option value="auto_oauth_refresh" ${item.sessionPolicy?.reauthMode === "auto_oauth_refresh" ? "selected" : ""}>Auto OAuth Refresh</option>
+              <option value="assisted_reauth" ${item.sessionPolicy?.reauthMode === "assisted_reauth" ? "selected" : ""}>1-Click Re-Auth</option>
+            </select>
+          </div>
+          <div>
+            <div class="card-label">Session TTL (min)</div>
+            <input type="number" class="edit-input" id="edit-session-ttl" min="0" value="${item.sessionPolicy?.sessionTtlMinutes ?? 60}" style="padding: 5px; font-size: 11px;">
+          </div>
+          <div>
+            <div class="card-label">Warn Lead (min)</div>
+            <input type="number" class="edit-input" id="edit-session-warn" min="1" value="${item.sessionPolicy?.notifyLeadMinutes ?? 5}" style="padding: 5px; font-size: 11px;">
+          </div>
+          <div>
+            <div class="card-label">Hard Max (min)</div>
+            <input type="number" class="edit-input" id="edit-session-hardmax" min="0" value="${item.sessionPolicy?.hardMaxLifetimeMinutes ?? 480}" style="padding: 5px; font-size: 11px;">
+          </div>
+        </div>
+      </div>
     </div>
   `;
+    const editSessToggle = document.getElementById("edit-session-enabled");
+    const editSessFields = document.getElementById("edit-session-fields");
+    editSessToggle?.addEventListener("change", () => {
+      if (editSessFields) editSessFields.style.display = editSessToggle.checked ? "grid" : "none";
+    });
     const editDatalist = document.getElementById("kloak-edit-services-datalist");
     if (editDatalist) {
       editDatalist.innerHTML = getAllKnownServiceNames().map((name) => `<option value="${name}"></option>`).join("");
@@ -5532,6 +5803,11 @@ ${notes}`;
       const pwdVal = document.getElementById("edit-password")?.value ?? item.password ?? "";
       const totpVal = document.getElementById("edit-totp")?.value ?? item.totpSecret ?? "";
       const notesVal = document.getElementById("edit-notes")?.value ?? item.notes ?? "";
+      const sessEnabled = document.getElementById("edit-session-enabled")?.checked ?? false;
+      const sessMode = document.getElementById("edit-session-mode")?.value || "notify_only";
+      const sessTtl = parseInt(document.getElementById("edit-session-ttl")?.value || "60", 10) || 0;
+      const sessWarn = parseInt(document.getElementById("edit-session-warn")?.value || "5", 10) || 5;
+      const sessHardMax = parseInt(document.getElementById("edit-session-hardmax")?.value || "480", 10) || 0;
       const oldPassword = item.password;
       let passwordHistory2 = Array.isArray(item.passwordHistory) ? [...item.passwordHistory] : [];
       if (oldPassword && pwdVal && oldPassword !== pwdVal) {
@@ -5556,6 +5832,18 @@ ${notes}`;
         trashed: Boolean(item.trashed),
         createdAt: item.createdAt || (/* @__PURE__ */ new Date()).toISOString(),
         updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        ...sessEnabled ? {
+          sessionPolicy: {
+            ...item.sessionPolicy || {},
+            enabled: true,
+            reauthMode: sessMode,
+            authMechanism: item.sessionPolicy?.authMechanism || (item.oauth?.refreshToken ? "oauth2_oidc" : "cookie_timer"),
+            sessionTtlMinutes: sessTtl,
+            idleTimeoutMinutes: item.sessionPolicy?.idleTimeoutMinutes ?? 30,
+            hardMaxLifetimeMinutes: sessHardMax,
+            notifyLeadMinutes: sessWarn
+          }
+        } : { sessionPolicy: void 0 },
         ...passwordHistory2.length > 0 ? { passwordHistory: passwordHistory2 } : {}
       };
       await saveVaultItemDirect(updated);
@@ -5569,9 +5857,124 @@ ${notes}`;
         }
         activeItem = savedItem;
         isEditing = false;
-        renderSidebarList(allItems);
+        applyFilterAndSort(false);
         renderDetailPane(savedItem);
         showToast("\u2713 Password updated successfully");
+      });
+    });
+  }
+  function showSessionsView() {
+    const container = document.getElementById("detail-pane");
+    if (!container) return;
+    if (totpInterval) {
+      clearInterval(totpInterval);
+      totpInterval = null;
+    }
+    if (addTotpInterval) {
+      clearInterval(addTotpInterval);
+      addTotpInterval = null;
+    }
+    activeItem = null;
+    setWorkspaceMode("sessions");
+    document.querySelectorAll(".list-item").forEach((el) => el.classList.remove("active"));
+    container.innerHTML = `<div style="padding: 18px; color: var(--text-muted); font-size: 12px;">Loading active website & web-app sessions...</div>`;
+    chrome.runtime.sendMessage({ type: "GET_SESSION_WATCH_STATUS" }, (res) => {
+      refreshSessionAlertDot();
+      const sessions = Array.isArray(res?.sessions) ? res.sessions : [];
+      const alerts = Array.isArray(res?.alerts) ? res.alerts : [];
+      const fmtLeft = (isoStr, status) => {
+        if (status === "revoked") return "Token Revoked \u2014 Sign In Required";
+        if (status === "expired") return "Expired \u2014 Sign Back In";
+        if (!isoStr) return "Active (watching cookies, redirects & 401s)";
+        const sec = Math.max(0, Math.round((Date.parse(isoStr) - Date.now()) / 1e3));
+        if (sec <= 0) return "Expired \u2014 Sign Back In";
+        if (sec < 60) return `Expires in ${sec}s`;
+        const m = Math.floor(sec / 60);
+        if (m < 60) return `Expires in ${m}m`;
+        return `Expires in ${Math.floor(m / 60)}h ${m % 60}m`;
+      };
+      const alertsHtml = alerts.length > 0 ? `
+      <div class="card" style="border-color: rgba(244, 63, 94, 0.45); background: rgba(244, 63, 94, 0.08); padding: 12px; margin-bottom: 12px;">
+        <div style="font-size: 11px; font-weight: 700; color: #fb7185; margin-bottom: 8px; text-transform: uppercase;">Alerts (${alerts.length})</div>
+        ${alerts.map((a) => `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.06);">
+            <div style="min-width: 0;">
+              <div style="font-size: 12px; font-weight: 700; color: #fff;">${escHtml(a.appTitle || a.domain)}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${escHtml(a.message)}</div>
+            </div>
+            <div style="display: flex; gap: 5px; flex-shrink: 0;">
+              ${a.canOAuthRefresh ? `<button class="btn-pill btn-sess-refresh" data-sid="${escHtml(a.sessionId)}" data-iid="${escHtml(a.itemId || "")}" data-dom="${escHtml(a.domain)}" style="background: #10B981; color: #fff; font-size: 11px;">Renew</button>` : ""}
+              <button class="btn-pill btn-sess-relogin" data-url="${escHtml(a.loginUrl)}" style="background: var(--accent); color: #fff; font-size: 11px;">Sign In</button>
+              <button class="btn-pill btn-sess-dismiss" data-aid="${escHtml(a.id)}" style="font-size: 11px;">\u2715</button>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    ` : "";
+      const sessionsHtml = sessions.length > 0 ? sessions.map((s) => {
+        const color = s.status === "expired" || s.status === "revoked" ? "#fb7185" : s.status === "expiring_soon" ? "#fbbf24" : "#34d399";
+        return `
+        <div class="card" style="padding: 11px; margin-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+            <div style="min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: ${color}; flex-shrink: 0;"></span>
+                <span style="font-size: 13px; font-weight: 700; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escHtml(s.appTitle || s.domain)}</span>
+                <span style="font-size: 10px; color: var(--text-muted);">${escHtml(s.domain)}</span>
+              </div>
+              <div style="font-size: 11px; color: ${color}; margin-top: 3px;">${fmtLeft(s.expiresAt, s.status)}</div>
+              <div style="font-size: 10px; color: var(--text-subtle); margin-top: 2px;">Mode: ${escHtml(s.reauthMode || "notify_only")} \xB7 Signal: ${escHtml(s.source || "cookie")}</div>
+            </div>
+            <div style="display: flex; gap: 5px; flex-shrink: 0;">
+              ${s.reauthMode === "auto_oauth_refresh" && s.itemId ? `<button class="btn-pill btn-sess-refresh" data-sid="${escHtml(s.id)}" data-iid="${escHtml(s.itemId)}" data-dom="${escHtml(s.domain)}" style="font-size: 11px;">\u21BB Renew</button>` : ""}
+              <button class="btn-pill btn-sess-relogin" data-url="${escHtml(s.url)}" style="font-size: 11px;">Open</button>
+            </div>
+          </div>
+        </div>
+      `;
+      }).join("") : `
+      <div class="card" style="padding: 20px; text-align: center;">
+        <div style="font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 4px;">No active site sessions recorded yet</div>
+        <div style="font-size: 11px; color: var(--text-muted);">Browse any website or web app with Kloak active. Auth cookies, JWT tokens, HTTP timeouts, and custom \`kloak:session\` hooks appear automatically.</div>
+      </div>
+    `;
+      container.innerHTML = `
+      <div class="creation-header">
+        <div class="detail-title" style="font-size: 15px;">Session Expiration Watch</div>
+        <button class="btn-pill" id="btn-sessions-refresh-list" style="font-size: 11px;">\u21BB Sync</button>
+      </div>
+      <div style="font-size: 11px; color: #34d399; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 8px 10px; border-radius: 8px; margin-bottom: 12px;">
+        \u{1F6E1} Guardrail Active: Passwords never auto-replay unattended. Silent refresh runs only for OAuth rotation grants within max lifetime limits.
+      </div>
+      ${alertsHtml}
+      ${sessionsHtml}
+    `;
+      document.getElementById("btn-sessions-refresh-list")?.addEventListener("click", () => showSessionsView());
+      container.querySelectorAll(".btn-sess-relogin").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const u = btn.dataset.url || "";
+          chrome.runtime.sendMessage({ type: "OPEN_LOGIN_AND_REAUTH", loginUrl: u });
+        });
+      });
+      container.querySelectorAll(".btn-sess-refresh").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const el = btn;
+          chrome.runtime.sendMessage({
+            type: "REFRESH_SESSION_OAUTH",
+            sessionId: el.dataset.sid,
+            itemId: el.dataset.iid,
+            domain: el.dataset.dom
+          }, (r) => {
+            showToast(r?.success ? "\u{1F504} OAuth session refreshed!" : "\u{1F510} Interactive re-login required");
+            showSessionsView();
+          });
+        });
+      });
+      container.querySelectorAll(".btn-sess-dismiss").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const aid = btn.dataset.aid || "";
+          chrome.runtime.sendMessage({ type: "DISMISS_SESSION_ALERT", alertId: aid }, () => showSessionsView());
+        });
       });
     });
   }
@@ -5615,183 +6018,652 @@ ${notes}`;
     const code = Math.abs(hash % 1e6);
     return code.toString().padStart(6, "0");
   }
-  function setupAccountRetrievalModal() {
-    const modal = document.getElementById("account-retrieve-modal");
-    const btnOpenHeader = document.getElementById("btn-retrieve-accounts");
-    const menuRetrieve = document.getElementById("menu-retrieve-accounts");
-    const btnClose = document.getElementById("btn-close-retrieve-modal");
-    const btnDone = document.getElementById("btn-merge-report-done");
-    if (!modal) return;
-    const openModal = () => {
-      modal.style.display = "flex";
-      document.getElementById("add-dropdown")?.classList.remove("open");
-      switchTab("google");
-      const reportPanel = document.getElementById("merge-report-panel");
-      if (reportPanel) reportPanel.style.display = "none";
-    };
-    const closeModal = () => {
-      modal.style.display = "none";
-    };
-    btnOpenHeader?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openModal();
-    });
-    menuRetrieve?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openModal();
-    });
-    btnClose?.addEventListener("click", closeModal);
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal();
-    });
-    btnDone?.addEventListener("click", async () => {
-      closeModal();
-      await loadLogins();
-    });
-    const tabs = modal.querySelectorAll(".modal-tab");
-    const panels = {
-      google: document.getElementById("panel-google"),
-      microsoft: document.getElementById("panel-microsoft"),
-      opera: document.getElementById("panel-opera"),
-      apple: document.getElementById("panel-apple"),
-      universal: document.getElementById("panel-universal")
-    };
-    function switchTab(tabKey) {
-      tabs.forEach((t) => {
-        const isMatch = t.getAttribute("data-tab") === tabKey;
-        t.classList.toggle("active", isMatch);
-      });
-      Object.keys(panels).forEach((k) => {
-        if (panels[k]) {
-          panels[k].style.display = k === tabKey ? "flex" : "none";
-        }
-      });
-      const reportPanel = document.getElementById("merge-report-panel");
-      if (reportPanel) reportPanel.style.display = "none";
+  var IMPORT_PROVIDERS = [
+    {
+      id: "google",
+      shortLabel: "Google",
+      title: "Chrome & Google Passwords",
+      subtitle: "Smart Auto-Merge Active",
+      description: "Import passwords exported from Google Password Manager or Chrome. Kloak normalizes domains, merges duplicates, preserves password history, and evaluates risk.",
+      format: "google-csv",
+      accept: ".csv,.json",
+      dropLabel: "Drop Google / Chrome passwords (.csv) here",
+      actionLabel: "Open Google Passwords",
+      actionUrl: "https://passwords.google.com",
+      svg: `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#EA4335" d="M12 5c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 1.79 14.97 1 12 1 7.36 1 3.39 3.66 1.48 7.54l3.66 2.84C6.02 7.21 8.77 5 12 5z"/>
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58l3.72 2.88c2.17-2 3.7-4.96 3.7-8.7z"/>
+      <path fill="#FBBC05" d="M5.14 14.62A7.1 7.1 0 0 1 4.78 12c0-.91.16-1.79.36-2.62L1.48 6.54A11.93 11.93 0 0 0 0 12c0 1.94.46 3.77 1.48 5.46l3.66-2.84z"/>
+      <path fill="#34A853" d="M12 23c3.24 0 5.95-1.08 7.93-2.91l-3.72-2.88c-1.08.72-2.45 1.16-4.21 1.16-3.23 0-5.98-2.21-6.86-5.21l-3.66 2.84C3.39 19.34 7.36 23 12 23z"/>
+    </svg>`
+    },
+    {
+      id: "microsoft",
+      shortLabel: "Microsoft",
+      title: "Microsoft Edge Wallet",
+      subtitle: "Smart Auto-Merge Active",
+      description: "Import passwords exported from Microsoft Edge or your Microsoft Account. Identical logins and aliases consolidate cleanly into your vault.",
+      format: "microsoft-csv",
+      accept: ".csv",
+      dropLabel: "Drop Microsoft Edge passwords (.csv) here",
+      actionLabel: "Open Edge Passwords",
+      actionUrl: "https://account.microsoft.com",
+      svg: `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="2" y="2" width="9.5" height="9.5" rx="1.2" fill="#F25022"/>
+      <rect x="12.5" y="2" width="9.5" height="9.5" rx="1.2" fill="#7FBA00"/>
+      <rect x="2" y="12.5" width="9.5" height="9.5" rx="1.2" fill="#00A4EF"/>
+      <rect x="12.5" y="12.5" width="9.5" height="9.5" rx="1.2" fill="#FFB900"/>
+    </svg>`
+    },
+    {
+      id: "opera",
+      shortLabel: "Opera",
+      title: "Opera & Opera GX",
+      subtitle: "Smart Auto-Merge Active",
+      description: "Bring in saved credentials from Opera or Opera GX settings. Duplicates across your other browsers are automatically deduplicated.",
+      format: "opera-csv",
+      accept: ".csv",
+      dropLabel: "Drop Opera / Opera GX passwords (.csv) here",
+      actionLabel: "Open Opera Account",
+      actionUrl: "https://auth.opera.com",
+      svg: `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <defs>
+        <linearGradient id="kloakOperaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#FF1B2D"/>
+          <stop offset="100%" stop-color="#A70014"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#kloakOperaGrad)" d="M12 1.5C6.2 1.5 1.5 6.2 1.5 12S6.2 22.5 12 22.5 22.5 17.8 22.5 12 17.8 1.5 12 1.5zm0 16.9c-2.55 0-4.35-2.62-4.35-6.4S9.45 5.6 12 5.6s4.35 2.62 4.35 6.4-1.8 6.4-4.35 6.4z"/>
+    </svg>`
+    },
+    {
+      id: "apple",
+      shortLabel: "Apple",
+      title: "Apple Safari & iCloud Keychain",
+      subtitle: "Smart Auto-Merge Active",
+      description: "Import CSV exports from Apple Passwords or Safari. Embedded OTPAuth secrets and verification codes are preserved automatically.",
+      format: "apple-csv",
+      accept: ".csv",
+      dropLabel: "Drop Apple Passwords (.csv) here",
+      svg: `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#FFFFFF" d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/>
+    </svg>`
+    },
+    {
+      id: "universal",
+      shortLabel: "All Files",
+      title: "Universal Vault Importer",
+      subtitle: "Auto-Detect Format",
+      description: "Supports Bitwarden (JSON/CSV), 1Password (1PUX/1PIF), LastPass, KeePass (XML/CSV), Proton Pass, Dashlane, recovery lists, and generic CSV.",
+      format: "auto",
+      accept: ".csv,.json,.xml,.1pux,.1pif,.txt",
+      dropLabel: "Drop any password or recovery export file here",
+      svg: `<svg viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#C4B5FD" d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+      <path fill="#6D4AFF" d="M12 10v4H9.5l4.5 4.5 4.5-4.5H16v-4h-4z"/>
+    </svg>`
     }
-    tabs.forEach((t) => {
-      t.addEventListener("click", () => {
-        const tabKey = t.getAttribute("data-tab") || "google";
-        switchTab(tabKey);
+  ];
+  function escapeCsvCell(val) {
+    const s = String(val ?? "");
+    if (/[",\n\r]/.test(s)) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  }
+  function downloadVaultExport(format) {
+    const activeItemsList = allItems.filter((i) => !i.trashed);
+    const dateStr = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+    let content = "";
+    let mime = "application/json";
+    let filename = `kloak-export-${dateStr}.json`;
+    if (format === "kloak-csv") {
+      const headers = ["title", "type", "username", "password", "url", "totp", "notes", "tags", "favorite", "created_at"];
+      const rows = activeItemsList.map((i) => [
+        escapeCsvCell(i.title || ""),
+        escapeCsvCell(i.type || "login"),
+        escapeCsvCell(i.username || ""),
+        escapeCsvCell(i.password || ""),
+        escapeCsvCell((i.urls || []).join("; ")),
+        escapeCsvCell(i.totpSecret || ""),
+        escapeCsvCell(i.notes || ""),
+        escapeCsvCell((i.tags || []).join(", ")),
+        escapeCsvCell(i.favorite ? "true" : "false"),
+        escapeCsvCell(i.createdAt || "")
+      ].join(","));
+      content = [headers.join(","), ...rows].join("\n");
+      mime = "text/csv;charset=utf-8";
+      filename = `kloak-export-${dateStr}.csv`;
+    } else if (format === "bitwarden-json") {
+      const bwItems = activeItemsList.map((i) => {
+        const itemType = i.type === "secure_note" ? 2 : i.type === "card" ? 3 : i.type === "identity" ? 4 : 1;
+        return {
+          id: i.id,
+          organizationId: null,
+          folderId: null,
+          type: itemType,
+          name: i.title || "Untitled",
+          notes: i.notes || null,
+          favorite: Boolean(i.favorite),
+          login: itemType === 1 ? {
+            uris: (i.urls || []).map((u) => ({ match: null, uri: u })),
+            username: i.username || null,
+            password: i.password || null,
+            totp: i.totpSecret || null
+          } : null,
+          collectionIds: []
+        };
       });
-    });
-    document.getElementById("btn-open-google-passwords")?.addEventListener("click", () => {
-      chrome.tabs.create({ url: "https://passwords.google.com" });
-    });
-    document.getElementById("btn-open-ms-passwords")?.addEventListener("click", () => {
-      chrome.tabs.create({ url: "https://account.microsoft.com" });
-    });
-    document.getElementById("btn-open-opera-passwords")?.addEventListener("click", () => {
-      chrome.tabs.create({ url: "https://auth.opera.com" });
-    });
-    const setupDropZone = (dropZoneId, fileInputId, browseBtnId, format) => {
-      const dropZone = document.getElementById(dropZoneId);
-      const fileInput = document.getElementById(fileInputId);
-      const browseBtn = document.getElementById(browseBtnId);
-      if (!dropZone || !fileInput) return;
+      content = JSON.stringify({ encrypted: false, folders: [], items: bwItems }, null, 2);
+      filename = `bitwarden-export-${dateStr}.json`;
+    } else {
+      content = JSON.stringify({
+        version: 1,
+        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        items: activeItemsList
+      }, null, 2);
+    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1e3);
+    showToast(`\u2713 Exported ${activeItemsList.length} items (${filename})`);
+  }
+  function showImportExportView(initialMode = "import") {
+    const container = document.getElementById("detail-pane");
+    if (!container) return;
+    if (totpInterval) {
+      clearInterval(totpInterval);
+      totpInterval = null;
+    }
+    if (addTotpInterval) {
+      clearInterval(addTotpInterval);
+      addTotpInterval = null;
+    }
+    activeItem = null;
+    setWorkspaceMode("import");
+    document.querySelectorAll(".list-item").forEach((el) => el.classList.remove("active"));
+    let activeMode = initialMode;
+    let activeProviderId = "google";
+    let lastMergeReport = null;
+    const render = () => {
+      const provider = IMPORT_PROVIDERS.find((p) => p.id === activeProviderId) || IMPORT_PROVIDERS[0];
+      const exportCount = allItems.filter((i) => !i.trashed).length;
+      container.innerHTML = `
+      <div class="io-workspace">
+        <div class="io-header">
+          <div class="io-title-wrap">
+            <div class="io-title-badge">
+              <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+            </div>
+            <div>
+              <div class="io-heading">Import & Export Passwords</div>
+              <div class="io-subtitle">Retrieve browser accounts with Smart Auto-Merge or export your vault</div>
+            </div>
+          </div>
+
+          <div class="io-mode-switch">
+            <button type="button" class="io-mode-btn ${activeMode === "import" ? "active" : ""}" id="io-tab-import">
+              <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+              Import
+            </button>
+            <button type="button" class="io-mode-btn ${activeMode === "export" ? "active" : ""}" id="io-tab-export">
+              <svg viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>
+              Export
+            </button>
+          </div>
+        </div>
+
+        ${activeMode === "import" ? lastMergeReport ? `
+            <div class="merge-report-panel" style="display: flex;">
+              <div class="report-header">
+                <span class="report-success-icon">\u2713</span>
+                <div class="report-title-box">
+                  <div class="report-title">Passwords Retrieved & Auto-Merged</div>
+                  <div class="report-subtitle">Deduplication, Cross-Type Combining & Risk Evaluation Complete</div>
+                </div>
+              </div>
+              <div class="report-stats-grid">
+                <div class="report-stat-card">
+                  <div class="report-stat-num" style="color: #6D4AFF;">${lastMergeReport.totalProcessed || (lastMergeReport.newItemsAdded || 0) + (lastMergeReport.exactDuplicatesMerged || 0) + (lastMergeReport.updatedPasswordsMerged || 0) + (lastMergeReport.crossTypeCombined || 0)}</div>
+                  <div class="report-stat-label">Total Accounts Processed</div>
+                </div>
+                <div class="report-stat-card">
+                  <div class="report-stat-num" style="color: #10B981;">${lastMergeReport.exactDuplicatesMerged || 0}</div>
+                  <div class="report-stat-label">Exact Duplicates Auto-Merged</div>
+                </div>
+                <div class="report-stat-card">
+                  <div class="report-stat-num" style="color: #00D2B4;">${lastMergeReport.updatedPasswordsMerged || 0}</div>
+                  <div class="report-stat-label">Updated Passwords Merged (History Kept)</div>
+                </div>
+                <div class="report-stat-card">
+                  <div class="report-stat-num" style="color: #34D399;">${lastMergeReport.crossTypeCombined || 0}</div>
+                  <div class="report-stat-label">Cross-Type Combines (2FA / Recovery)</div>
+                </div>
+                <div class="report-stat-card">
+                  <div class="report-stat-num" style="color: #FF884D;">${lastMergeReport.newItemsAdded || 0}</div>
+                  <div class="report-stat-label">New Accounts Added to Vault</div>
+                </div>
+                ${lastMergeReport.reusedPasswordGroups && lastMergeReport.reusedPasswordGroups.length > 0 ? `
+                  <div class="report-stat-card" style="grid-column: span 2; border-color: rgba(245, 74, 74, 0.4); background: rgba(245, 74, 74, 0.08);">
+                    <div class="report-stat-num" style="color: #EF4444; font-size: 13px;">
+                      \u26A0\uFE0F ${lastMergeReport.reusedPasswordGroups.length} Reused Password Groups Detected
+                    </div>
+                    <div class="report-stat-label" style="color: #FF9B9B;">
+                      Identical passwords used across different services. Consider updating with generated passwords.
+                    </div>
+                  </div>
+                ` : ""}
+              </div>
+              <div class="report-actions" style="gap: 8px;">
+                <button type="button" class="btn-provider-action" id="btn-io-import-another">Import Another File</button>
+                <button type="button" class="btn-report-done" id="btn-io-done-vault">Done & View Vault</button>
+              </div>
+            </div>
+          ` : `
+            <div class="io-provider-bar">
+              ${IMPORT_PROVIDERS.map((p) => `
+                <button type="button" class="io-provider-tab ${p.id === provider.id ? "active" : ""}" data-provider="${p.id}">
+                  <span class="io-brand-logo">${p.svg}</span>
+                  <span>${p.shortLabel}</span>
+                </button>
+              `).join("")}
+            </div>
+
+            <div class="io-provider-card">
+              <div class="io-provider-hero-logo">${provider.svg}</div>
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">${provider.title}</span>
+                  <span class="provider-tag green">Smart Auto-Merge Active</span>
+                </div>
+                <p class="provider-desc" style="margin: 0;">${provider.description}</p>
+                ${provider.actionLabel && provider.actionUrl ? `
+                  <div class="provider-actions-row">
+                    <button type="button" class="btn-provider-action" id="btn-io-open-provider">\u2197 ${provider.actionLabel}</button>
+                  </div>
+                ` : ""}
+              </div>
+            </div>
+
+            <div class="io-drop-zone" id="io-drop-zone">
+              <input type="file" id="io-file-input" accept="${provider.accept}" style="display: none;">
+              <div class="io-drop-svg">
+                <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+              </div>
+              <div class="drop-label">${provider.dropLabel}</div>
+              <div class="drop-sub">or <button type="button" class="btn-browse" id="btn-io-browse">Browse File</button></div>
+            </div>
+          ` : `
+          <div class="io-provider-card" style="align-items: center; border-color: rgba(245, 158, 11, 0.28); background: rgba(245, 158, 11, 0.06);">
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 13px; font-weight: 700; color: #FFFFFF;">Ready to export ${exportCount} active vault ${exportCount === 1 ? "item" : "items"}</span>
+                <span class="provider-tag" style="background: rgba(245, 158, 11, 0.16); border-color: rgba(245, 158, 11, 0.35); color: #FBBF24;">Handle Exports Carefully</span>
+              </div>
+              <div class="provider-desc" style="margin-top: 4px;">
+                Exported JSON and CSV files contain plaintext credentials for portability across Kloak, browsers, and Bitwarden. Store securely and delete temporary files after importing elsewhere.
+              </div>
+            </div>
+          </div>
+
+          <div class="io-export-grid">
+            <div class="io-export-card">
+              <span class="io-export-ext">.JSON</span>
+              <div class="io-export-name">Kloak JSON</div>
+              <div class="io-export-desc">Full credential schema including URLs, 2FA secrets, recovery usage, and notes.</div>
+              <button type="button" class="btn-io-export" data-export-format="kloak-json">Export JSON</button>
+            </div>
+            <div class="io-export-card">
+              <span class="io-export-ext">.CSV</span>
+              <div class="io-export-name">Universal CSV</div>
+              <div class="io-export-desc">Spreadsheet & browser compatible CSV table with title, user, password, URL & TOTP.</div>
+              <button type="button" class="btn-io-export" data-export-format="kloak-csv">Export CSV</button>
+            </div>
+            <div class="io-export-card">
+              <span class="io-export-ext">BW .JSON</span>
+              <div class="io-export-name">Bitwarden JSON</div>
+              <div class="io-export-desc">Structured Bitwarden-compatible vault archive ready for portable migration.</div>
+              <button type="button" class="btn-io-export" data-export-format="bitwarden-json">Export Bitwarden</button>
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+      document.getElementById("io-tab-import")?.addEventListener("click", () => {
+        activeMode = "import";
+        render();
+      });
+      document.getElementById("io-tab-export")?.addEventListener("click", () => {
+        activeMode = "export";
+        render();
+      });
+      container.querySelectorAll(".io-provider-tab[data-provider]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          activeProviderId = btn.dataset.provider || "google";
+          lastMergeReport = null;
+          render();
+        });
+      });
+      if (provider.actionUrl) {
+        document.getElementById("btn-io-open-provider")?.addEventListener("click", () => {
+          chrome.tabs?.create?.({ url: provider.actionUrl });
+        });
+      }
+      const dropZone = document.getElementById("io-drop-zone");
+      const fileInput = document.getElementById("io-file-input");
+      const browseBtn = document.getElementById("btn-io-browse");
+      const handleImportFile = (file) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = reader.result;
+          if (!content) return;
+          chrome.runtime.sendMessage(
+            {
+              type: "IMPORT_PASSWORDS",
+              content,
+              format: provider.format,
+              options: { autoMerge: true, filename: file.name }
+            },
+            (response) => {
+              if (response?.success && response.result?.mergeReport) {
+                lastMergeReport = response.result.mergeReport;
+                render();
+              } else if (response?.success) {
+                lastMergeReport = {
+                  totalProcessed: response.result?.imported || 1,
+                  exactDuplicatesMerged: 0,
+                  updatedPasswordsMerged: 0,
+                  crossTypeCombined: 0,
+                  newItemsAdded: response.result?.imported || 1,
+                  reusedPasswordGroups: []
+                };
+                render();
+              } else {
+                showToast("\u26A0 Import failed: " + (response?.error || "Failed to parse file"));
+              }
+            }
+          );
+        };
+        reader.readAsText(file);
+      };
       browseBtn?.addEventListener("click", (e) => {
         e.stopPropagation();
-        fileInput.click();
+        fileInput?.click();
       });
-      dropZone.addEventListener("click", () => {
-        fileInput.click();
-      });
-      dropZone.addEventListener("dragover", (e) => {
+      dropZone?.addEventListener("click", () => fileInput?.click());
+      dropZone?.addEventListener("dragover", (e) => {
         e.preventDefault();
         dropZone.classList.add("dragover");
       });
-      dropZone.addEventListener("dragleave", () => {
-        dropZone.classList.remove("dragover");
-      });
-      dropZone.addEventListener("drop", (e) => {
+      dropZone?.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+      dropZone?.addEventListener("drop", (e) => {
         e.preventDefault();
         dropZone.classList.remove("dragover");
-        const files = e.dataTransfer?.files;
-        if (files && files.length > 0) {
-          processFile(files[0], format);
-        }
+        const file = e.dataTransfer?.files?.[0];
+        if (file) handleImportFile(file);
       });
-      fileInput.addEventListener("change", () => {
-        if (fileInput.files && fileInput.files.length > 0) {
-          processFile(fileInput.files[0], format);
-        }
+      fileInput?.addEventListener("change", () => {
+        const file = fileInput.files?.[0];
+        if (file) handleImportFile(file);
+      });
+      document.getElementById("btn-io-import-another")?.addEventListener("click", () => {
+        lastMergeReport = null;
+        render();
+      });
+      document.getElementById("btn-io-done-vault")?.addEventListener("click", async () => {
+        setWorkspaceMode("vault");
+        await loadLogins();
+        const visible = getFilteredAndSortedItems();
+        if (visible.length > 0) selectItem(visible[0]);
+      });
+      container.querySelectorAll(".btn-io-export[data-export-format]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          if (allItems.length === 0) {
+            showToast("Unlock vault first to export credentials");
+            return;
+          }
+          const fmt = btn.dataset.exportFormat;
+          downloadVaultExport(fmt);
+        });
       });
     };
-    setupDropZone("drop-zone-google", "file-input-google", "btn-browse-google", "google-csv");
-    setupDropZone("drop-zone-microsoft", "file-input-microsoft", "btn-browse-microsoft", "microsoft-csv");
-    setupDropZone("drop-zone-opera", "file-input-opera", "btn-browse-opera", "opera-csv");
-    setupDropZone("drop-zone-apple", "file-input-apple", "btn-browse-apple", "apple-csv");
-    setupDropZone("drop-zone-universal", "file-input-universal", "btn-browse-universal", "auto");
-    async function processFile(file, format) {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const content = e.target?.result;
-        if (!content) return;
-        chrome.runtime.sendMessage(
-          {
-            type: "IMPORT_PASSWORDS",
-            content,
-            format,
-            options: { autoMerge: true }
-          },
-          async (response) => {
-            if (response?.success && response.result?.mergeReport) {
-              displayMergeReport(response.result.mergeReport);
-            } else if (response?.success) {
-              displayMergeReport({
-                totalProcessed: response.result.imported || 1,
-                exactDuplicatesMerged: 0,
-                updatedPasswordsMerged: 0,
-                newItemsAdded: response.result.imported || 1,
-                reusedPasswordGroups: []
-              });
-            } else {
-              alert("Import error: " + (response?.error || "Failed to parse file"));
-            }
-          }
-        );
-      };
-      reader.readAsText(file);
+    render();
+  }
+  function showSettingsView() {
+    const container = document.getElementById("detail-pane");
+    if (!container) return;
+    if (totpInterval) {
+      clearInterval(totpInterval);
+      totpInterval = null;
     }
-    function displayMergeReport(report) {
-      Object.keys(panels).forEach((k) => {
-        if (panels[k]) panels[k].style.display = "none";
-      });
-      const reportPanel = document.getElementById("merge-report-panel");
-      const statsGrid = document.getElementById("report-stats-grid");
-      if (!reportPanel || !statsGrid) return;
-      statsGrid.innerHTML = `
-      <div class="report-stat-card">
-        <div class="report-stat-num" style="color: #6D4AFF;">${report.totalProcessed || report.newItemsAdded + report.exactDuplicatesMerged + report.updatedPasswordsMerged}</div>
-        <div class="report-stat-label">Total Accounts Processed</div>
-      </div>
-      <div class="report-stat-card">
-        <div class="report-stat-num" style="color: #10B981;">${report.exactDuplicatesMerged || 0}</div>
-        <div class="report-stat-label">Exact Duplicates Auto-Merged</div>
-      </div>
-      <div class="report-stat-card">
-        <div class="report-stat-num" style="color: #00D2B4;">${report.updatedPasswordsMerged || 0}</div>
-        <div class="report-stat-label">Updated Passwords Merged (History Kept)</div>
-      </div>
-      <div class="report-stat-card">
-        <div class="report-stat-num" style="color: #FF884D;">${report.newItemsAdded || 0}</div>
-        <div class="report-stat-label">New Accounts Added to Vault</div>
-      </div>
-    `;
-      if (report.reusedPasswordGroups && report.reusedPasswordGroups.length > 0) {
-        statsGrid.innerHTML += `
-        <div class="report-stat-card" style="grid-column: span 2; border-color: rgba(245, 74, 74, 0.4); background: rgba(245, 74, 74, 0.08);">
-          <div class="report-stat-num" style="color: #EF4444; font-size: 13px;">
-            \u26A0\uFE0F ${report.reusedPasswordGroups.length} Reused Password Groups Detected
+    if (addTotpInterval) {
+      clearInterval(addTotpInterval);
+      addTotpInterval = null;
+    }
+    activeItem = null;
+    setWorkspaceMode("settings");
+    document.querySelectorAll(".list-item").forEach((el) => el.classList.remove("active"));
+    const state = {
+      bentoAutofill: true,
+      autoSave: true,
+      phishingShield: true,
+      totpAutofill: true,
+      autoLockMinutes: 15,
+      sessionMonitor: true,
+      sessionNotifications: true,
+      autoOAuthRefresh: true,
+      sessionWarnMinutes: 5,
+      hwConfigured: false,
+      bridgeConnected: false,
+      bridgeText: "Checking local Kloak bridge..."
+    };
+    const renderSettings = () => {
+      container.innerHTML = `
+      <div class="settings-workspace">
+        <div class="io-header">
+          <div class="io-title-wrap">
+            <div class="io-title-badge">
+              <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </div>
+            <div>
+              <div class="io-heading">Extension Settings</div>
+              <div class="io-subtitle">Autofill behavior, session alerts, hardware keys & bridge status</div>
+            </div>
           </div>
-          <div class="report-stat-label" style="color: #FF9B9B;">
-            Identical passwords used across different services. Consider updating with generated passwords.
+
+          <span class="provider-tag ${state.bridgeConnected ? "green" : ""}" style="${state.bridgeConnected ? "" : "background: rgba(245,158,11,0.16); border-color: rgba(245,158,11,0.35); color: #FBBF24;"}">
+            ${state.bridgeConnected ? "\u25CF Desktop Bridge Active" : "\u25CF App Standby"}
+          </span>
+        </div>
+
+        <div class="settings-section-title">Autofill & Browser Protection</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Bento In-Page Autofill Popup</div>
+              <div class="settings-row-desc">Show compact tile popup inside login forms for 1-click filling</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.bentoAutofill ? "on" : ""}" id="set-toggle-bento">${state.bentoAutofill ? "Enabled" : "Disabled"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Save & Update Password Prompts</div>
+              <div class="settings-row-desc">Offer to save newly entered credentials upon form submission</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.autoSave ? "on" : ""}" id="set-toggle-autosave">${state.autoSave ? "Active" : "Muted"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Phishing & Lookalike Domain Shield</div>
+              <div class="settings-row-desc">Detect homograph URLs and warn before filling sensitive fields</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.phishingShield ? "on" : ""}" id="set-toggle-phishing">${state.phishingShield ? "Protected" : "Off"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">2FA TOTP Code Auto-Filler</div>
+              <div class="settings-row-desc">Automatically fill 6-digit verification codes on 2FA challenge inputs</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.totpAutofill ? "on" : ""}" id="set-toggle-totp">${state.totpAutofill ? "Auto-Fill" : "Manual"}</button>
           </div>
         </div>
-      `;
-      }
-      reportPanel.style.display = "flex";
+
+        <div class="settings-section-title">Session Expiration & Auto-Reauth</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Session Watch Monitor</div>
+              <div class="settings-row-desc">Monitor cookie/JWT expiry and notify before web sessions log out</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.sessionMonitor ? "on" : ""}" id="set-toggle-session-mon">${state.sessionMonitor ? "Active" : "Paused"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Browser Expiry Alerts</div>
+              <div class="settings-row-desc">Raise extension alerts when tracked sessions approach expiration</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.sessionNotifications ? "on" : ""}" id="set-toggle-session-notif">${state.sessionNotifications ? "Alerts On" : "Muted"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Silent OAuth Token Rotation</div>
+              <div class="settings-row-desc">Refresh active OAuth sessions automatically without replaying passwords</div>
+            </div>
+            <button type="button" class="settings-toggle-btn ${state.autoOAuthRefresh ? "on" : ""}" id="set-toggle-oauth-refresh">${state.autoOAuthRefresh ? "Enabled" : "Off"}</button>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Warning Lead Time</div>
+              <div class="settings-row-desc">Minutes before expiration to warn</div>
+            </div>
+            <div class="settings-pill-group">
+              ${[1, 3, 5, 10, 15].map((m) => `<button type="button" class="settings-pill-btn ${state.sessionWarnMinutes === m ? "active" : ""}" data-warn-min="${m}">${m}m</button>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section-title">Vault Security & Hardware Key</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Auto-Lock Inactivity Timer</div>
+              <div class="settings-row-desc">Lock vault automatically after browser inactivity</div>
+            </div>
+            <div class="settings-pill-group">
+              ${[{ l: "1m", v: 1 }, { l: "5m", v: 5 }, { l: "15m", v: 15 }, { l: "30m", v: 30 }, { l: "1h", v: 60 }, { l: "Never", v: 0 }].map((o) => `<button type="button" class="settings-pill-btn ${state.autoLockMinutes === o.v ? "active" : ""}" data-autolock-min="${o.v}">${o.l}</button>`).join("")}
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-title">Hardware Security Key (FIDO2 / YubiKey)</div>
+              <div class="settings-row-desc">${state.hwConfigured ? "Enrolled for hardware unlock" : "Enroll a USB/NFC key for hardware-backed unlock"}</div>
+            </div>
+            <button type="button" class="btn-provider-action" id="btn-settings-hw-key">${state.hwConfigured ? "Manage Key" : "Configure Key"}</button>
+          </div>
+        </div>
+      </div>
+    `;
+      document.getElementById("set-toggle-bento")?.addEventListener("click", () => {
+        state.bentoAutofill = !state.bentoAutofill;
+        chrome.storage?.local?.set({ kloak_bento_autofill: state.bentoAutofill });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-autosave")?.addEventListener("click", () => {
+        state.autoSave = !state.autoSave;
+        chrome.storage?.local?.set({ kloak_auto_save: state.autoSave });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-phishing")?.addEventListener("click", () => {
+        state.phishingShield = !state.phishingShield;
+        chrome.storage?.local?.set({ kloak_phishing_shield: state.phishingShield });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-totp")?.addEventListener("click", () => {
+        state.totpAutofill = !state.totpAutofill;
+        chrome.storage?.local?.set({ kloak_totp_autofill: state.totpAutofill });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-session-mon")?.addEventListener("click", () => {
+        state.sessionMonitor = !state.sessionMonitor;
+        chrome.runtime?.sendMessage?.({ type: "UPDATE_SESSION_SETTINGS", settings: { enabled: state.sessionMonitor } });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-session-notif")?.addEventListener("click", () => {
+        state.sessionNotifications = !state.sessionNotifications;
+        chrome.runtime?.sendMessage?.({ type: "UPDATE_SESSION_SETTINGS", settings: { desktopNotifications: state.sessionNotifications } });
+        renderSettings();
+      });
+      document.getElementById("set-toggle-oauth-refresh")?.addEventListener("click", () => {
+        state.autoOAuthRefresh = !state.autoOAuthRefresh;
+        chrome.runtime?.sendMessage?.({ type: "UPDATE_SESSION_SETTINGS", settings: { autoOAuthRefresh: state.autoOAuthRefresh } });
+        renderSettings();
+      });
+      container.querySelectorAll("[data-warn-min]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.sessionWarnMinutes = parseInt(btn.dataset.warnMin || "5", 10);
+          chrome.runtime?.sendMessage?.({ type: "UPDATE_SESSION_SETTINGS", settings: { warnMinutes: state.sessionWarnMinutes } });
+          renderSettings();
+        });
+      });
+      container.querySelectorAll("[data-autolock-min]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.autoLockMinutes = parseInt(btn.dataset.autolockMin || "15", 10);
+          chrome.storage?.local?.set({ kloak_autolock: state.autoLockMinutes });
+          renderSettings();
+        });
+      });
+      document.getElementById("btn-settings-hw-key")?.addEventListener("click", () => {
+        document.dispatchEvent(new CustomEvent("kloak-open-hw-modal"));
+      });
+    };
+    renderSettings();
+    try {
+      chrome.storage?.local?.get([
+        "kloak_phishing_shield",
+        "kloak_auto_save",
+        "kloak_autolock",
+        "kloak_bento_autofill",
+        "kloak_totp_autofill",
+        "kloak_session_monitor",
+        "kloak_session_desktop_notifications",
+        "kloak_auto_oauth_refresh",
+        "kloak_session_warn_minutes",
+        "kloak_hardware_key"
+      ], (items) => {
+        if (items.kloak_phishing_shield !== void 0) state.phishingShield = Boolean(items.kloak_phishing_shield);
+        if (items.kloak_auto_save !== void 0) state.autoSave = Boolean(items.kloak_auto_save);
+        if (typeof items.kloak_autolock === "number") state.autoLockMinutes = items.kloak_autolock;
+        if (items.kloak_bento_autofill !== void 0) state.bentoAutofill = Boolean(items.kloak_bento_autofill);
+        if (items.kloak_totp_autofill !== void 0) state.totpAutofill = Boolean(items.kloak_totp_autofill);
+        if (items.kloak_session_monitor !== void 0) state.sessionMonitor = Boolean(items.kloak_session_monitor);
+        if (items.kloak_session_desktop_notifications !== void 0) state.sessionNotifications = Boolean(items.kloak_session_desktop_notifications);
+        if (items.kloak_auto_oauth_refresh !== void 0) state.autoOAuthRefresh = Boolean(items.kloak_auto_oauth_refresh);
+        if (typeof items.kloak_session_warn_minutes === "number") state.sessionWarnMinutes = items.kloak_session_warn_minutes;
+        state.hwConfigured = Boolean(items.kloak_hardware_key);
+        if (isSettingsViewOpen) renderSettings();
+      });
+      chrome.runtime?.sendMessage?.({ type: "PING" }, (resp) => {
+        state.bridgeConnected = !(chrome.runtime.lastError || !resp);
+        state.bridgeText = state.bridgeConnected ? "Connected to Kloak Desktop App" : "Desktop Standby";
+        if (isSettingsViewOpen) renderSettings();
+      });
+    } catch {
     }
+  }
+  function setupAccountRetrievalModal() {
+    const menuRetrieve = document.getElementById("menu-retrieve-accounts");
+    menuRetrieve?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      document.getElementById("add-dropdown")?.classList.remove("open");
+      document.getElementById("btn-add")?.classList.remove("open");
+      showImportExportView("import");
+    });
   }
   function setupHardwareKeyModal() {
     const modal = document.getElementById("modal-hw-key");
@@ -5816,6 +6688,7 @@ ${notes}`;
       if (modalError) modalError.style.display = "none";
     };
     btnOpen?.addEventListener("click", showModal);
+    document.addEventListener("kloak-open-hw-modal", showModal);
     btnClose?.addEventListener("click", hideModal);
     modal.addEventListener("click", (e) => {
       if (e.target === modal) hideModal();
