@@ -190,6 +190,8 @@ function matchesCategory(item: any, category: VaultCategory): boolean {
 
 function updateCategoryCounts(items: any[]) {
   const categories: VaultCategory[] = ['all', 'login', '2fa', 'email_alias', 'card', 'secure_note', 'identity'];
+  let shouldFallbackToAll = false;
+
   categories.forEach(cat => {
     const count = items.filter(item => matchesCategory(item, cat)).length;
     const badge = document.getElementById(`count-${cat}`);
@@ -197,7 +199,22 @@ function updateCategoryCounts(items: any[]) {
       badge.textContent = String(count);
       badge.classList.toggle('is-zero', count === 0);
     }
+
+    const btn = document.querySelector<HTMLElement>(`.cat-btn[data-category="${cat}"]`);
+    if (btn) {
+      const isHidden = cat !== 'all' && count === 0;
+      btn.style.display = isHidden ? 'none' : '';
+      btn.hidden = isHidden;
+      if (isHidden && currentCategory === cat) {
+        shouldFallbackToAll = true;
+      }
+    }
   });
+
+  if (shouldFallbackToAll) {
+    currentCategory = 'all';
+    updateActiveCategoryButton(document.getElementById('filter-all'));
+  }
 }
 
 function setWorkspaceMode(mode: WorkspaceMode) {
