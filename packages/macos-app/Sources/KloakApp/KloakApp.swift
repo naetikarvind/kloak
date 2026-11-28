@@ -260,8 +260,11 @@ public struct KloakApp: App {
             }
         }
 
-        MenuBarExtra("Kloak", systemImage: vaultStore.isUnlocked ? "shield.lefthalf.filled.badge.checkmark" : "lock.shield.fill") {
+        MenuBarExtra {
             MenuBarView(vaultStore: vaultStore)
+        } label: {
+            Image(nsImage: KloakLogoView.menuBarTemplateImage(isUnlocked: vaultStore.isUnlocked))
+                .accessibilityLabel("Kloak")
         }
         .menuBarExtraStyle(.window)
     }

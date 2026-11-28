@@ -10,6 +10,110 @@ public struct KloakLogoView: View {
         self.glow = glow
     }
 
+    /// Cached high-resolution squircle artwork extracted directly from the compiled AppIcon.icns
+    /// so every in-app logo matches the macOS Dock/App Switcher Liquid Glass icon pixel-for-pixel.
+    private static let cachedBundleIcon: NSImage? = {
+        guard let iconUrl = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+              let sourceImage = NSImage(contentsOf: iconUrl) else {
+            return nil
+        }
+
+        // Select the highest-resolution raster representation (avoid small 16/32pt icns representations).
+        let bestRep = sourceImage.representations
+            .compactMap { $0 as? NSBitmapImageRep }
+            .max(by: { $0.pixelsWide < $1.pixelsWide })
+
+        guard let rep = bestRep, let cgImg = rep.cgImage else {
+            return sourceImage
+        }
+
+        let w = CGFloat(cgImg.width)
+        let h = CGFloat(cgImg.height)
+        // AppIcon Composer embeds an ~10% transparent margin + drop shadow around the squircle;
+        // crop tightly to the squircle bounds so it fills the requested view size cleanly.
+        let insetX = round(w * 0.095)
+        let insetY = round(h * 0.095)
+        let cropRect = CGRect(
+            x: insetX,
+            y: insetY,
+            width: max(1, w - insetX * 2),
+            height: max(1, h - insetY * 2)
+        )
+        guard let cropped = cgImg.cropping(to: cropRect) else {
+            return sourceImage
+        }
+        return NSImage(cgImage: cropped, size: NSSize(width: cropRect.width, height: cropRect.height))
+    }()
+
+    /// Generates a monochrome template icon matching the Kloak shield + K + padlock motif
+    /// for the macOS menu bar item.
+    public static func menuBarTemplateImage(isUnlocked: Bool) -> NSImage {
+        let size = NSSize(width: 18, height: 18)
+        let image = NSImage(size: size, flipped: false) { rect in
+            NSColor.black.set()
+
+            // Top padlock shackle arch (slightly lifted when unlocked)
+            let shackleLift: CGFloat = isUnlocked ? 1.2 : 0.0
+            let shackle = NSBezierPath()
+            shackle.lineWidth = 1.65
+            shackle.lineCapStyle = .round
+            shackle.move(to: NSPoint(x: 6.1, y: 11.8))
+            shackle.line(to: NSPoint(x: 6.1, y: 13.0 + shackleLift))
+            shackle.appendArc(
+                withCenter: NSPoint(x: 9.0, y: 13.0 + shackleLift),
+                radius: 2.9,
+                startAngle: 180,
+                endAngle: 0,
+                clockwise: true
+            )
+            shackle.line(to: NSPoint(x: 11.9, y: isUnlocked ? 13.0 : 11.8))
+            shackle.stroke()
+
+            // Shield silhouette with crisp "K" cutout via even-odd winding rule
+            let shield = NSBezierPath()
+            shield.windingRule = .evenOdd
+            shield.move(to: NSPoint(x: 9.0, y: 13.4))
+            shield.line(to: NSPoint(x: 3.1, y: 11.5))
+            shield.line(to: NSPoint(x: 3.1, y: 6.6))
+            shield.curve(
+                to: NSPoint(x: 9.0, y: 1.5),
+                controlPoint1: NSPoint(x: 3.1, y: 3.7),
+                controlPoint2: NSPoint(x: 9.0, y: 1.5)
+            )
+            shield.curve(
+                to: NSPoint(x: 14.9, y: 6.6),
+                controlPoint1: NSPoint(x: 9.0, y: 1.5),
+                controlPoint2: NSPoint(x: 14.9, y: 3.7)
+            )
+            shield.line(to: NSPoint(x: 14.9, y: 11.5))
+            shield.close()
+
+            // Cutout "K" stem
+            shield.appendRect(NSRect(x: 6.3, y: 4.5, width: 1.45, height: 5.5))
+            // Cutout "K" arms
+            shield.move(to: NSPoint(x: 7.75, y: 7.05))
+            shield.line(to: NSPoint(x: 10.25, y: 10.0))
+            shield.line(to: NSPoint(x: 11.95, y: 10.0))
+            shield.line(to: NSPoint(x: 9.15, y: 6.75))
+            shield.line(to: NSPoint(x: 12.15, y: 4.5))
+            shield.line(to: NSPoint(x: 10.35, y: 4.5))
+            shield.line(to: NSPoint(x: 7.75, y: 6.6))
+            shield.close()
+
+            shield.fill()
+
+            // Small status dot in bottom-right corner when locked so state stays visually scannable
+            if !isUnlocked {
+                let badge = NSBezierPath(ovalIn: NSRect(x: 13.3, y: 1.4, width: 3.6, height: 3.6))
+                badge.fill()
+            }
+
+            return true
+        }
+        image.isTemplate = true
+        return image
+    }
+
     public var body: some View {
         ZStack {
             // Ambient Aura Glow behind icon
@@ -31,8 +135,18 @@ public struct KloakLogoView: View {
                     .blur(radius: size * 0.18)
             }
 
-            // High-Fidelity Liquid Glass Icon matching AppIcon.icon
-            LiquidGlassKloakIcon(size: size)
+            if let bundleIcon = Self.cachedBundleIcon {
+                Image(nsImage: bundleIcon)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: size * 0.224, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.32), radius: size * 0.09, x: 0, y: size * 0.04)
+            } else {
+                // Vector fallback matching AppIcon.icon (royal-blue beveled K + Liquid Glass shield)
+                LiquidGlassKloakIcon(size: size)
+            }
         }
         .frame(width: size, height: size)
     }
@@ -425,49 +539,48 @@ struct ShieldBodyLayer: View {
     }
 }
 
-/// Floating Geometric "K" with Cyan Glow Filter and Frosted White Glass
+/// Floating Geometric "K" with Royal-Blue Beveled Glass Fill (matching AppIcon.icon)
 struct EmblemKLayer: View {
     var size: CGFloat
 
     var body: some View {
         ZStack {
-            // Neon Cyan Refraction Halo (matching SVG filter k-glow: #7DD3FC)
+            // Subtle Blue/Cyan Refraction Halo
             EmblemKShape()
-                .fill(Color(red: 0.490, green: 0.827, blue: 0.988).opacity(0.60))
-                .blur(radius: size * 0.035)
+                .fill(Color(red: 0.302, green: 0.332, blue: 1.000).opacity(0.45))
+                .blur(radius: size * 0.030)
 
             // Soft Shadow
             EmblemKShape()
-                .fill(Color.black.opacity(0.40))
-                .offset(x: 0, y: size * 0.02)
-                .blur(radius: size * 0.012)
+                .fill(Color.black.opacity(0.45))
+                .offset(x: 0, y: size * 0.022)
+                .blur(radius: size * 0.014)
 
-            // Translucent Frosted White Glass Letter (icon.json: blend-mode: hard-light)
+            // Faceted Royal-Blue Glass Letter matching AppIcon.icon (#4D55FF -> #3B42F6)
             EmblemKShape()
                 .fill(
                     LinearGradient(
                         colors: [
-                            Color.white,
-                            Color(white: 0.92)
+                            Color(red: 0.388, green: 0.435, blue: 1.000),
+                            Color(red: 0.243, green: 0.278, blue: 0.925)
                         ],
-                        startPoint: .top,
-                        endPoint: .bottom
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
                 )
-                .blendMode(.hardLight)
 
-            // Glass Specular Face Ridge
+            // Specular Indigo/Cyan Bevel Ridge
             EmblemKShape()
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.85),
-                            Color.white.opacity(0.20)
+                            Color(red: 0.620, green: 0.740, blue: 1.000).opacity(0.85),
+                            Color(red: 0.302, green: 0.332, blue: 1.000).opacity(0.35)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: max(0.8, size * 0.008)
+                    lineWidth: max(0.8, size * 0.010)
                 )
         }
         .frame(width: size, height: size)

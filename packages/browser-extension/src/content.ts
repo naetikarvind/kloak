@@ -32,6 +32,45 @@ let cachedAiEvaluation: any = null;
 let isAiDrawerExpanded = false;
 let activeLockedPollTimer: any = null;
 
+let kloakLogoSvgUid = 0;
+
+function renderKloakLogoSvg(className = '', sizeAttr?: number): string {
+  const uid = ++kloakLogoSvgUid;
+  const cls = className ? ` class="${className}"` : '';
+  const sizeAttrs = sizeAttr ? ` width="${sizeAttr}" height="${sizeAttr}"` : '';
+  return `<svg${cls}${sizeAttrs} viewBox="0 0 1024 1024" aria-hidden="true">
+    <defs>
+      <linearGradient id="kloakBgGrad-${uid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5936FF"/>
+        <stop offset="70%" stop-color="#8C19D8"/>
+        <stop offset="100%" stop-color="#7612C4"/>
+      </linearGradient>
+      <linearGradient id="kloakShackle-${uid}" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0%" stop-color="#6B7EFF"/>
+        <stop offset="100%" stop-color="#5BA2FF"/>
+      </linearGradient>
+      <linearGradient id="kloakShieldL-${uid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#5B21B6"/>
+        <stop offset="100%" stop-color="#312E81"/>
+      </linearGradient>
+      <linearGradient id="kloakShieldR-${uid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#2E1065"/>
+        <stop offset="100%" stop-color="#1E1B4B"/>
+      </linearGradient>
+      <linearGradient id="kloakK-${uid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#6370FF"/>
+        <stop offset="100%" stop-color="#3D46EC"/>
+      </linearGradient>
+    </defs>
+    <rect width="1024" height="1024" rx="230" fill="url(#kloakBgGrad-${uid})"/>
+    <path d="M 360 368 L 360 252 A 152 152 0 0 1 664 252 L 664 368" fill="none" stroke="url(#kloakShackle-${uid})" stroke-width="68" stroke-linecap="round"/>
+    <path d="M 512 248 L 207 333 L 207 630 C 207 821 512 948 512 948 Z" fill="url(#kloakShieldL-${uid})"/>
+    <path d="M 512 248 L 817 333 L 817 630 C 817 821 512 948 512 948 Z" fill="url(#kloakShieldR-${uid})"/>
+    <path d="M 512 248 L 817 333 L 817 630 C 817 821 512 948 512 948 C 512 948 207 821 207 630 L 207 333 Z" fill="none" stroke="#7DD3FC" stroke-width="26" stroke-linejoin="round"/>
+    <path d="M 377 424 L 440 424 L 440 744 L 377 744 Z M 440 604 L 560 424 L 642 424 L 492 634 L 652 744 L 560 744 L 440 624 Z" fill="url(#kloakK-${uid})" stroke="#93ACFF" stroke-opacity="0.72" stroke-width="10" stroke-linejoin="round"/>
+  </svg>`;
+}
+
 // Initial sync of all vault items for cross-referencing recovery notes
 chrome.runtime.sendMessage({ type: 'SEARCH_VAULT', query: '' }, (res) => {
   if (res && Array.isArray(res.items)) {
@@ -556,9 +595,10 @@ const POPUP_STYLES = `
   }
 
   .kloak-brand-icon {
-    width: 12px;
-    height: 12px;
-    fill: #7C5CFF;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    flex-shrink: 0;
   }
 
   .kloak-close-btn {
@@ -1552,7 +1592,7 @@ function buildPopupUI(items: any[], input: HTMLInputElement, isUnlocked: boolean
   header.className = 'kloak-header';
   header.innerHTML = `
     <div class="kloak-brand">
-      <svg class="kloak-brand-icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      ${renderKloakLogoSvg('kloak-brand-icon')}
       <span>Kloak (${hostname})</span>
     </div>
     <button class="kloak-close-btn" id="kloak-btn-close" title="Close (Esc)">✕</button>
@@ -2317,11 +2357,7 @@ function updateInFieldIcons() {
       iconEl.id = `kloak-icon-${fieldId}`;
       iconEl.className = 'kloak-field-badge';
       iconEl.title = 'Kloak: Click to autofill or generate credentials';
-      iconEl.innerHTML = `
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="#6D4AFF">
-          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
-        </svg>
-      `;
+      iconEl.innerHTML = renderKloakLogoSvg('', 14);
       iconEl.addEventListener('mousedown', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2490,16 +2526,16 @@ const SAVE_BAR_STYLES = `
     width: 30px;
     height: 30px;
     border-radius: 8px;
-    background: linear-gradient(135deg, #6D4AFF, #4D35CC);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    filter: drop-shadow(0 2px 6px rgba(109, 74, 255, 0.35));
   }
   .kloak-save-icon svg {
-    width: 15px;
-    height: 15px;
-    fill: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
   }
   .kloak-save-text {
     flex: 1;
@@ -2618,7 +2654,7 @@ function showSaveBar(opts: {
   bar.className = 'kloak-save-bar';
   bar.innerHTML = `
     <div class="kloak-save-icon">
-      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+      ${renderKloakLogoSvg('', 28)}
     </div>
     <div class="kloak-save-text">
       <div class="kloak-save-title">${titleText}</div>

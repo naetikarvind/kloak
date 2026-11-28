@@ -34,19 +34,17 @@ export default function TitleBar() {
     }}>
       {/* Left: brand */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <div style={{
-          width: '22px',
-          height: '22px',
-          borderRadius: '6px',
-          background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '13px',
-          flexShrink: 0,
-        }}>
-          🔒
-        </div>
+        <img
+          src="./icon.png"
+          alt="Kloak"
+          style={{
+            width: '22px',
+            height: '22px',
+            borderRadius: '6px',
+            display: 'block',
+            flexShrink: 0,
+          }}
+        />
         <span style={{
           fontWeight: 600,
           fontSize: '13px',

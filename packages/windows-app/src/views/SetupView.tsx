@@ -79,18 +79,18 @@ export default function SetupView({ onComplete }: Props) {
       }}>
         {/* Hero */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '72px',
-            height: '72px',
-            borderRadius: '18px',
-            background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '36px',
-            margin: '0 auto 16px',
-            boxShadow: '0 12px 32px rgba(59,130,246,0.35)',
-          }}>🔒</div>
+          <img
+            src="./icon.png"
+            alt="Kloak"
+            style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '18px',
+              display: 'block',
+              margin: '0 auto 16px',
+              filter: 'drop-shadow(0 12px 24px rgba(109, 74, 255, 0.35))',
+            }}
+          />
           <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Welcome to Kloak
           </h1>

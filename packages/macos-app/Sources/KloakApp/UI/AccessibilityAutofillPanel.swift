@@ -533,22 +533,7 @@ public struct AccessibilityAutofillPopupView: View {
                 .padding(.top, 7)
 
             HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [LiquidGlassTheme.purpleAccent, LiquidGlassTheme.primaryAccent],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 28, height: 28)
-
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .shadow(color: LiquidGlassTheme.purpleAccent.opacity(0.45), radius: 6, x: 0, y: 2)
+                KloakLogoView(size: 28, glow: true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {

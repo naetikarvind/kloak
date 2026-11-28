@@ -74,5 +74,9 @@ if (fs.existsSync(iconsetDir)) {
   fs.mkdirSync(extIconsDir, { recursive: true });
   fs.writeFileSync(path.join(extIconsDir, 'favicon.ico'), icoBuffer);
 
-  console.log(`✅ Successfully generated AppIcon.ico and favicon.ico (${icoBuffer.length} bytes, ${images.length} resolutions)`);
+  const winPublicDir = path.resolve('packages/windows-app/public');
+  fs.mkdirSync(winPublicDir, { recursive: true });
+  fs.writeFileSync(path.join(winPublicDir, 'icon.ico'), icoBuffer);
+
+  console.log(`✅ Successfully generated AppIcon.ico, favicon.ico, and Windows icon.ico (${icoBuffer.length} bytes, ${images.length} resolutions)`);
 }
